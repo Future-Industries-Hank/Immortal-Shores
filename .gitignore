@@ -19,10 +19,7 @@ target/
 .idea/
 .vscode/*
 !.vscode/extensions.json
-PROMPT-01-COMPLETE.md
-PROMPT-02-COMPLETE.md
-BUILD-CHECK.md
-SELF-REVIEW.md
-REVIEW-DASHBOARD.html
+# Local secrets / large capture dumps (commit curated evidence intentionally)
 tools/judge/evidence/**
 !tools/judge/evidence/.gitkeep
+!tools/judge/evidence/README.md
