@@ -71,6 +71,7 @@ export class SettlementView {
   private padMeshes = new Map<string, Mesh>();
   private padMats = new Map<string, StandardMaterial>();
   private padIcons = new Map<string, Mesh>();
+  private padGhosts = new Map<string, Mesh>();
   private scaffoldNode: TransformNode | null = null;
   private roadRoot: TransformNode | null = null;
   private roadMeshes: Mesh[] = [];
@@ -491,18 +492,17 @@ export class SettlementView {
     this.mapArch = arch;
     const pal = arch.palette;
 
-    // Large ground that fills mid-iso money shot without infinite empty board
+    // Near sand plate
     const ground = MeshBuilder.CreateGround(
       "ground",
-      { width: 55, height: 48, subdivisions: this.quality === "low" ? 16 : 56 },
+      { width: 48, height: 42, subdivisions: this.quality === "low" ? 16 : 56 },
       this.scene
     );
-    ground.position.set(-2, 0, 2);
+    ground.position.set(-2, 0, 1.5);
     const mat = new StandardMaterial("groundMat", this.scene);
     mat.diffuseColor = hexToColor3(pal.sand);
     mat.specularColor = hexToColor3("#3A3020").scale(0.08);
     mat.emissiveColor = hexToColor3(pal.sand).scale(0.03);
-    // Procedural grit so sand isn't a flat stamp
     const grit = this.makeSandTexture(pal.sand);
     if (grit) {
       mat.diffuseTexture = grit;
@@ -512,6 +512,22 @@ export class SettlementView {
     ground.parent = this.envRoot;
     ground.isPickable = false;
     ground.receiveShadows = true;
+
+    // Far sand ring — darker/cooler for distance falloff (depth category)
+    const far = MeshBuilder.CreateGround(
+      "farSand",
+      { width: 70, height: 60, subdivisions: 8 },
+      this.scene
+    );
+    far.position.set(4, -0.02, 4);
+    const farMat = new StandardMaterial("farSandMat", this.scene);
+    farMat.diffuseColor = hexToColor3("#B8A078");
+    farMat.emissiveColor = hexToColor3("#8A7858").scale(0.08);
+    farMat.specularColor = Color3.Black();
+    far.material = farMat;
+    far.parent = this.envRoot;
+    far.isPickable = false;
+    far.receiveShadows = true;
 
     const wet = MeshBuilder.CreateGround(
       "wetBank",
@@ -894,9 +910,11 @@ export class SettlementView {
   private buildFixedPads() {
     for (const m of this.padMeshes.values()) m.dispose();
     for (const m of this.padIcons.values()) m.dispose();
+    for (const m of this.padGhosts.values()) m.dispose();
     this.padMeshes.clear();
     this.padMats.clear();
     this.padIcons.clear();
+    this.padGhosts.clear();
 
     for (const def of SETTLEMENT_PLOTS) {
       const pos = this.worldPos(def);
@@ -955,7 +973,7 @@ export class SettlementView {
       border.receiveShadows = true;
       if (def.starterKind) border.setEnabled(false);
 
-      // Category icon (shape+color) for empty buildable pads
+      // Category icon + packed-earth ghost foundation for empty buildable pads
       if (!def.starterKind) {
         const iconRoot = new TransformNode(`padIconRoot-${def.id}`, this.scene);
         iconRoot.parent = this.root;
@@ -967,6 +985,22 @@ export class SettlementView {
           def.category
         );
         if (icon) this.padIcons.set(def.id, icon);
+
+        const ghost = MeshBuilder.CreateBox(
+          `ghost-${def.id}`,
+          { width: 1.6, height: 0.35, depth: 1.4 },
+          this.scene
+        );
+        ghost.position.set(pos.x, 0.22, pos.z);
+        const gm = new StandardMaterial(`ghostMat-${def.id}`, this.scene);
+        gm.diffuseColor = hexToColor3(STYLE.mudbrick);
+        gm.emissiveColor = hexToColor3(STYLE.mudbrick).scale(0.08);
+        gm.alpha = 0.35;
+        gm.wireframe = true;
+        ghost.material = gm;
+        ghost.parent = this.root;
+        ghost.isPickable = false;
+        this.padGhosts.set(def.id, ghost);
       }
 
       pad.actionManager = new ActionManager(this.scene);
@@ -1051,6 +1085,11 @@ export class SettlementView {
         icon.setEnabled(!taken);
         icon.visibility = taken ? 0 : 0.75;
       }
+      // Ghost foundation — packed earth footprint (architecture intent, not candy pad)
+      const ghost = this.padGhosts.get(id);
+      if (ghost) {
+        ghost.setEnabled(!taken && !underConstruction);
+      }
     }
     this.syncScaffold(settlement);
   }
@@ -1133,7 +1172,49 @@ export class SettlementView {
       }
     }
     this.syncWorkers(settlement);
+    this.syncNightWindows(settlement);
     this.updateSelectRing();
+  }
+
+  private nightWindows: Mesh[] = [];
+
+  /** Explicit facade lamps — do not rely on glTF name matching for night craft. */
+  private syncNightWindows(settlement: SettlementState) {
+    for (const m of this.nightWindows) m.dispose();
+    this.nightWindows = [];
+    const st = settlement;
+    const winMat = new StandardMaterial("winMat", this.scene);
+    winMat.diffuseColor = hexToColor3("#FFD080");
+    winMat.emissiveColor = hexToColor3("#FFB040").scale(0.95);
+    winMat.specularColor = Color3.Black();
+    winMat.disableLighting = true;
+
+    const placeWindows = (plotId: string, count: number, y: number) => {
+      const def = getPlot(plotId);
+      if (!def) return;
+      const w = this.worldPos(def);
+      for (let i = 0; i < count; i++) {
+        const box = MeshBuilder.CreateBox(
+          `win-${plotId}-${i}`,
+          { width: 0.28, height: 0.35, depth: 0.08 },
+          this.scene
+        );
+        box.position.set(w.x + (i - (count - 1) / 2) * 0.45, y, w.z - 0.95);
+        box.material = winMat;
+        box.parent = this.root;
+        box.isPickable = false;
+        this.nightWindows.push(box);
+      }
+    };
+
+    // Always place on civic plots if those buildings exist
+    if (st.buildings.some((b) => b.kind === "great_house")) {
+      placeWindows("civic-gh", 4, 1.35);
+      placeWindows("civic-gh", 3, 1.95);
+    }
+    if (st.buildings.some((b) => b.kind === "market")) {
+      placeWindows("civic-market", 3, 1.15);
+    }
   }
 
   private refreshBuildingMeta(b: BuildingState) {

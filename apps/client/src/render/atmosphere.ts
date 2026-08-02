@@ -7,6 +7,7 @@ import {
   Color4,
   DirectionalLight,
   HemisphericLight,
+  PointLight,
   Scene,
   Vector3,
   type Mesh,
@@ -20,6 +21,8 @@ export type DayPhase = "day" | "dusk" | "night";
 export class Atmosphere {
   private sun: DirectionalLight;
   private hemi: HemisphericLight;
+  private ghLight: PointLight;
+  private marketLight: PointLight;
   private t0 = performance.now() * 0.001;
   /** Full cycle seconds (default ~90s for readable TOD in playtest). */
   cycleSeconds = 90;
@@ -32,7 +35,15 @@ export class Atmosphere {
   ) {
     this.sun = sun;
     this.hemi = hemi;
-    // Fog off by default in ortho iso — EXP fog often washes near ground into white wedges
+    // Local warm lights for night (Great House + Market)
+    this.ghLight = new PointLight("ghLight", new Vector3(-2.2, 2.2, 0.5), scene);
+    this.ghLight.diffuse = hexToColor3("#FFB060");
+    this.ghLight.intensity = 0;
+    this.ghLight.range = 8;
+    this.marketLight = new PointLight("mktLight", new Vector3(2.5, 1.8, 1.5), scene);
+    this.marketLight.diffuse = hexToColor3("#FFD080");
+    this.marketLight.intensity = 0;
+    this.marketLight.range = 6;
     this.scene.fogMode = Scene.FOGMODE_NONE;
     this.scene.fogDensity = 0;
     this.scene.fogColor = hexToColor3("#B8C8D0");
@@ -112,15 +123,20 @@ export class Atmosphere {
       this.scene.fogColor = hexToColor3("#101820");
     }
 
+    // Night local lamps (not just roof flood)
+    this.ghLight.intensity = n > 0.55 ? 1.8 * (n - 0.4) : 0;
+    this.marketLight.intensity = n > 0.55 ? 1.2 * (n - 0.4) : 0;
+
     if (river) {
       const rm = river.material as StandardMaterial | null;
       if (rm) {
-        const deep = hexToColor3(STYLE.riverDeep);
+        const deep = hexToColor3("#0A2030");
         const light = hexToColor3(STYLE.riverLight);
-        rm.diffuseColor = Color3.Lerp(light, deep, 0.4 + n * 0.4);
-        rm.specularColor = light.scale(0.35 + (1 - n) * 0.25);
-        rm.alpha = 0.88;
-        rm.emissiveColor = light.scale(0.04 + Math.sin(now * 1.4) * 0.02);
+        rm.diffuseColor = Color3.Lerp(light, deep, 0.55 + n * 0.25);
+        rm.specularColor = light.scale(0.55 + (1 - n) * 0.25);
+        rm.specularPower = 48;
+        rm.alpha = 0.92;
+        rm.emissiveColor = deep.scale(0.08 + Math.sin(now * 1.4) * 0.03);
       }
     }
   }
