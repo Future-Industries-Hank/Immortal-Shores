@@ -47,26 +47,26 @@ async function enterGame() {
   view.setQuality(q.value as Quality);
   q.addEventListener("change", () => view?.setQuality(q.value as Quality));
 
-  // Docked hub: collapse so world goes full-bleed when needed
-  const dockBtn = document.getElementById("btn-dock-toggle");
-  const collapsed = localStorage.getItem("hub_collapsed") === "1";
-  if (collapsed) gameEl.classList.add("hub-collapsed");
-  dockBtn?.addEventListener("click", () => {
-    gameEl.classList.toggle("hub-collapsed");
+  // Bottom tray: collapse content, keep tab bar (full-width world, no side chrome)
+  const trayBtn = document.getElementById("btn-tray-toggle");
+  const collapsed = localStorage.getItem("tray_collapsed") === "1";
+  if (collapsed) gameEl.classList.add("tray-collapsed");
+  trayBtn?.addEventListener("click", () => {
+    gameEl.classList.toggle("tray-collapsed");
     localStorage.setItem(
-      "hub_collapsed",
-      gameEl.classList.contains("hub-collapsed") ? "1" : "0"
+      "tray_collapsed",
+      gameEl.classList.contains("tray-collapsed") ? "1" : "0"
     );
     requestAnimationFrame(() => {
       layoutCanvas();
-      setTimeout(layoutCanvas, 230);
+      setTimeout(layoutCanvas, 220);
     });
   });
 
-  // Keep canvas sized when hub/nav reflows
-  const stage = document.getElementById("stage");
-  if (stage && "ResizeObserver" in window) {
-    new ResizeObserver(() => layoutCanvas()).observe(stage);
+  // Keep canvas sized when top/bottom bars reflow
+  const viewport = document.getElementById("viewport");
+  if (viewport && "ResizeObserver" in window) {
+    new ResizeObserver(() => layoutCanvas()).observe(viewport);
   }
   requestAnimationFrame(layoutCanvas);
 

@@ -11,8 +11,8 @@
   --ink-ui: #2a2118;
   --papyrus: #f3e6c8;
   --seal-accent: #8b3a4a;
-  --hub-w: min(340px, 34vw);
-  --hub-min: 280px;
+  --tray-h: min(28vh, 240px);
+  --tray-h-open: min(38vh, 320px);
   --hud-h: 3.1rem;
   --warn-yellow: #c9a227;
   --warn-red: #a33;
@@ -160,14 +160,18 @@ button.small {
   font-size: 0.9rem;
 }
 
-/* ── Game shell: top bar + world | docked hub ───────────────── */
+/* ── Game shell: top bar · world · bottom bar only ──────────── */
 #game {
   position: relative;
   width: 100%;
   height: 100%;
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto 1fr auto;
   background: #1a1410;
+}
+
+#game.tray-collapsed {
+  grid-template-rows: auto 1fr auto;
 }
 
 #hud-top {
@@ -207,18 +211,6 @@ button.small {
   margin-top: 0;
 }
 
-#stage {
-  display: grid;
-  grid-template-columns: 1fr var(--hub-w);
-  min-height: 0;
-  min-width: 0;
-  transition: grid-template-columns 0.22s ease;
-}
-
-#game.hub-collapsed #stage {
-  grid-template-columns: 1fr 0fr;
-}
-
 #viewport {
   position: relative;
   min-width: 0;
@@ -234,44 +226,49 @@ button.small {
   touch-action: none;
 }
 
-/* Docked hub — shares papyrus chrome with HUD, no floating overlay */
+/* Bottom hub: tabs always visible; tray content expands under them */
 #hub {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  min-height: 0;
-  background: linear-gradient(180deg, var(--papyrus) 0%, #e8d9b8 100%);
-  border-left: 1px solid var(--sand-deep);
-  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.2);
+  max-height: var(--tray-h-open);
+  background: linear-gradient(0deg, var(--papyrus) 0%, #e8d9b8 100%);
+  border-top: 1px solid var(--sand-deep);
+  box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.18);
+  z-index: 5;
   overflow: hidden;
-  z-index: 4;
+  transition: max-height 0.2s ease;
 }
 
-#game.hub-collapsed #hub {
-  border-left: none;
-  pointer-events: none;
+#game.tray-collapsed #hub {
+  max-height: none;
+}
+
+#game.tray-collapsed #side {
+  display: none;
 }
 
 #nav {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.25rem;
-  padding: 0.45rem 0.45rem 0.35rem;
-  border-bottom: 1px solid var(--sand-deep);
-  background: rgba(255, 253, 246, 0.55);
+  padding: 0.4rem 0.5rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  background: rgba(255, 253, 246, 0.65);
+  border-bottom: 1px solid rgba(196, 165, 116, 0.45);
   flex: 0 0 auto;
 }
 
 #nav button {
-  flex: 1 1 auto;
-  min-width: 4.2rem;
+  flex: 0 0 auto;
   background: transparent;
   color: var(--ink-ui);
   border: 1px solid transparent;
   border-radius: 8px;
-  font-size: 0.8rem;
-  min-height: 40px;
-  padding: 0.35rem 0.45rem;
+  font-size: 0.82rem;
+  min-height: 44px;
+  padding: 0.4rem 0.75rem;
 }
 
 #nav button:hover {
@@ -287,10 +284,11 @@ button.small {
 }
 
 #side {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
+  max-height: var(--tray-h);
   min-height: 0;
   overflow: auto;
-  padding: 0.65rem 0.75rem 1rem;
+  padding: 0.55rem 0.85rem 0.75rem;
   pointer-events: auto;
 }
 
@@ -300,13 +298,25 @@ button.small {
   border-radius: 0;
   padding: 0;
   box-shadow: none;
-  animation: hub-in 0.18s ease;
+  max-width: 72rem;
+  margin: 0 auto;
+  animation: hub-in 0.16s ease;
+}
+
+/* Horizontal-friendly content rows in bottom tray */
+.side-panel .building-row,
+.side-panel .offer-row {
+  display: inline-flex;
+  width: auto;
+  min-width: 12rem;
+  margin-right: 0.35rem;
+  vertical-align: top;
 }
 
 @keyframes hub-in {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -315,15 +325,15 @@ button.small {
 }
 
 .side-panel h2 {
-  margin: 0 0 0.5rem;
-  font-size: 1.05rem;
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
   color: var(--river-deep);
   letter-spacing: 0.01em;
 }
 
 .side-panel h3 {
-  margin: 0.85rem 0 0.35rem;
-  font-size: 0.82rem;
+  margin: 0.65rem 0 0.3rem;
+  font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--sand-deep);
@@ -651,49 +661,16 @@ button.build-choice strong {
   border-color: var(--seal-accent);
 }
 
-/* Tablet: slightly narrower dock */
-@media (max-width: 1100px) {
-  :root {
-    --hub-w: min(300px, 36vw);
-  }
-  #nav button {
-    font-size: 0.78rem;
-    min-height: 42px;
-  }
-}
-
-/* Mobile: hub becomes bottom sheet under world */
 @media (max-width: 720px) {
   :root {
-    --hub-w: 100%;
-  }
-
-  #stage {
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr minmax(38vh, 42vh);
-  }
-
-  #game.hub-collapsed #stage {
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr 0fr;
-  }
-
-  #hub {
-    border-left: none;
-    border-top: 1px solid var(--sand-deep);
-    box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.18);
-  }
-
-  #nav {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    --tray-h: min(32vh, 220px);
+    --tray-h-open: min(42vh, 280px);
   }
 
   #nav button {
-    flex: 0 0 auto;
     min-height: 48px;
     font-size: 0.78rem;
+    padding: 0.4rem 0.65rem;
   }
 
   #hud-top {
@@ -702,7 +679,7 @@ button.build-choice strong {
   }
 
   .hint {
-    bottom: 0.65rem;
+    bottom: 0.55rem;
     font-size: 0.72rem;
     white-space: normal;
   }
