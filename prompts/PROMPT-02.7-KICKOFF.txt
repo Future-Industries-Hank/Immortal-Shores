@@ -1,0 +1,28 @@
+Paste as the full agent session prompt:
+
+---
+
+Pull latest main: Future-Industries-Hank/Immortal-Shores. Economy frozen.
+
+STOP thrashing atmosphere/sand while buildings are still squares.
+R10 at 6.1 with Structures 7 is INVALID if the money-shot still shows box buildings.
+Director confirmation: buildings still look like squares.
+
+EXECUTE: prompts/PROMPT-02.7-RESTART-FROM-BOARDS.md
+
+START HERE:
+1. Open every image in docs/visual-inspiration/ (README + buildings/* + settlement/*).
+2. Write STRUCTURE-RESET.md: for each BuildingKind, is on-screen mesh glTF or CreateBox?
+   Close-up screenshot each. Mark box vs real.
+3. HARD RESTART structure craft: Blender-reauthor great_house, market, fields, ration_house,
+   mudbrick_yard, harbor+barge first — match silhouette/massing of the matching board JPGs.
+   Export glTF to apps/client/public/models/buildings/. Commit new bytes.
+4. Ensure kitLoader glTF path wins over procedural box fallback for those kinds.
+5. Playwright: board vs in-game side-by-side under tools/judge/evidence/gauntlet-02.7/
+6. MONEY-SHOT-CHECK.md PASS only when GH/Market/field/shop are clearly NOT cubes.
+7. Only then resume full judge loop to overall ≥ 8.0 / min ≥ 6.0.
+   Inject: if buildings read as boxes, Structures ≤ 3 always.
+
+FORBIDDEN: stop at 6.x, inflate Structures, polish only mist/HUD, import JPGs as final art.
+Use Blender MCP (single owner), Playwright, existing inspiration boards.
+Start now — Phase A inventory then Blender great_house from board 01.

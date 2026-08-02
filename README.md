@@ -39,23 +39,25 @@ See [`HOSTING.md`](./HOSTING.md).
 | **2** | [`prompts/PROMPT-02-VISUAL.md`](./prompts/PROMPT-02-VISUAL.md) | First visual pass | Ran — director ~**1.5/10** (not enough) |
 | **2.5 primer** | [`prompts/PROMPT-02.5-PRIMER-READINESS.md`](./prompts/PROMPT-02.5-PRIMER-READINESS.md) | MCP/skills readiness | Ran |
 | **2.5 goal** | [`prompts/PROMPT-02.5-VISUAL-GAUNTLET.md`](./prompts/PROMPT-02.5-VISUAL-GAUNTLET.md) | First 8/10 attempt | **FAIL 4.8** — do not stop there |
-| **2.6 loop** | [`prompts/PROMPT-02.6-VISUAL-LOOP.md`](./prompts/PROMPT-02.6-VISUAL-LOOP.md) | **Keep iterating until ≥ 8/10** | **RUN THIS** |
-| Kickoff paste | [`prompts/PROMPT-02.6-KICKOFF.txt`](./prompts/PROMPT-02.6-KICKOFF.txt) | One-block session prompt | Copy-paste |
+| **2.6 loop** | [`prompts/PROMPT-02.6-VISUAL-LOOP.md`](./prompts/PROMPT-02.6-VISUAL-LOOP.md) | Loop until ≥ 8/10 | Ran — stalled ~6.x while buildings still boxy |
+| **2.7 restart** | [`prompts/PROMPT-02.7-RESTART-FROM-BOARDS.md`](./prompts/PROMPT-02.7-RESTART-FROM-BOARDS.md) | **Rebuild buildings from Imagine boards** | **RUN THIS** |
+| Kickoff | [`prompts/PROMPT-02.7-KICKOFF.txt`](./prompts/PROMPT-02.7-KICKOFF.txt) | Paste for new session | Copy-paste |
+| Inspiration | [`docs/visual-inspiration/`](./docs/visual-inspiration/) | Reference JPGs (not ship assets) | Required for 02.7 |
 
 Mechanics pre-check: [`CRITICAL-AUDIT-PRE-02.md`](./CRITICAL-AUDIT-PRE-02.md) (green).  
 Do not reopen escrow, plot counts, or GDD rates.
 
-### Planner kickoff — loop until 8/10 (current)
+### Planner kickoff — structure restart (current)
 
 ```text
 Pull latest main. Economy frozen.
 
-02.5 ended HONEST FAIL at 4.8/10 — that is NOT done.
-Execute prompts/PROMPT-02.6-VISUAL-LOOP.md (or paste PROMPT-02.6-KICKOFF.txt).
+R10 ~6.1 FAIL with Structures inflated while buildings still read as squares.
+Execute prompts/PROMPT-02.7-RESTART-FROM-BOARDS.md (or paste PROMPT-02.7-KICKOFF.txt).
 
-Rules: fix→capture→judge→fix top-3→repeat until overall ≥ 8.0 and min category ≥ 6.0.
-Forbidden: stop after N rounds, wait for director, fake PASS, idle.
-Start Stack 1 money-shot (settlement day mid-iso). Use Playwright + Blender + skills.
+Open docs/visual-inspiration/ boards FIRST. Blender-reauthor glTF heroes to match
+silhouettes (great_house, market, fields, shops, harbor). No more sand-only rounds.
+Structures ≤ 3 if still boxes. Then money-shot PASS, then loop to overall ≥ 8.0.
 ```
 ---
 
