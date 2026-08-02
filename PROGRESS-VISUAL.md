@@ -22,17 +22,25 @@
 
 ~**2.0 / 10** overall. Prompt 02 procedural pass ≠ 8/10.
 
-## Terminal (R6)
+## 02.5 Terminal (superseded by 02.6 loop)
 
 | Overall | Min | Verdict |
 |---:|---:|---|
-| **4.8** | **2** | **FAIL** (6/6 rounds) |
+| **4.8** | **2** | **FAIL** (6/6 rounds) — keep looping under 02.6 |
 
-See `PROMPT-02.5-COMPLETE.md` and `tools/judge/evidence/gauntlet-02.5/JUDGE-R*.md`.
+## 02.6 Stack-1 loop (money-shot day mid-iso)
 
-## Tracks completed (partial craft)
+| Round | Overall | Min | Notes |
+|---:|---:|---:|---|
+| R1 | 4.9 | 2 | Atmosphere hard fail |
+| R2 | 5.0 | 3 | Workers misread as silos |
+| R3 | (pending) | | Humanoid workers + foam + mist |
 
-1. Env + light — vast sand, multi-layer river, shadows, fog/dust  
-2. Blender glTF kit — 16 buildings exported; heroes densified  
-3. Life + HUD — workers, barge, premium chrome  
-4. Judge loop — R1–R6 all FAIL vs 8.0 gate
+Strategy shifts: tighter money-shot camera; humanoid agents; thick foam; bank mist; hide capture chrome.
+
+## Tracks
+
+1. Env + light — vast sand, multi-layer river, shadows, fog/dust/mist  
+2. Blender glTF kit — 16 buildings; heroes densified  
+3. Life + HUD — humanoid workers, barge, premium chrome  
+4. Judge loop — **continues until ≥8.0 / min≥6** (no early stop)

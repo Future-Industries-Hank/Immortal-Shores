@@ -76,11 +76,13 @@ export class Atmosphere {
         ? Color3.Lerp(dayColor, duskColor, n * 2)
         : Color3.Lerp(duskColor, nightColor, (n - 0.5) * 2);
     this.sun.diffuse = sunCol;
-    // Night must be unmistakably dark (judge evidence)
-    this.sun.intensity = 1.2 - n * 1.05;
-    this.sun.direction = new Vector3(-0.55 + n * 0.2, -1, 0.3 - n * 0.15);
+    // Stronger key for contact-shadow staging (day); deep cut for night
+    this.sun.intensity = 1.45 - n * 1.2;
+    // Raking low sun at dusk for long contact shadows
+    const elev = n < 0.5 ? -0.95 : -0.55 - (n - 0.5) * 0.6;
+    this.sun.direction = new Vector3(-0.75 + n * 0.15, elev, 0.45 - n * 0.2);
 
-    this.hemi.intensity = 0.52 - n * 0.4;
+    this.hemi.intensity = 0.55 - n * 0.42;
     this.hemi.diffuse = Color3.Lerp(
       hexToColor3("#E8F0F8"),
       hexToColor3("#1A2840"),
@@ -88,7 +90,8 @@ export class Atmosphere {
     );
     this.hemi.groundColor = hexToColor3(STYLE.sandDeep).scale(0.35 * (1 - n * 0.7));
 
-    const clearDay = Color4.FromColor3(hexToColor3("#87A8B8"), 1);
+    // Day sky leans warm-sand so ground edge never reads as pure black void
+    const clearDay = Color4.FromColor3(hexToColor3("#A8B8B0"), 1);
     const clearDusk = Color4.FromColor3(hexToColor3("#C07050"), 1);
     const clearNight = Color4.FromColor3(hexToColor3("#0A1018"), 1);
     this.scene.clearColor =
@@ -96,17 +99,17 @@ export class Atmosphere {
         ? Color4.Lerp(clearDay, clearDusk, n * 2)
         : Color4.Lerp(clearDusk, clearNight, (n - 0.5) * 2);
 
-    // Readable heat haze / distance air (must show in screenshots)
+    // Soft distance air — haze planes carry still-readable volume; fog softens edges
     this.scene.fogMode = Scene.FOGMODE_EXP2;
     if (n < 0.35) {
-      this.scene.fogDensity = 0.012;
-      this.scene.fogColor = hexToColor3("#D4C4A0");
-    } else if (n < 0.7) {
       this.scene.fogDensity = 0.014;
-      this.scene.fogColor = hexToColor3("#C89870");
+      this.scene.fogColor = hexToColor3("#C8B898");
+    } else if (n < 0.7) {
+      this.scene.fogDensity = 0.018;
+      this.scene.fogColor = hexToColor3("#C09068");
     } else {
-      this.scene.fogDensity = 0.016;
-      this.scene.fogColor = hexToColor3("#1A2838");
+      this.scene.fogDensity = 0.022;
+      this.scene.fogColor = hexToColor3("#152030");
     }
 
     if (river) {

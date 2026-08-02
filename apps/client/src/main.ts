@@ -101,6 +101,9 @@ async function enterGame() {
 
   const s = await api.me();
   applySnapshot(s);
+  // Default money-shot framing after first sync
+  view.prepareMoneyShot();
+  requestAnimationFrame(() => view?.prepareMoneyShot());
 
   // Show province + map + unique luxury on first load
   const st0 = s.settlements[0];

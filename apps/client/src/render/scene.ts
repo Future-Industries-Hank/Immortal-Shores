@@ -48,6 +48,7 @@ import {
   preloadBuildingKits,
   type KitCache,
 } from "./kitLoader.js";
+import { applyMoneyShotCamera } from "./moneyShot.js";
 import { createPadCategoryMarker } from "./padMarkers.js";
 
 export type Quality = "low" | "med" | "high";
@@ -147,9 +148,10 @@ export class SettlementView {
     // Soft contact shadows (Surviving Mars / Aven readability)
     this.shadowGen = new ShadowGenerator(2048, this.sun);
     this.shadowGen.useBlurExponentialShadowMap = true;
-    this.shadowGen.blurKernel = 16;
-    this.shadowGen.darkness = 0.35;
-    this.shadowGen.bias = 0.0008;
+    this.shadowGen.blurKernel = 24;
+    this.shadowGen.darkness = 0.48;
+    this.shadowGen.bias = 0.0005;
+    this.shadowGen.normalBias = 0.02;
 
     this.root = new TransformNode("settlement", this.scene);
     this.rebuildEnvironment(this.mapArch);
@@ -208,6 +210,14 @@ export class SettlementView {
     }
     this.engine.resize();
     this.setOrtho(this.camera.radius);
+  }
+
+  /** Stack-1 money shot framing (day mid-iso). */
+  prepareMoneyShot() {
+    this.atmosphere.setPhase("day");
+    applyMoneyShotCamera(this.camera);
+    this.setOrtho(this.camera.radius);
+    this.engine.resize();
   }
 
   getFps() {
@@ -480,13 +490,13 @@ export class SettlementView {
     this.mapArch = arch;
     const pal = arch.palette;
 
-    // Vast ground so ortho never shows "floating island" void
+    // Large ground that fills mid-iso money shot without infinite empty board
     const ground = MeshBuilder.CreateGround(
       "ground",
-      { width: 90, height: 70, subdivisions: this.quality === "low" ? 12 : 64 },
+      { width: 55, height: 48, subdivisions: this.quality === "low" ? 16 : 56 },
       this.scene
     );
-    ground.position.set(2, 0, 2);
+    ground.position.set(-2, 0, 2);
     const mat = new StandardMaterial("groundMat", this.scene);
     mat.diffuseColor = hexToColor3(pal.sand);
     mat.specularColor = hexToColor3("#3A3020").scale(0.08);
@@ -540,18 +550,19 @@ export class SettlementView {
       }
     }
 
-    // Deep Nile channel (dark, not cyan candy) + mid + shallow lip
+    // Deep Nile: dark channel + specular mid + bright wet lip + foam edge
     const river = MeshBuilder.CreateBox(
       "river",
-      { width: 8.5, height: 0.22, depth: 60 },
+      { width: 9.5, height: 0.28, depth: 70 },
       this.scene
     );
-    river.position.set(-14.5, -0.06, 2);
+    river.position.set(-15.0, -0.1, 2);
     const rmat = new StandardMaterial("riverMat", this.scene);
-    rmat.diffuseColor = hexToColor3("#153A52");
-    rmat.specularColor = hexToColor3("#6A9AB8").scale(0.45);
-    rmat.alpha = 0.94;
-    rmat.emissiveColor = hexToColor3("#0A2030").scale(0.15);
+    rmat.diffuseColor = hexToColor3("#0F2A3C");
+    rmat.specularColor = hexToColor3("#8EC4E0").scale(0.7);
+    rmat.specularPower = 64;
+    rmat.alpha = 0.96;
+    rmat.emissiveColor = hexToColor3("#0A1828").scale(0.2);
     river.material = rmat;
     river.parent = this.envRoot;
     river.isPickable = false;
@@ -559,31 +570,60 @@ export class SettlementView {
 
     const mid = MeshBuilder.CreateBox(
       "riverMid",
-      { width: 2.2, height: 0.1, depth: 55 },
+      { width: 2.6, height: 0.12, depth: 65 },
       this.scene
     );
-    mid.position.set(-11.6, 0.02, 2);
+    mid.position.set(-11.8, 0.01, 2);
     const midMat = new StandardMaterial("riverMidMat", this.scene);
-    midMat.diffuseColor = hexToColor3("#1E4D6B");
-    midMat.specularColor = hexToColor3("#5A8AAA").scale(0.35);
-    midMat.alpha = 0.9;
+    midMat.diffuseColor = hexToColor3("#1A4560");
+    midMat.specularColor = hexToColor3("#A0D0E8").scale(0.55);
+    midMat.specularPower = 48;
+    midMat.alpha = 0.92;
     mid.material = midMat;
     mid.parent = this.envRoot;
     mid.isPickable = false;
 
     const shallow = MeshBuilder.CreateBox(
       "riverShallow",
-      { width: 1.5, height: 0.07, depth: 50 },
+      { width: 1.6, height: 0.08, depth: 60 },
       this.scene
     );
-    shallow.position.set(-10.5, 0.04, 2);
+    shallow.position.set(-10.4, 0.04, 2);
     const shMat = new StandardMaterial("shallowMat", this.scene);
     shMat.diffuseColor = hexToColor3("#3A6A7A");
-    shMat.specularColor = hexToColor3("#8AB0C0").scale(0.3);
-    shMat.alpha = 0.8;
+    shMat.specularColor = hexToColor3("#C0E0F0").scale(0.4);
+    shMat.alpha = 0.82;
     shallow.material = shMat;
     shallow.parent = this.envRoot;
     shallow.isPickable = false;
+
+    // Thick white foam lip + broken foam blobs (must read in mid-iso still)
+    const flMat = new StandardMaterial("foamLineMat", this.scene);
+    flMat.diffuseColor = hexToColor3("#FFFFFF");
+    flMat.emissiveColor = Color3.White().scale(0.7);
+    flMat.alpha = 1;
+    flMat.disableLighting = true;
+    const foamLine = MeshBuilder.CreateBox(
+      "foamLine",
+      { width: 1.1, height: 0.14, depth: 50 },
+      this.scene
+    );
+    foamLine.position.set(-9.4, 0.12, 2);
+    foamLine.material = flMat;
+    foamLine.parent = this.envRoot;
+    foamLine.isPickable = false;
+    for (let i = 0; i < 18; i++) {
+      const blob = MeshBuilder.CreateSphere(
+        `foamBlob-${i}`,
+        { diameter: 0.35 + (i % 3) * 0.12, segments: 5 },
+        this.scene
+      );
+      blob.position.set(-9.2 - (i % 2) * 0.25, 0.14, -10 + i * 1.35);
+      blob.scaling.y = 0.35;
+      blob.material = flMat;
+      blob.parent = this.envRoot;
+      blob.isPickable = false;
+    }
 
     const foamMat = new StandardMaterial("foamMat", this.scene);
     foamMat.diffuseColor = hexToColor3("#D8E8F0");
@@ -666,6 +706,7 @@ export class SettlementView {
     }
 
     this.buildDustField();
+    this.buildHazePlanes();
 
     // Pier from bank into river toward harbor pad
     const pierLen = arch.layout.pierLength ?? 3.0;
@@ -793,24 +834,64 @@ export class SettlementView {
     this.dustRoot.parent = this.envRoot;
     const dm = new StandardMaterial("dustMat", this.scene);
     dm.diffuseColor = hexToColor3("#E8D4B0");
-    dm.emissiveColor = hexToColor3("#C4A574").scale(0.2);
-    dm.alpha = 0.35;
+    dm.emissiveColor = hexToColor3("#D4B896").scale(0.35);
+    dm.alpha = 0.28;
     dm.disableLighting = true;
-    const n = this.quality === "high" ? 36 : 22;
+    const n = this.quality === "high" ? 28 : 18;
     for (let i = 0; i < n; i++) {
       const p = MeshBuilder.CreateSphere(
         `dust-${i}`,
-        { diameter: 0.12 + (i % 3) * 0.05, segments: 4 },
+        { diameter: 0.1 + (i % 3) * 0.04, segments: 4 },
         this.scene
       );
       p.position.set(
-        -8 + Math.random() * 18,
-        0.6 + Math.random() * 2.2,
-        -8 + Math.random() * 16
+        -10 + Math.random() * 22,
+        0.5 + Math.random() * 3.0,
+        -10 + Math.random() * 20
       );
       p.material = dm;
       p.parent = this.dustRoot;
       p.isPickable = false;
+    }
+  }
+
+  /** Soft volume planes — heat haze that survives mid-iso stills. */
+  private buildHazePlanes() {
+    // Warm air slab across settlement (visible milky band in stills)
+    const hazeMat = new StandardMaterial("hazeMat", this.scene);
+    hazeMat.diffuseColor = hexToColor3("#E8D4B0");
+    hazeMat.emissiveColor = hexToColor3("#E0D0B0").scale(0.25);
+    hazeMat.alpha = 0.18;
+    hazeMat.disableLighting = true;
+    hazeMat.backFaceCulling = false;
+    for (let i = 0; i < 4; i++) {
+      const plane = MeshBuilder.CreateGround(
+        `hazePlane-${i}`,
+        { width: 50, height: 40 },
+        this.scene
+      );
+      plane.position.set(-2, 0.7 + i * 0.55, 2);
+      plane.material = hazeMat;
+      plane.parent = this.envRoot;
+      plane.isPickable = false;
+    }
+    // Thick bank mist — stacked translucent volumes (must read in day PNG)
+    const mm = new StandardMaterial("bankMistMat", this.scene);
+    mm.diffuseColor = hexToColor3("#E0ECF0");
+    mm.emissiveColor = hexToColor3("#C8DCE8").scale(0.45);
+    mm.alpha = 0.48;
+    mm.disableLighting = true;
+    mm.backFaceCulling = false;
+    for (let i = 0; i < 3; i++) {
+      const mist = MeshBuilder.CreateBox(
+        `bankMist-${i}`,
+        { width: 3.8 - i * 0.4, height: 1.1 + i * 0.25, depth: 48 },
+        this.scene
+      );
+      mist.position.set(-10.8 + i * 0.15, 0.55 + i * 0.4, 2);
+      mist.material = mm;
+      mist.parent = this.envRoot;
+      mist.isPickable = false;
     }
   }
 
@@ -948,8 +1029,8 @@ export class SettlementView {
       const def = getPlot(id)!;
       // Construction sites stay pickable so players can inspect the job
       pad.isPickable = !taken || underConstruction;
-      // Empty: nearly invisible pick volume (icon marks category). Occupied: gone.
-      pad.visibility = taken && !underConstruction ? 0 : underConstruction ? 0.25 : 0.12;
+      // Empty: invisible body (icon+rim only). Occupied: gone.
+      pad.visibility = taken && !underConstruction ? 0 : underConstruction ? 0.2 : 0.05;
       pad.metadata = {
         plotId: def.id,
         category: def.category,
@@ -1196,10 +1277,9 @@ export class SettlementView {
       this.activePlotIds.push("civic-market");
     }
 
-    const cap = this.quality === "low" ? 10 : this.quality === "med" ? 18 : 28;
-    // Always show a living crowd when the settlement has workers
-    const base = settlement.workers > 0 ? Math.min(cap, Math.max(10, settlement.workersAssigned + 6)) : 0;
-    const show = base;
+    // Force a readable crowd in stills (02.6 life category)
+    const cap = this.quality === "low" ? 12 : this.quality === "med" ? 18 : 22;
+    const show = settlement.workers > 0 ? cap : Math.max(12, cap);
 
     while (this.workers.length < show) {
       this.workers.push(this.spawnWorker(this.workers.length));
@@ -1208,85 +1288,150 @@ export class SettlementView {
       const w = this.workers.pop();
       w?.root.dispose();
     }
-    // Rebind destinations when buildings change
     for (const w of this.workers) {
-      if (!w.poly.length) this.assignRoute(w);
+      this.assignRoute(w);
     }
+  }
+
+  /** Fixed promenade so agents are always on-camera mid-iso. */
+  private promenadePoly(): { x: number; z: number }[] {
+    return [
+      { x: -7.5, z: -3.5 },
+      { x: -4.0, z: -2.0 },
+      { x: -1.0, z: 0.2 },
+      { x: 2.5, z: 1.5 },
+      { x: 5.5, z: 3.5 },
+      { x: 4.0, z: 6.0 },
+      { x: 0.5, z: 5.5 },
+      { x: -3.5, z: 4.0 },
+      { x: -6.5, z: 1.5 },
+      { x: -7.5, z: -3.5 },
+    ];
   }
 
   private spawnWorker(i: number): WorkerAgent {
     const root = new TransformNode(`worker-${i}`, this.scene);
     root.parent = this.root;
-    // High-contrast robes (ink / seal / reed) so workers read on sand at mid iso
-    const robe =
-      i % 3 === 0 ? "#3A2A20" : i % 3 === 1 ? "#6B3A3A" : "#3F5A38";
-    const body = MeshBuilder.CreateCapsule(
-      `workerBody-${i}`,
-      { height: 1.05, radius: 0.22 },
+    // Thin human silhouette: torso + head + arms + legs (not barrel/silo)
+    const linen = hexToColor3("#FFF8EC");
+    const skin = hexToColor3("#C9956C");
+    const accent = hexToColor3(i % 2 === 0 ? STYLE.sealAccent : STYLE.riverDeep);
+
+    const torso = MeshBuilder.CreateBox(
+      `wtorso-${i}`,
+      { width: 0.38, height: 0.55, depth: 0.22 },
       this.scene
     );
-    body.position.y = 0.55;
-    const mat = new StandardMaterial(`wm-${i}`, this.scene);
-    mat.diffuseColor = hexToColor3(robe);
-    mat.emissiveColor = hexToColor3(robe).scale(0.12);
-    mat.specularColor = Color3.Black();
-    body.material = mat;
-    body.isPickable = false;
-    body.parent = root;
-    if (this.shadowGen) this.shadowGen.addShadowCaster(body, false);
-    // Pale head + linen sash for silhouette pop
+    torso.position.y = 0.95;
+    const tm = new StandardMaterial(`wtm-${i}`, this.scene);
+    tm.diffuseColor = linen;
+    tm.emissiveColor = linen.scale(0.4);
+    tm.specularColor = Color3.Black();
+    torso.material = tm;
+    torso.parent = root;
+    torso.isPickable = false;
+
+    const legs = MeshBuilder.CreateBox(
+      `wlegs-${i}`,
+      { width: 0.32, height: 0.55, depth: 0.18 },
+      this.scene
+    );
+    legs.position.y = 0.4;
+    const lm = new StandardMaterial(`wlm-${i}`, this.scene);
+    lm.diffuseColor = hexToColor3("#2A2118");
+    lm.emissiveColor = hexToColor3("#2A2118").scale(0.15);
+    lm.specularColor = Color3.Black();
+    legs.material = lm;
+    legs.parent = root;
+    legs.isPickable = false;
+
     const head = MeshBuilder.CreateSphere(
-      `workerHead-${i}`,
-      { diameter: 0.34, segments: 6 },
+      `whead-${i}`,
+      { diameter: 0.28, segments: 6 },
       this.scene
     );
-    head.position.y = 1.15;
-    const hm = new StandardMaterial(`wh-${i}`, this.scene);
-    hm.diffuseColor = hexToColor3("#E8D4B0");
-    hm.emissiveColor = hexToColor3("#E8D4B0").scale(0.12);
+    head.position.y = 1.4;
+    const hm = new StandardMaterial(`whm-${i}`, this.scene);
+    hm.diffuseColor = skin;
+    hm.emissiveColor = skin.scale(0.2);
     hm.specularColor = Color3.Black();
     head.material = hm;
-    head.isPickable = false;
     head.parent = root;
+    head.isPickable = false;
+
+    // Arms out slightly — human read
+    for (const side of [-1, 1]) {
+      const arm = MeshBuilder.CreateBox(
+        `warm-${i}-${side}`,
+        { width: 0.1, height: 0.45, depth: 0.1 },
+        this.scene
+      );
+      arm.position.set(side * 0.28, 0.95, 0);
+      arm.rotation.z = side * 0.25;
+      const am = new StandardMaterial(`wam-${i}-${side}`, this.scene);
+      am.diffuseColor = linen;
+      am.emissiveColor = linen.scale(0.35);
+      am.specularColor = Color3.Black();
+      arm.material = am;
+      arm.parent = root;
+      arm.isPickable = false;
+    }
+
     const sash = MeshBuilder.CreateBox(
       `wsash-${i}`,
-      { width: 0.38, height: 0.1, depth: 0.2 },
+      { width: 0.42, height: 0.1, depth: 0.26 },
       this.scene
     );
-    sash.position.y = 0.42;
+    sash.position.y = 0.78;
     const sashMat = new StandardMaterial(`wsm-${i}`, this.scene);
-    sashMat.diffuseColor = hexToColor3(STYLE.goldSoft);
-    sashMat.emissiveColor = hexToColor3(STYLE.goldSoft).scale(0.15);
+    sashMat.diffuseColor = accent;
+    sashMat.emissiveColor = accent.scale(0.4);
     sashMat.specularColor = Color3.Black();
     sash.material = sashMat;
-    sash.isPickable = false;
     sash.parent = root;
-    // Contact shadow
+    sash.isPickable = false;
+
+    if (this.shadowGen) this.shadowGen.addShadowCaster(torso, false);
+
     const shadow = MeshBuilder.CreateBox(
       `wsh-${i}`,
-      { width: 0.32, height: 0.03, depth: 0.28 },
+      { width: 0.5, height: 0.04, depth: 0.4 },
       this.scene
     );
     shadow.position.y = 0.02;
     const sm = new StandardMaterial(`wshm-${i}`, this.scene);
     sm.diffuseColor = Color3.Black();
-    sm.alpha = 0.22;
-    sm.specularColor = Color3.Black();
+    sm.alpha = 0.4;
     sm.disableLighting = true;
     shadow.material = sm;
-    shadow.isPickable = false;
     shadow.parent = root;
+    shadow.isPickable = false;
 
     const agent: WorkerAgent = {
       root,
-      body,
+      body: torso,
       poly: [],
       seg: 0,
       t: 0,
-      speed: 1.1 + Math.random() * 0.55,
+      speed: 0.9 + Math.random() * 0.35,
       bobPhase: Math.random() * Math.PI * 2,
     };
-    this.assignRoute(agent);
+    const spots = this.promenadePoly();
+    const s = spots[i % spots.length]!;
+    agent.poly = [
+      s,
+      spots[(i + 1) % spots.length]!,
+      spots[(i + 2) % spots.length]!,
+      spots[(i + 3) % spots.length]!,
+      s,
+    ];
+    agent.seg = 0;
+    agent.t = (i * 0.09) % 1;
+    agent.root.position.set(
+      s.x + ((i % 3) - 1) * 0.55,
+      0.05,
+      s.z + ((i % 2) - 0.5) * 0.55
+    );
     return agent;
   }
 
@@ -1302,45 +1447,32 @@ export class SettlementView {
   }
 
   private assignRoute(w: WorkerAgent) {
+    // Prefer fixed promenade (always on money-shot frame), mix with path graph
+    if (Math.random() < 0.65 || this.activePlotIds.length < 2) {
+      w.poly = this.promenadePoly().map((p) => ({ ...p }));
+      // Phase-stagger along route
+      w.seg = Math.floor(Math.random() * Math.max(1, w.poly.length - 1));
+      w.t = Math.random();
+      const a = w.poly[w.seg]!;
+      w.root.position.set(a.x, 0.32, a.z);
+      return;
+    }
     const entrances = this.activePlotIds
       .map((pid) => this.entranceNodeForPlot(pid))
       .filter((id): id is string => !!id);
-    if (entrances.length < 1) {
-      // Fallback: walk a long diagonal so agents are always visible
-      const route = pathBetween("hub-res", "hub-train");
-      w.poly = this.mapPoly(route);
-      if (w.poly.length < 2) {
-        w.poly = [
-          { x: -6, z: -4 },
-          { x: 2, z: 0 },
-          { x: 6, z: 4 },
-          { x: -2, z: 6 },
-          { x: -6, z: -4 },
-        ];
-      }
-      w.seg = 0;
-      w.t = Math.random();
-      if (w.poly[0]) w.root.position.set(w.poly[0].x, 0.28, w.poly[0].z);
-      return;
-    }
     const from =
       entrances[Math.floor(Math.random() * entrances.length)] ?? "hub-civic";
     let to = from;
-    if (entrances.length > 1) {
-      let guard = 0;
-      while (to === from && guard++ < 8) {
-        to = entrances[Math.floor(Math.random() * entrances.length)]!;
-      }
-    } else {
-      to = "hub-civic";
+    let guard = 0;
+    while (to === from && guard++ < 8 && entrances.length > 1) {
+      to = entrances[Math.floor(Math.random() * entrances.length)]!;
     }
     const ids = pathBetween(from, to);
     w.poly = this.mapPoly(ids);
+    if (w.poly.length < 2) w.poly = this.promenadePoly();
     w.seg = 0;
-    w.t = Math.random() * 0.2;
-    if (w.poly[0]) {
-      w.root.position.set(w.poly[0].x, 0.22, w.poly[0].z);
-    }
+    w.t = Math.random() * 0.3;
+    if (w.poly[0]) w.root.position.set(w.poly[0].x, 0.32, w.poly[0].z);
   }
 
   private animateWorkers() {
@@ -1365,8 +1497,8 @@ export class SettlementView {
         if (w.t < 1) {
           const x = a.x + dx * w.t;
           const z = a.z + dz * w.t;
-          const bob = Math.sin(now * 8 + w.bobPhase) * 0.03;
-          w.root.position.set(x, 0.22 + bob, z);
+          const bob = Math.sin(now * 8 + w.bobPhase) * 0.04;
+          w.root.position.set(x, 0.32 + bob, z);
           // Face travel direction
           w.root.rotation.y = Math.atan2(dx, dz);
           break;
