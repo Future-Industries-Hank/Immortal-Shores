@@ -39,25 +39,29 @@ See [`HOSTING.md`](./HOSTING.md).
 | **1.9** | [`prompts/PROMPT-01.9-ART-STORYBOARD.md`](./prompts/PROMPT-01.9-ART-STORYBOARD.md) | **Art storyboard — director Yes/No** | Boards ready → **you approve** |
 | **2** | [`prompts/PROMPT-02-VISUAL.md`](./prompts/PROMPT-02-VISUAL.md) | First visual pass | Ran — ~1.5/10 (not enough) |
 | **2.5–2.6** | primer + loop | Toward 8/10 | Stalled ~6.x; boxes still |
-| **2.7** | [`prompts/PROMPT-02.7-RESTART-FROM-BOARDS.md`](./prompts/PROMPT-02.7-RESTART-FROM-BOARDS.md) | Rebuild glTF from approved boards | After 1.9 Yes |
-| Review UI | [`ART-STORYBOARD-REVIEW.html`](./ART-STORYBOARD-REVIEW.html) | Click Yes/No/Revise per board | **Open this** |
-| Inspiration | [`docs/visual-inspiration/`](./docs/visual-inspiration/) | Style guide JPGs (not final art) | Generated |
+| **2.7** | [`prompts/PROMPT-02.7-RESTART-FROM-BOARDS.md`](./prompts/PROMPT-02.7-RESTART-FROM-BOARDS.md) | Rebuild glTF from boards | Ran / partial |
+| **2.8** | [`prompts/PROMPT-02.8-DIRECTOR-PLAY-PASS.md`](./prompts/PROMPT-02.8-DIRECTOR-PLAY-PASS.md) | **Director play: fixed camera, fog, workers** | **RUN THIS** |
+| Kickoff | [`prompts/PROMPT-02.8-KICKOFF.txt`](./prompts/PROMPT-02.8-KICKOFF.txt) | Paste block | Copy-paste |
+| Review UI | [`ART-STORYBOARD-REVIEW.html`](./ART-STORYBOARD-REVIEW.html) | Yes/No boards | Open when locking look |
+| Inspiration | [`docs/visual-inspiration/`](./docs/visual-inspiration/) | Style guide JPGs | Generated |
 
 **FI skills (general pack):** `fi-art-storyboard` · specialized HTML: `fi-html-game` (Future Industries `.claude/skills/`).
 
 Mechanics pre-check: [`CRITICAL-AUDIT-PRE-02.md`](./CRITICAL-AUDIT-PRE-02.md) (green).  
 Do not reopen escrow, plot counts, or GDD rates.
 
-### Director — approve storyboard (Phase 1.9) then rebuild
+### Planner kickoff — director play pass (current)
 
 ```text
-1) Open ART-STORYBOARD-REVIEW.html — Yes / No / Revise each board.
-2) When all required Yes → ART-STORYBOARD-APPROVED.md (builder or you).
-3) Then agent: prompts/PROMPT-02.7-RESTART-FROM-BOARDS.md
-   Blender-reauthor glTF to match approved boards; boxes ⇒ Structures ≤ 3;
-   loop until overall ≥ 8.0.
-```
+Pull latest main. Economy frozen.
+R17 “8.0” is provisional only — director playtest overrides.
 
+Execute prompts/PROMPT-02.8-DIRECTOR-PLAY-PASS.md (or PROMPT-02.8-KICKOFF.txt).
+
+Fixed full-settlement camera (no zoom). Cut fog. Workers small + count from sim +
+no ghosting through buildings. Keep building detail and desert. Accept via
+DIRECTOR-PLAY-PASS.md checkboxes — not vanity judge scores.
+```
 ### Future packs (FI)
 
 Phase **1.9 art storyboard** is now mandatory in `fi-game-build` / `FI-PLAYBOOK` before multi-round visual overhaul. Browser titles use specialized skill **`fi-html-game`**.---

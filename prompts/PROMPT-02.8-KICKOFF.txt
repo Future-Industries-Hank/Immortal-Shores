@@ -1,0 +1,24 @@
+Paste as full session prompt:
+
+---
+
+Pull main Future-Industries-Hank/Immortal-Shores @ 9775230+ (latest). Economy frozen.
+
+R17 claimed provisional 8.0 — DIRECTOR PLAYTEST rejects presentation. Binding feedback:
+
+1) Too much fog; mouse wheel seems to change fog → disable settlement zoom; cut fog density hard.
+2) Workers same size as buildings → scale humans way down (~door-relative, not building-sized).
+3) Workers ghost through buildings → path only on roads/pad edges; no clip.
+4) Too many workers → STOP inventing 14–26 for stills. Count must track settlement.workers / assignments (sparse accents).
+5) Settlement is NOT a zoomable playable 3D map → fixed orthographic board showing ALL plots at once; slightly wider than current money-shot; buildings/plots/desert are the hero, not people.
+6) KEEP: detailed buildings, few plots, nice desert setting.
+
+Execute: prompts/PROMPT-02.8-DIRECTOR-PLAY-PASS.md
+
+Code smoking guns to fix first:
+- scene.ts syncWorkers: remove forced cap 14/20/26 for "readable crowd"
+- spawnWorker: scaling 1.18 + oversized body meshes
+- camera attachControl + radius 18–55 + EXP2 fog ~0.056
+
+Acceptance = DIRECTOR-PLAY-PASS.md checkboxes, not another 8.0 vanity judge.
+Start with fixed wider camera + worker count/scale.
