@@ -11,7 +11,9 @@
   --ink-ui: #2a2118;
   --papyrus: #f3e6c8;
   --seal-accent: #8b3a4a;
-  --panel-w: min(360px, 92vw);
+  --hub-w: min(340px, 34vw);
+  --hub-min: 280px;
+  --hud-h: 3.1rem;
   --warn-yellow: #c9a227;
   --warn-red: #a33;
   font-family: "Segoe UI", system-ui, sans-serif;
@@ -25,6 +27,19 @@ html.dark {
   --sand-deep: #5a4a38;
   --river-deep: #5a9ec4;
   background: #12100e;
+}
+
+html.dark #hub {
+  background: linear-gradient(180deg, #2a241c 0%, #1e1a14 100%);
+}
+
+html.dark #nav {
+  background: rgba(20, 16, 12, 0.45);
+}
+
+html.dark #nav button:hover {
+  background: rgba(90, 74, 56, 0.5);
+  color: var(--ink-ui);
 }
 
 html.cb {
@@ -145,33 +160,29 @@ button.small {
   font-size: 0.9rem;
 }
 
+/* ── Game shell: top bar + world | docked hub ───────────────── */
 #game {
   position: relative;
   width: 100%;
   height: 100%;
-}
-
-#view {
-  width: 100%;
-  height: 100%;
-  display: block;
-  touch-action: none;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background: #1a1410;
 }
 
 #hud-top {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+  position: relative;
+  z-index: 5;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  background: linear-gradient(180deg, rgba(243, 230, 200, 0.95), rgba(243, 230, 200, 0.75));
+  min-height: var(--hud-h);
+  padding: 0.45rem 0.75rem;
+  background: var(--papyrus);
   border-bottom: 1px solid var(--sand-deep);
-  z-index: 5;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset;
 }
 
 #resources {
@@ -192,62 +203,130 @@ button.small {
   font-size: 0.9rem;
 }
 
-#nav {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
+.hud-actions {
+  margin-top: 0;
+}
+
+#stage {
+  display: grid;
+  grid-template-columns: 1fr var(--hub-w);
+  min-height: 0;
+  min-width: 0;
+  transition: grid-template-columns 0.22s ease;
+}
+
+#game.hub-collapsed #stage {
+  grid-template-columns: 1fr 0fr;
+}
+
+#viewport {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  background: #1a1410;
+  overflow: hidden;
+}
+
+#view {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+/* Docked hub — shares papyrus chrome with HUD, no floating overlay */
+#hub {
   display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: linear-gradient(180deg, var(--papyrus) 0%, #e8d9b8 100%);
+  border-left: 1px solid var(--sand-deep);
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+  z-index: 4;
+}
+
+#game.hub-collapsed #hub {
+  border-left: none;
+  pointer-events: none;
+}
+
+#nav {
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.25rem;
-  padding: 0.4rem;
-  overflow-x: auto;
-  background: rgba(243, 230, 200, 0.94);
-  border-top: 1px solid var(--sand-deep);
-  z-index: 5;
+  padding: 0.45rem 0.45rem 0.35rem;
+  border-bottom: 1px solid var(--sand-deep);
+  background: rgba(255, 253, 246, 0.55);
+  flex: 0 0 auto;
 }
 
 #nav button {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  min-width: 4.2rem;
   background: transparent;
   color: var(--ink-ui);
   border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  min-height: 40px;
+  padding: 0.35rem 0.45rem;
+}
+
+#nav button:hover {
+  background: rgba(232, 212, 176, 0.65);
+  color: var(--ink-ui);
 }
 
 #nav button.active {
-  background: var(--sand-light);
-  border-color: var(--sand-deep);
+  background: var(--river-deep);
+  color: #f5f0e6;
+  border-color: transparent;
   outline: none;
 }
 
 #side {
-  position: absolute;
-  top: 3.4rem;
-  right: 0.5rem;
-  width: var(--panel-w);
-  max-height: calc(100% - 7rem);
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
-  z-index: 6;
-  pointer-events: none;
+  padding: 0.65rem 0.75rem 1rem;
+  pointer-events: auto;
 }
 
 .side-panel {
-  pointer-events: auto;
-  background: rgba(243, 230, 200, 0.96);
-  border: 1px solid var(--sand-deep);
-  border-radius: 12px;
-  padding: 0.75rem;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  animation: hub-in 0.18s ease;
+}
+
+@keyframes hub-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .side-panel h2 {
   margin: 0 0 0.5rem;
   font-size: 1.05rem;
   color: var(--river-deep);
+  letter-spacing: 0.01em;
 }
 
 .side-panel h3 {
-  margin: 0.75rem 0 0.35rem;
-  font-size: 0.9rem;
+  margin: 0.85rem 0 0.35rem;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--sand-deep);
 }
 
 .building-row,
@@ -290,7 +369,7 @@ button.small {
 #toast {
   position: absolute;
   left: 50%;
-  bottom: 4.5rem;
+  bottom: 1.1rem;
   transform: translateX(-50%);
   background: var(--ink-ui);
   color: var(--papyrus);
@@ -303,7 +382,7 @@ button.small {
 .hint {
   position: absolute;
   left: 50%;
-  bottom: 4.4rem;
+  bottom: 1rem;
   transform: translateX(-50%);
   margin: 0;
   padding: 0.4rem 0.85rem;
@@ -314,6 +393,8 @@ button.small {
   z-index: 4;
   pointer-events: none;
   white-space: nowrap;
+  max-width: min(90%, 28rem);
+  text-align: center;
 }
 
 .hint.hidden {
@@ -570,57 +651,77 @@ button.build-choice strong {
   border-color: var(--seal-accent);
 }
 
-/* Desktop default — isometric dominant */
-@media (max-width: 1024px) {
-  /* Tablet */
-  #side {
-    width: min(320px, 40vw);
+/* Tablet: slightly narrower dock */
+@media (max-width: 1100px) {
+  :root {
+    --hub-w: min(300px, 36vw);
   }
   #nav button {
-    font-size: 0.85rem;
-    min-height: 44px;
+    font-size: 0.78rem;
+    min-height: 42px;
   }
 }
 
+/* Mobile: hub becomes bottom sheet under world */
 @media (max-width: 720px) {
-  /* Mobile portrait-first */
-  #side {
-    left: 0.35rem;
-    right: 0.35rem;
-    width: auto;
-    max-height: 38vh;
-    top: auto;
-    bottom: 3.6rem;
+  :root {
+    --hub-w: 100%;
   }
+
+  #stage {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr minmax(38vh, 42vh);
+  }
+
+  #game.hub-collapsed #stage {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 0fr;
+  }
+
+  #hub {
+    border-left: none;
+    border-top: 1px solid var(--sand-deep);
+    box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.18);
+  }
+
+  #nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #nav button {
+    flex: 0 0 auto;
+    min-height: 48px;
+    font-size: 0.78rem;
+  }
+
   #hud-top {
     font-size: 0.78rem;
     padding: 0.4rem 0.5rem;
   }
-  #nav {
-    gap: 0.15rem;
-    padding: 0.3rem;
-  }
-  #nav button {
-    min-height: 48px;
-    padding: 0.45rem 0.55rem;
-    font-size: 0.78rem;
-  }
+
   .hint {
-    bottom: 3.6rem;
+    bottom: 0.65rem;
     font-size: 0.72rem;
     white-space: normal;
-    max-width: 92vw;
-    text-align: center;
   }
+
   .auth-panel {
     width: min(100%, 92vw);
+  }
+
+  .goals-panel {
+    bottom: auto;
+    top: 0.5rem;
+    left: 0.5rem;
   }
 }
 
 .prod-overlay {
   position: absolute;
   left: 0.5rem;
-  top: 3.6rem;
+  top: 0.5rem;
   z-index: 7;
   max-width: min(300px, 90vw);
   max-height: 50vh;
@@ -649,7 +750,7 @@ html.dark .prod-overlay {
 
 .ration-warn {
   position: absolute;
-  top: 3.5rem;
+  top: 0.65rem;
   left: 50%;
   transform: translateX(-50%);
   z-index: 12;
@@ -685,11 +786,12 @@ html.dark .prod-overlay {
   top: 12%;
 }
 .goals-panel {
-  bottom: 4.8rem;
+  bottom: 1rem;
   left: 0.75rem;
   transform: none;
   width: min(280px, 88vw);
   font-size: 0.85rem;
+  z-index: 14;
 }
 .goals-panel ul {
   margin: 0.35rem 0;

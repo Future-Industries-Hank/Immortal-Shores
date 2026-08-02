@@ -33,6 +33,11 @@ function applySnapshot(s: PublicSnapshot) {
   if (view && s.settlements[0]) view.sync(s.settlements[0]);
 }
 
+function layoutCanvas() {
+  // Babylon needs a resize when the docked hub opens/closes or the stage reflows
+  window.dispatchEvent(new Event("resize"));
+}
+
 async function enterGame() {
   authEl.hidden = true;
   gameEl.hidden = false;
@@ -41,6 +46,29 @@ async function enterGame() {
   const q = document.getElementById("quality") as HTMLSelectElement;
   view.setQuality(q.value as Quality);
   q.addEventListener("change", () => view?.setQuality(q.value as Quality));
+
+  // Docked hub: collapse so world goes full-bleed when needed
+  const dockBtn = document.getElementById("btn-dock-toggle");
+  const collapsed = localStorage.getItem("hub_collapsed") === "1";
+  if (collapsed) gameEl.classList.add("hub-collapsed");
+  dockBtn?.addEventListener("click", () => {
+    gameEl.classList.toggle("hub-collapsed");
+    localStorage.setItem(
+      "hub_collapsed",
+      gameEl.classList.contains("hub-collapsed") ? "1" : "0"
+    );
+    requestAnimationFrame(() => {
+      layoutCanvas();
+      setTimeout(layoutCanvas, 230);
+    });
+  });
+
+  // Keep canvas sized when hub/nav reflows
+  const stage = document.getElementById("stage");
+  if (stage && "ResizeObserver" in window) {
+    new ResizeObserver(() => layoutCanvas()).observe(stage);
+  }
+  requestAnimationFrame(layoutCanvas);
 
   // 3D → UI only (do not bounce clearSelection back into UI)
   view.setSelectHandler((ev) => {

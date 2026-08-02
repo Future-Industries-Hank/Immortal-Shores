@@ -25,11 +25,10 @@
       </div>
 
       <div id="game" hidden>
-        <canvas id="view"></canvas>
         <header id="hud-top">
           <div id="resources"></div>
           <div id="seals"></div>
-          <div class="row gap">
+          <div class="row gap hud-actions">
             <select id="quality">
               <option value="high">High</option>
               <option value="med" selected>Med</option>
@@ -37,34 +36,47 @@
             </select>
             <button id="btn-map" type="button" title="World Map">Map</button>
             <button id="btn-postcard" type="button" title="Postcard">✉</button>
+            <button id="btn-dock-toggle" type="button" class="secondary" title="Collapse hub" aria-label="Toggle hub">
+              Hub
+            </button>
           </div>
         </header>
-        <nav id="nav">
-          <button data-panel="settlement" class="active" type="button">Shore</button>
-          <button data-panel="harbor" type="button">Harbor</button>
-          <button data-panel="tablets" type="button">Tablets</button>
-          <button data-panel="allies" type="button">Allies</button>
-          <button data-panel="wall" type="button">Wall</button>
-          <button data-panel="build" type="button">Build</button>
-          <button data-panel="military" type="button">Military</button>
-        </nav>
-        <aside id="side">
-          <div id="panel-settlement" class="side-panel"></div>
-          <div id="panel-harbor" class="side-panel" hidden></div>
-          <div id="panel-tablets" class="side-panel" hidden></div>
-          <div id="panel-allies" class="side-panel" hidden></div>
-          <div id="panel-wall" class="side-panel" hidden></div>
-          <div id="panel-build" class="side-panel" hidden></div>
-          <div id="panel-military" class="side-panel" hidden></div>
-          <div id="panel-map" class="side-panel" hidden></div>
-        </aside>
+
+        <div id="stage">
+          <div id="viewport">
+            <canvas id="view"></canvas>
+            <div id="prod-overlay" class="prod-overlay" hidden></div>
+            <div id="ration-warn" class="ration-warn" hidden></div>
+            <p id="hint" class="hint">Colored pads = build sites · click buildings · trade for other luxuries</p>
+            <div id="toast" hidden></div>
+          </div>
+
+          <aside id="hub" class="hub-open">
+            <nav id="nav" aria-label="Settlement hub">
+              <button data-panel="settlement" class="active" type="button">Shore</button>
+              <button data-panel="harbor" type="button">Harbor</button>
+              <button data-panel="tablets" type="button">Tablets</button>
+              <button data-panel="allies" type="button">Allies</button>
+              <button data-panel="wall" type="button">Wall</button>
+              <button data-panel="build" type="button">Build</button>
+              <button data-panel="military" type="button">Military</button>
+            </nav>
+            <div id="side">
+              <div id="panel-settlement" class="side-panel"></div>
+              <div id="panel-harbor" class="side-panel" hidden></div>
+              <div id="panel-tablets" class="side-panel" hidden></div>
+              <div id="panel-allies" class="side-panel" hidden></div>
+              <div id="panel-wall" class="side-panel" hidden></div>
+              <div id="panel-build" class="side-panel" hidden></div>
+              <div id="panel-military" class="side-panel" hidden></div>
+              <div id="panel-map" class="side-panel" hidden></div>
+            </div>
+          </aside>
+        </div>
+
         <div id="building-inspect" class="inspect-panel" hidden></div>
-        <div id="prod-overlay" class="prod-overlay" hidden></div>
         <div id="tutorial" class="tutorial-panel" hidden></div>
         <div id="goals" class="goals-panel" hidden></div>
-        <div id="ration-warn" class="ration-warn" hidden></div>
-        <p id="hint" class="hint">Colored pads = build sites · click buildings · trade for other luxuries</p>
-        <div id="toast" hidden></div>
       </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
