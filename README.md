@@ -40,8 +40,9 @@ See [`HOSTING.md`](./HOSTING.md).
 | **2** | [`prompts/PROMPT-02-VISUAL.md`](./prompts/PROMPT-02-VISUAL.md) | First visual pass | Ran — ~1.5/10 (not enough) |
 | **2.5–2.6** | primer + loop | Toward 8/10 | Stalled ~6.x; boxes still |
 | **2.7** | [`prompts/PROMPT-02.7-RESTART-FROM-BOARDS.md`](./prompts/PROMPT-02.7-RESTART-FROM-BOARDS.md) | Rebuild glTF from boards | Ran / partial |
-| **2.8** | [`prompts/PROMPT-02.8-DIRECTOR-PLAY-PASS.md`](./prompts/PROMPT-02.8-DIRECTOR-PLAY-PASS.md) | **Director play: fixed camera, fog, workers** | **RUN THIS** |
-| Kickoff | [`prompts/PROMPT-02.8-KICKOFF.txt`](./prompts/PROMPT-02.8-KICKOFF.txt) | Paste block | Copy-paste |
+| **2.8** | [`prompts/PROMPT-02.8-DIRECTOR-PLAY-PASS.md`](./prompts/PROMPT-02.8-DIRECTOR-PLAY-PASS.md) | Director play issues (reference) | Nested in 02.9 Step 3 |
+| **2.9** | [`prompts/PROMPT-02.9-APPROVAL-THEN-CRAFT.md`](./prompts/PROMPT-02.9-APPROVAL-THEN-CRAFT.md) | **Storyboard → standard view → craft** | **RUN THIS** |
+| Kickoff | [`prompts/PROMPT-02.9-KICKOFF.txt`](./prompts/PROMPT-02.9-KICKOFF.txt) | Paste block | Copy-paste |
 | Review UI | [`ART-STORYBOARD-REVIEW.html`](./ART-STORYBOARD-REVIEW.html) | Yes/No boards | Open when locking look |
 | Inspiration | [`docs/visual-inspiration/`](./docs/visual-inspiration/) | Style guide JPGs | Generated |
 
@@ -50,19 +51,22 @@ See [`HOSTING.md`](./HOSTING.md).
 Mechanics pre-check: [`CRITICAL-AUDIT-PRE-02.md`](./CRITICAL-AUDIT-PRE-02.md) (green).  
 Do not reopen escrow, plot counts, or GDD rates.
 
-### Planner kickoff — director play pass (current)
+### Planner kickoff — approval then craft (current)
 
 ```text
 Pull latest main. Economy frozen.
-R17 “8.0” is provisional only — director playtest overrides.
 
-Execute prompts/PROMPT-02.8-DIRECTOR-PLAY-PASS.md (or PROMPT-02.8-KICKOFF.txt).
+Execute prompts/PROMPT-02.9-APPROVAL-THEN-CRAFT.md (or PROMPT-02.9-KICKOFF.txt).
 
-Fixed full-settlement camera (no zoom). Cut fog. Workers small + count from sim +
-no ghosting through buildings. Keep building detail and desert. Accept via
-DIRECTOR-PLAY-PASS.md checkboxes — not vanity judge scores.
-```
-### Future packs (FI)
+STEP 1: Open ART-STORYBOARD-REVIEW.html for director Yes/No on inspiration boards.
+        WAIT. Write ART-STORYBOARD-APPROVED.md when done.
+
+STEP 2: Fixed full-settlement STANDARD VIEW (no zoom; few buildings + pads;
+        0–3 tiny workers for scale). Capture STANDARD-VIEW-DAY.png.
+        Director confirms POV + building/people scale. STANDARD-VIEW-APPROVED.md
+
+STEP 3: Only then craft — fog/shadow stamps/workers/camera per director play notes.
+```### Future packs (FI)
 
 Phase **1.9 art storyboard** is now mandatory in `fi-game-build` / `FI-PLAYBOOK` before multi-round visual overhaul. Browser titles use specialized skill **`fi-html-game`**.---
 

@@ -1,0 +1,48 @@
+Paste as the entire agent session prompt:
+
+---
+
+Pull latest main: Future-Industries-Hank/Immortal-Shores. Economy frozen.
+
+Execute prompts/PROMPT-02.9-APPROVAL-THEN-CRAFT.md in order. Do not skip.
+
+══════════════════════════════════════
+STEP 1 — ART STORYBOARD (do this first)
+══════════════════════════════════════
+1. Start a simple static server from repo root if needed:
+   python3 -m http.server 8765 --directory .
+2. Tell the director to open:
+   http://127.0.0.1:8765/ART-STORYBOARD-REVIEW.html
+3. Boards are under docs/visual-inspiration/ (inspiration only, not final assets).
+4. Director marks Yes / No / Revise per image. WAIT for them.
+5. On all required Yes → write ART-STORYBOARD-APPROVED.md
+6. Do NOT implement craft until Step 1 is done.
+
+══════════════════════════════════════
+STEP 2 — STANDARD VIEW (POV + scale)
+══════════════════════════════════════
+After storyboard approval:
+1. Implement FIXED settlement camera (no wheel zoom) showing the FULL shore:
+   river + all pads + a few buildings (GH, Market, one field, one shop, etc.).
+2. Workers: 0–3 tiny people only (for scale), not a crowd; small vs buildings.
+3. Minimal fog so the board is clear.
+4. Capture tools/judge/evidence/standard-view/STANDARD-VIEW-DAY.png
+5. Ask director to confirm:
+   (A) perspective OK?
+   (B) building vs person scale OK?
+   (C) whole play area visible without zoom?
+6. Write STANDARD-VIEW-APPROVED.md only on Yes. If No, fix framing/scale and re-capture.
+7. Do NOT start Step 3 until standard view is approved.
+
+══════════════════════════════════════
+STEP 3 — CRAFT (director play issues)
+══════════════════════════════════════
+Only after Steps 1–2:
+- Keep fixed board camera from Step 2
+- Cut fog soup; kill black rings + rectangular shadow-box stamps
+  (kitLoader rake/box shadows, shadowBlob, worker foot boxes)
+- Workers: count from sim, sparse, small, no ghosting through buildings
+- Keep building detail + desert; people are accents not the focus
+- Fill DIRECTOR-PLAY-PASS.md checkboxes
+
+Start NOW with Step 1: open the storyboard URL for the director and wait.
