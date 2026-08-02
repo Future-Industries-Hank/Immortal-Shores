@@ -30,24 +30,33 @@ See [`HOSTING.md`](./HOSTING.md).
 
 ---
 
-## Agent prompts (three phases)
+## Agent prompts
 
-| Order | Prompt | Goal | Stop when |
+| Order | Prompt | Goal | Status |
 |---|---|---|---|
-| **1** | [`prompts/PROMPT-01-PLAYABLE.md`](./prompts/PROMPT-01-PLAYABLE.md) | Playable core | `PROMPT-01-COMPLETE.md` — **DONE** at `9f0479d` |
-| **1.5** | [`prompts/PROMPT-01.5-MODERN-2026.md`](./prompts/PROMPT-01.5-MODERN-2026.md) | 2026 modernization (trust trade, PWA, QoL, onboarding, social) | `PROMPT-01.5-COMPLETE.md` — **DONE** |
-| **2** | [`prompts/PROMPT-02-VISUAL.md`](./prompts/PROMPT-02-VISUAL.md) | Visual / production gauntlet | Impartial judge **PASS** — **RUN NEXT** |
+| **1** | [`prompts/PROMPT-01-PLAYABLE.md`](./prompts/PROMPT-01-PLAYABLE.md) | Playable core | **DONE** |
+| **1.5** | [`prompts/PROMPT-01.5-MODERN-2026.md`](./prompts/PROMPT-01.5-MODERN-2026.md) | 2026 systems | **DONE** |
+| **2** | [`prompts/PROMPT-02-VISUAL.md`](./prompts/PROMPT-02-VISUAL.md) | First visual pass | Ran — director ~**1.5/10** (not enough) |
+| **2.5 primer** | [`prompts/PROMPT-02.5-PRIMER-READINESS.md`](./prompts/PROMPT-02.5-PRIMER-READINESS.md) | MCP/skills readiness, go-no-go | **Run first** |
+| **2.5 goal** | [`prompts/PROMPT-02.5-VISUAL-GAUNTLET.md`](./prompts/PROMPT-02.5-VISUAL-GAUNTLET.md) | Graphics **≥ 8/10** | After primer **GO** |
 
-**Prompt 01 + 01.5 are closed.** Open a new session with only Prompt 02 for the visual gauntlet.  
+Mechanics pre-check: [`CRITICAL-AUDIT-PRE-02.md`](./CRITICAL-AUDIT-PRE-02.md) (green).  
 Do not reopen escrow, plot counts, or GDD rates.
 
-### Planner / agent kickoff for 02
+### Planner kickoff — 8/10 visual gauntlet
 
 ```text
-Pull main. Read PROMPT-01.5-COMPLETE.md and docs/STYLE-CONTRACT.md.
-Execute only prompts/PROMPT-02-VISUAL.md. Stop at PROMPT-02-COMPLETE.md after judge PASS.
-```
+Pull latest main. Economy is frozen.
 
+1) ONLY prompts/PROMPT-02.5-PRIMER-READINESS.md
+   → VISUAL-READY.md (probe Playwright, Blender, Scenario, image_gen, fi-* skills).
+   NO-GO if no eyes (Playwright) or no mesh path (Blender/3D gen) for an honest 8/10.
+
+2) If GO → prompts/PROMPT-02.5-VISUAL-GAUNTLET.md
+   Stop only when independent judge overall ≥ 8.0 (min category ≥ 6).
+   Prior ~1.5/10 is FAIL. Quality benchmarks (craft only, do not copy setting):
+   Surviving Mars, Aven Colony, IXION, Frostpunk 2, Oxygen Not Included.
+```
 ---
 
 ## Design docs
