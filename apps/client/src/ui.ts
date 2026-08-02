@@ -24,6 +24,7 @@ import {
   renderBuildingPopup,
   renderGenericPopup,
 } from "./inspectPopup.js";
+import { formatChatHtml, toggleProdOverlay } from "./modern.js";
 
 const HUD_RESOURCES: ResourceId[] = [
   "emmer",
@@ -304,11 +305,24 @@ function renderSettlement(s: PublicSnapshot) {
     }
     <h3>Buildings</h3>
     <div id="building-list"></div>
+    <h3>Production QoL</h3>
+    <div class="row">
+      <button class="small" id="btn-overlay">Toggle overlay</button>
+      <button class="small secondary" id="btn-balance">Apply balance helper</button>
+    </div>
+    <div class="row">
+      <button class="small secondary" id="btn-pause">${s.player.pauseNonEssential ? "Resume non-essential" : "Pause non-essential"}</button>
+    </div>
     <h3>Time</h3>
-    <p class="muted">Construction and production use real hours. Speed time only for testing / catch-up.</p>
+    <p class="muted">Real hours only. Speed-up is testing/catch-up — not monetized.</p>
     <div class="row">
       <button class="small" id="btn-advance-1">+1 hour</button>
       <button class="small secondary" id="btn-advance-8">+8 hours</button>
+    </div>
+    <h3>Account</h3>
+    <div class="row">
+      <button class="small secondary" id="btn-dark">Dark mode</button>
+      <button class="small secondary" id="btn-cb">Color-blind</button>
     </div>
   `;
   const list = panel.querySelector("#building-list")!;
@@ -419,6 +433,36 @@ function renderSettlement(s: PublicSnapshot) {
       handlers.onToast((e as Error).message);
     }
   });
+  panel.querySelector("#btn-overlay")?.addEventListener("click", () => {
+    toggleProdOverlay();
+    handlers.onSnapshot(s);
+  });
+  panel.querySelector("#btn-balance")?.addEventListener("click", async () => {
+    try {
+      handlers.onSnapshot(await api.suggestWorkers(st.id));
+      sfx.ok();
+    } catch (e) {
+      handlers.onToast((e as Error).message);
+    }
+  });
+  panel.querySelector("#btn-pause")?.addEventListener("click", async () => {
+    try {
+      handlers.onSnapshot(await api.pauseProduction(!s.player.pauseNonEssential));
+      sfx.ok();
+    } catch (e) {
+      handlers.onToast((e as Error).message);
+    }
+  });
+  panel.querySelector("#btn-dark")?.addEventListener("click", () => {
+    const on = localStorage.getItem("dark") !== "1";
+    localStorage.setItem("dark", on ? "1" : "0");
+    document.documentElement.classList.toggle("dark", on);
+  });
+  panel.querySelector("#btn-cb")?.addEventListener("click", () => {
+    const on = localStorage.getItem("cb") !== "1";
+    localStorage.setItem("cb", on ? "1" : "0");
+    document.documentElement.classList.toggle("cb", on);
+  });
 }
 
 function renderHarbor(s: PublicSnapshot) {
@@ -457,10 +501,15 @@ function renderHarbor(s: PublicSnapshot) {
     for (const b of st.barges) {
       const row = document.createElement("div");
       row.className = "building-row";
-      row.innerHTML = `<strong>Barge ${b.id.slice(0, 6)}</strong> <span class="muted">${b.status}</span>
+      const eta =
+        b.status === "in_transit" && b.arriveAt
+          ? `ETA ${Math.max(0, (b.arriveAt - Date.now()) / 3_600_000).toFixed(2)}h`
+          : b.status;
+      row.innerHTML = `<strong>Barge ${b.id.slice(0, 6)}</strong> <span class="muted">${eta}</span>
         ${
           b.status === "docked"
-            ? `<button class="small" data-launch="${b.id}">Load 10 luxury &amp; launch (to own harbor)</button>`
+            ? `<label>Cargo <input type="range" min="1" max="100" value="10" data-cargo="${b.id}" /></label>
+               <button class="small" data-launch="${b.id}">Launch to own shore</button>`
             : b.status === "building"
               ? `<span class="muted">${(b.workerHoursDone ?? 0).toFixed(1)}/${b.workerHoursRequired ?? 20} h</span>`
               : ""
@@ -471,9 +520,13 @@ function renderHarbor(s: PublicSnapshot) {
       btn.onclick = async () => {
         try {
           const lux = st.uniqueLuxury;
+          const slider = list.querySelector<HTMLInputElement>(
+            `input[data-cargo="${btn.dataset.launch}"]`
+          );
+          const amt = Number(slider?.value ?? 10);
           handlers.onSnapshot(
             await api.launchBarge(st.id, btn.dataset.launch!, st.id, [
-              { resource: lux, amount: 10 },
+              { resource: lux, amount: amt },
             ])
           );
           sfx.trade();
@@ -533,31 +586,127 @@ function renderTablets(s: PublicSnapshot) {
 
 function renderAllies(s: PublicSnapshot) {
   const panel = document.getElementById("panel-allies")!;
+  const rep = (s.reputation ?? [])
+    .map(
+      (r) =>
+        `<div class="offer-row"><strong>${r.name}</strong> · ${r.successCount} successful trades
+        <button class="small" data-pref="${r.playerId}">Prefer</button></div>`
+    )
+    .join("");
+  const hist = (s.player.tradeHistory ?? [])
+    .slice()
+    .reverse()
+    .slice(0, 8)
+    .map((h) => `<div class="muted">${h.withName}: ${h.summary}</div>`)
+    .join("");
+  const circles = (s.circles ?? [])
+    .map((c) => `<div>${c.name} (${c.memberIds.length}/12)</div>`)
+    .join("");
+  const legacy = (s.player.legacyAscensions ?? [])
+    .map((a) => `<div>${a.name} · prestige ${a.prestige}</div>`)
+    .join("") || "<div class='muted'>No Ascensions yet</div>";
+  const notes = (s.notifications ?? [])
+    .slice()
+    .reverse()
+    .slice(0, 5)
+    .map((n) => `<div class="muted">${n.title}: ${n.body}</div>`)
+    .join("");
   panel.innerHTML = `
-    <h2>Allies</h2>
-    <p class="muted">Allies list expands with Seals. Prestige: ${s.player.prestige}</p>
-    <p>Trade partners appear as you complete Tablet Wall deals.</p>
+    <h2>Allies & reputation</h2>
+    <p class="muted">Prestige ${s.player.prestige} · preferred partners pin to trade lists</p>
+    <h3>Successful trade partners</h3>
+    ${rep || "<p class='muted'>No completed trades yet</p>"}
+    <h3>Trade history</h3>
+    ${hist || "<p class='muted'>—</p>"}
+    <h3>Trading Circles</h3>
+    ${circles || "<p class='muted'>None joined</p>"}
+    <div class="row"><button class="small" id="mk-circle">Create circle</button></div>
+    <h3>Notifications</h3>
+    ${notes || "<p class='muted'>Quiet shores</p>"}
+    <button class="small secondary" id="read-notes">Mark read</button>
+    <h3>Legacy</h3>
+    ${legacy}
+    <h3>Seasonal</h3>
+    <p class="muted">${s.seasonal ? `${s.seasonal.title}: ${s.seasonal.progress}/${s.seasonal.goalAmount}` : "No event"}</p>
+    <button class="small secondary" id="seasonal-join">Contribute 10 Rations</button>
+    <h3>Cosmetics (no power)</h3>
+    <p class="muted">Owned: ${(s.player.cosmeticsOwned ?? []).join(", ")}</p>
+    <button class="small secondary" id="buy-banner">Unlock river banner (0 Seals demo)</button>
   `;
+  panel.querySelectorAll<HTMLButtonElement>("[data-pref]").forEach((btn) => {
+    btn.onclick = async () => {
+      try {
+        handlers.onSnapshot(await api.partner(btn.dataset.pref!, true));
+      } catch (e) {
+        handlers.onToast((e as Error).message);
+      }
+    };
+  });
+  panel.querySelector("#mk-circle")?.addEventListener("click", async () => {
+    try {
+      handlers.onSnapshot(await api.createCircle("Province partners"));
+      sfx.ok();
+    } catch (e) {
+      handlers.onToast((e as Error).message);
+    }
+  });
+  panel.querySelector("#read-notes")?.addEventListener("click", async () => {
+    try {
+      handlers.onSnapshot(await api.readNotifications());
+    } catch (e) {
+      handlers.onToast((e as Error).message);
+    }
+  });
+  panel.querySelector("#seasonal-join")?.addEventListener("click", async () => {
+    try {
+      await api.seasonal();
+      handlers.onSnapshot(await api.seasonalContribute(10));
+      sfx.ok();
+    } catch (e) {
+      handlers.onToast((e as Error).message);
+    }
+  });
+  panel.querySelector("#buy-banner")?.addEventListener("click", async () => {
+    try {
+      handlers.onSnapshot(await api.purchaseCosmetic("banner_river", 0));
+      sfx.ok();
+    } catch (e) {
+      handlers.onToast((e as Error).message);
+    }
+  });
 }
 
 function renderWall(s: PublicSnapshot) {
   const panel = document.getElementById("panel-wall")!;
   const st = s.settlements[0];
+  const defaultCh = s.player.prefs?.defaultChatChannel ?? "province";
   panel.innerHTML = `
     <h2>Tablet Wall</h2>
+    <p class="muted">Trust trade — no escrow. Province channel is home while on your shore.</p>
+    <div class="row">
+      <select id="chat-channel">
+        <option value="province" ${defaultCh === "province" ? "selected" : ""}>Province</option>
+        <option value="trade" ${defaultCh === "trade" ? "selected" : ""}>Trade</option>
+        <option value="general" ${defaultCh === "general" ? "selected" : ""}>General</option>
+      </select>
+      <input id="chat-search" placeholder="Search…" style="flex:1" />
+    </div>
     <div class="chat-box" id="chat-box"></div>
     <div class="row">
-      <input id="chat-input" placeholder="General / Trade chat…" />
+      <input id="chat-input" placeholder="**bold** *italic* @name emoji ok" />
       <button class="small" id="chat-send">Send</button>
     </div>
-    <h3>Post barter offer</h3>
-    <p class="muted">Give some of your unique luxury for Rations (structured — free text never settles).</p>
+    <h3>Trust offer (Wall)</h3>
+    <p class="muted">You promise goods; taker pays atomically if both still hold stock. Free text never settles.</p>
     <label>Give amount <input id="offer-give" type="number" value="3" min="1" /></label>
     <label>Want rations <input id="offer-want" type="number" value="15" min="1" /></label>
-    <button id="post-offer">Post offer</button>
+    <div class="row">
+      <button id="post-offer">Post trust offer</button>
+      <button class="small secondary" id="save-tpl">Save template</button>
+    </div>
     <h3>Open offers</h3>
     <div id="offer-list"></div>
-    <h3>Market (Rations)</h3>
+    <h3>Market (Rations · province range)</h3>
     <label>Sell resource
       <select id="mkt-res">
         <option value="emmer">Emmer</option>
@@ -571,18 +720,54 @@ function renderWall(s: PublicSnapshot) {
     <div id="mkt-list"></div>
   `;
   const box = panel.querySelector("#chat-box")!;
-  for (const m of s.chat.slice(-40)) {
-    const line = document.createElement("div");
-    line.className = "chat-line";
-    line.textContent = `[${m.channel}] ${m.fromName}: ${m.text}`;
-    box.appendChild(line);
-  }
-  box.scrollTop = box.scrollHeight;
+  const search = () =>
+    ((panel.querySelector("#chat-search") as HTMLInputElement)?.value ?? "").toLowerCase();
+  const redrawChat = () => {
+    const q = search();
+    box.innerHTML = "";
+    const preferred = new Set(s.player.prefs?.preferredPartners ?? []);
+    let msgs = s.chat.slice(-50);
+    if (q) msgs = msgs.filter((m) => m.text.toLowerCase().includes(q) || m.fromName.toLowerCase().includes(q));
+    // Prefer province channel messages first when sorting soft
+    msgs = [...msgs].sort((a, b) => {
+      const ap = preferred.has(a.fromId) ? 1 : 0;
+      const bp = preferred.has(b.fromId) ? 1 : 0;
+      return bp - ap || a.createdAt - b.createdAt;
+    });
+    for (const m of msgs.slice(-40)) {
+      const line = document.createElement("div");
+      line.className = "chat-line chat-md";
+      line.innerHTML = `<span class="muted">[${m.channel}] ${m.fromName}:</span> ${formatChatHtml(m.text)}`;
+      box.appendChild(line);
+    }
+    box.scrollTop = box.scrollHeight;
+  };
+  redrawChat();
+  panel.querySelector("#chat-search")?.addEventListener("input", redrawChat);
   panel.querySelector("#chat-send")?.addEventListener("click", async () => {
     const text = (panel.querySelector("#chat-input") as HTMLInputElement).value;
+    const channel = (panel.querySelector("#chat-channel") as HTMLSelectElement)
+      .value as "general" | "trade" | "province";
     try {
-      handlers.onSnapshot(await api.chat("general", text));
+      handlers.onSnapshot(await api.chat(channel, text));
       sfx.chat();
+    } catch (e) {
+      handlers.onToast((e as Error).message);
+    }
+  });
+  panel.querySelector("#save-tpl")?.addEventListener("click", async () => {
+    if (!st) return;
+    const give = Number((panel.querySelector("#offer-give") as HTMLInputElement).value);
+    const want = Number((panel.querySelector("#offer-want") as HTMLInputElement).value);
+    try {
+      handlers.onSnapshot(
+        await api.saveTemplate(
+          "Luxury for rations",
+          [{ resource: st.uniqueLuxury, amount: give }],
+          [{ resource: "rations", amount: want }]
+        )
+      );
+      sfx.ok();
     } catch (e) {
       handlers.onToast((e as Error).message);
     }

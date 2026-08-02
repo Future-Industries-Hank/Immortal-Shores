@@ -15,16 +15,26 @@ npm run dev
 
 ### Persistence
 
-By default the server uses a **file-backed world store** at `apps/server/data/world.json` (no Docker required). Schema mirrors the Postgres-oriented economy model (vaults, ledger, mail, escrow, market, barges).
+By default the server uses a **file-backed world store** at `apps/server/data/world.json` (no Docker required). Good for single-process dev and Prompt 01/01.5.
 
-### Optional PostgreSQL (docker-compose)
+### PostgreSQL (production multiplayer)
 
 ```bash
 docker compose up -d
-# future: set DATABASE_URL=postgres://immortal:immortal@localhost:5432/immortal_shores
+# Planned: DATABASE_URL=postgres://immortal:immortal@localhost:5432/immortal_shores
 ```
 
-Postgres is specified for production FI hosting; the file store is the Prompt 01 default so agents and players can run without Docker.
+`docker-compose.yml` ships Postgres 16. A full SQL driver is the next hardening step when multi-instance hosts are required; file store remains the documented dev default.
+
+### Live channels
+
+- **WebSocket** `GET /ws?token=` — snapshots + chat/trade/barge/notify events  
+- **Long-poll** `GET /api/poll?since=` — fallback for older browsers  
+
+### Auth
+
+- Dev: name + password register/login (token in `Authorization: Bearer`)  
+- Optional: `POST /api/account/email`, TOTP setup/enable, `POST /api/login-2fa`
 
 ## Environment
 

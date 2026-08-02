@@ -105,7 +105,7 @@ export const api = {
       method: "POST",
       json: { mailId },
     }),
-  chat: (channel: "general" | "trade", text: string) =>
+  chat: (channel: "general" | "trade" | "province" | "private", text: string) =>
     req<PublicSnapshot>("/api/chat", {
       method: "POST",
       json: { channel, text },
@@ -171,4 +171,105 @@ export const api = {
       method: "POST",
       json: { resource, amount },
     }),
+  suggestWorkers: (settlementId: string) =>
+    req<PublicSnapshot>("/api/workers/suggest", {
+      method: "POST",
+      json: { settlementId },
+    }),
+  pauseProduction: (pause: boolean) =>
+    req<PublicSnapshot>("/api/production/pause", {
+      method: "POST",
+      json: { pause },
+    }),
+  tutorialStep: (step: number) =>
+    req<PublicSnapshot>("/api/tutorial/step", {
+      method: "POST",
+      json: { step },
+    }),
+  tutorialGoal: (goal: string) =>
+    req<PublicSnapshot>("/api/tutorial/goal", {
+      method: "POST",
+      json: { goal },
+    }),
+  dismissGoals: () =>
+    req<PublicSnapshot>("/api/tutorial/dismiss-goals", { method: "POST", json: {} }),
+  saveTemplate: (
+    name: string,
+    give: ResourceStack[],
+    want: ResourceStack[]
+  ) =>
+    req<PublicSnapshot>("/api/templates", {
+      method: "POST",
+      json: { name, give, want },
+    }),
+  partner: (partnerId: string, add: boolean) =>
+    req<PublicSnapshot>("/api/partners", {
+      method: "POST",
+      json: { partnerId, add },
+    }),
+  mute: (targetId: string, mute: boolean) =>
+    req<PublicSnapshot>("/api/mute", {
+      method: "POST",
+      json: { targetId, mute },
+    }),
+  notifyPrefs: (patch: Record<string, boolean>) =>
+    req<PublicSnapshot>("/api/notify-prefs", {
+      method: "POST",
+      json: patch,
+    }),
+  readNotifications: () =>
+    req<PublicSnapshot>("/api/notifications/read", { method: "POST", json: {} }),
+  setEmail: (email: string) =>
+    req<PublicSnapshot>("/api/account/email", {
+      method: "POST",
+      json: { email },
+    }),
+  totpSetup: () => req<{ secret: string; otpauth: string }>("/api/account/totp/setup", {
+    method: "POST",
+    json: {},
+  }),
+  totpEnable: (code: string) =>
+    req<PublicSnapshot>("/api/account/totp/enable", {
+      method: "POST",
+      json: { code },
+    }),
+  login2fa: (name: string, password: string, code?: string) =>
+    req<{ token: string; playerId: string }>("/api/login-2fa", {
+      method: "POST",
+      json: { name, password, code },
+    }),
+  listCircles: () =>
+    req<{ id: string; name: string; members: number; max: number }[]>("/api/circles"),
+  createCircle: (name: string) =>
+    req<PublicSnapshot>("/api/circles", { method: "POST", json: { name } }),
+  joinCircle: (circleId: string) =>
+    req<PublicSnapshot>("/api/circles/join", {
+      method: "POST",
+      json: { circleId },
+    }),
+  circlePost: (circleId: string, text: string) =>
+    req<PublicSnapshot>("/api/circles/post", {
+      method: "POST",
+      json: { circleId, text },
+    }),
+  equipCosmetic: (slot: string, cosmeticId: string) =>
+    req<PublicSnapshot>("/api/cosmetics/equip", {
+      method: "POST",
+      json: { slot, cosmeticId },
+    }),
+  purchaseCosmetic: (cosmeticId: string, sealCost = 0) =>
+    req<PublicSnapshot>("/api/cosmetics/purchase", {
+      method: "POST",
+      json: { cosmeticId, sealCost },
+    }),
+  seasonal: () => req<unknown>("/api/seasonal"),
+  seasonalContribute: (amount: number) =>
+    req<PublicSnapshot>("/api/seasonal/contribute", {
+      method: "POST",
+      json: { amount },
+    }),
+  poll: (since: number) =>
+    req<{ serverTime: number; chat: unknown[]; notifications: unknown[] }>(
+      `/api/poll?since=${since}`
+    ),
 };

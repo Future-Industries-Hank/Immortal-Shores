@@ -55,21 +55,23 @@ export type UnitKind = "bowmen" | "spearmen" | "chariot_warriors";
 
 export type MailKind = "gift" | "trade" | "system" | "dm";
 
-export type EscrowState =
+/** Trust-trade offer lifecycle (no bank escrow). */
+export type TradeState =
   | "draft"
   | "posted"
-  | "locked"
   | "completed"
   | "rejected"
   | "expired"
   | "cancelled";
 
+/** @deprecated use TradeState — kept for type compatibility */
+export type EscrowState = TradeState;
+
 export type LedgerReason =
   | "tick_production"
   | "upkeep"
   | "market"
-  | "escrow_lock"
-  | "escrow_settle"
+  | "trade_accept"
   | "gift"
   | "barge_depart"
   | "barge_arrive"
@@ -84,7 +86,10 @@ export type LedgerReason =
   | "worker_growth"
   | "founding"
   | "monument"
-  | "shrine_offering";
+  | "shrine_offering"
+  /** legacy ledger rows from Prompt 01 — do not write new ones */
+  | "escrow_lock"
+  | "escrow_settle";
 
 export interface ResourceStack {
   resource: ResourceId;
@@ -174,10 +179,63 @@ export interface SettlementState {
   createdAt: number;
 }
 
+export interface PlayerPrefs {
+  preferredPartners: string[];
+  mutedPlayerIds: string[];
+  notify: {
+    construction: boolean;
+    barge: boolean;
+    trade: boolean;
+    blessing: boolean;
+    envoy: boolean;
+    email: boolean;
+    push: boolean;
+  };
+  darkMode?: boolean;
+  colorBlind?: boolean;
+  defaultChatChannel?: "general" | "trade" | "province";
+}
+
+export interface TutorialState {
+  completed: boolean;
+  step: number;
+  dismissedGoals: boolean;
+  goals: {
+    mudbrickYard: boolean;
+    rationHouse: boolean;
+    assignWorkers: boolean;
+    luxuryLesson: boolean;
+    firstTrade: boolean;
+    seeGhUpgrade: boolean;
+  };
+}
+
+export interface OfferTemplate {
+  id: string;
+  name: string;
+  give: ResourceStack[];
+  want: ResourceStack[];
+}
+
+export interface TradeHistoryRow {
+  id: string;
+  withPlayerId: string;
+  withName: string;
+  kind: "market" | "wall" | "gift" | "barge";
+  success: boolean;
+  ts: number;
+  summary: string;
+}
+
 export interface PlayerState {
   id: string;
   name: string;
   passwordHash: string;
+  /** Optional account email for 2026 auth */
+  email?: string;
+  /** base32 secret when 2FA enabled */
+  totpSecret?: string;
+  totpEnabled?: boolean;
   vault: VaultBalances;
   seals: number;
   settlementIds: string[];
@@ -187,6 +245,17 @@ export interface PlayerState {
   eternalName?: string;
   createdAt: number;
   lastSeenAt: number;
+  prefs?: PlayerPrefs;
+  tutorial?: TutorialState;
+  offerTemplates?: OfferTemplate[];
+  tradeHistory?: TradeHistoryRow[];
+  /** Cosmetic skin ids owned */
+  cosmeticsOwned?: string[];
+  cosmeticsEquipped?: Record<string, string>;
+  /** Pause non-essential production flag */
+  pauseNonEssential?: boolean;
+  /** Ascension history for Legacy page */
+  legacyAscensions?: { name: string; prestige: number; at: number }[];
 }
 
 export interface MarketOrder {
@@ -205,13 +274,46 @@ export interface TradeOffer {
   posterId: string;
   give: ResourceStack[];
   want: ResourceStack[];
-  state: EscrowState;
-  channel: "trade" | "province" | "private";
+  state: TradeState;
+  channel: "trade" | "province" | "private" | "circle";
   provinceId?: string;
+  circleId?: string;
   createdAt: number;
   expiresAt: number;
   counterpartyId?: string;
   acceptKey?: string;
+}
+
+export interface TradingCircle {
+  id: string;
+  name: string;
+  ownerId: string;
+  memberIds: string[];
+  createdAt: number;
+  /** Private board posts (chat-like) */
+  board: ChatMessage[];
+}
+
+export interface SeasonalEvent {
+  id: string;
+  provinceId: string | "all";
+  title: string;
+  goalResource: ResourceId;
+  goalAmount: number;
+  progress: number;
+  endsAt: number;
+  blessingHours: number;
+  active: boolean;
+}
+
+export interface NotificationItem {
+  id: string;
+  playerId: string;
+  kind: "construction" | "barge" | "trade" | "blessing" | "envoy" | "system";
+  title: string;
+  body: string;
+  ts: number;
+  read: boolean;
 }
 
 export interface MailItem {
@@ -283,9 +385,19 @@ export interface PublicSnapshot {
   player: {
     id: string;
     name: string;
+    email?: string;
     seals: number;
     prestige: number;
     vault: VaultBalances;
+    prefs?: PlayerPrefs;
+    tutorial?: TutorialState;
+    offerTemplates?: OfferTemplate[];
+    tradeHistory?: TradeHistoryRow[];
+    cosmeticsOwned?: string[];
+    cosmeticsEquipped?: Record<string, string>;
+    pauseNonEssential?: boolean;
+    totpEnabled?: boolean;
+    legacyAscensions?: { name: string; prestige: number; at: number }[];
   };
   settlements: SettlementState[];
   mail: MailItem[];
@@ -298,6 +410,13 @@ export interface PublicSnapshot {
   };
   serverTime: number;
   tickSummary?: TickSummary;
+  /** QoL production lines for primary settlement */
+  production?: import("./production.js").BuildingProdLine[];
+  hoursUntilRationEmpty?: number | null;
+  notifications?: NotificationItem[];
+  circles?: TradingCircle[];
+  seasonal?: SeasonalEvent | null;
+  reputation?: { playerId: string; name: string; successCount: number }[];
 }
 
 export interface TickSummary {

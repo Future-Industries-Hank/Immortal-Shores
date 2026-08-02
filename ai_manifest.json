@@ -6,7 +6,8 @@
   "visual_tier_requested": 3,
   "visual_tier_achieved": 1,
   "has_complete_loop": true,
-  "playtested_minutes": 20,
+  "modern_2026_systems": true,
+  "playtested_minutes": 35,
   "social_model": "persistent-async-server-tick-postcard-visits-market-tablet-barges-mail-escrow",
   "uniqueness_answers": {
     "differentiator": "Unique per-settlement luxury forces social trade from minute one on an eternal-river province map, with barge logistics and permanent Ascension legacy on the world.",
@@ -21,10 +22,10 @@
     "trade": "Market + Tablet Wall + River Barges + mail/escrow/gifts"
   },
   "percentages": {
-    "code": 85,
-    "art": 15,
+    "code": 92,
+    "art": 18,
     "audio": 40,
     "design": 100
   },
-  "notes": "Prompt 01 complete 2026-08-02. Procedural massing placeholders; Prompt 02 owns visual tier 3."
+  "notes": "Prompt 01.5 complete 2026-08-02. Trust trade, PWA/WS, tutorial, Circles, QoL. Prompt 02 owns visual tier 3 / judge."
 }

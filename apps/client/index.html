@@ -3,6 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#1e4d6b" />
+    <meta name="description" content="Immortal Shores — river empire builder. Trade, not conquest." />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
     <title>Immortal Shores</title>
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
@@ -55,7 +59,11 @@
           <div id="panel-map" class="side-panel" hidden></div>
         </aside>
         <div id="building-inspect" class="inspect-panel" hidden></div>
-        <p id="hint" class="hint">Colored pads = build sites (shop / special / training) · click buildings to manage</p>
+        <div id="prod-overlay" class="prod-overlay" hidden></div>
+        <div id="tutorial" class="tutorial-panel" hidden></div>
+        <div id="goals" class="goals-panel" hidden></div>
+        <div id="ration-warn" class="ration-warn" hidden></div>
+        <p id="hint" class="hint">Colored pads = build sites · click buildings · trade for other luxuries</p>
         <div id="toast" hidden></div>
       </div>
     </div>

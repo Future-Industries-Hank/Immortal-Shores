@@ -28,10 +28,16 @@ import {
   SETTLEMENT_PLOTS,
   getPlot,
   greatHouseUpgradeCost,
+  hoursUntilRationEmpty,
   makeStarterBuildings,
+  marketProvinceRange,
+  productionOverlay,
+  provinceInRange,
   sealRequiredForGh,
+  suggestWorkerBalance,
   type BuildingKind,
   type LuxuryMaterial,
+  type NotificationItem,
   type PublicSnapshot,
   type ResourceId,
   type ResourceStack,
@@ -40,6 +46,46 @@ import {
 } from "@immortal/shared";
 import { Store } from "./store.js";
 import { applySettlementTick } from "./tick.js";
+
+export type GameEvent =
+  | { type: "chat"; playerId?: string; payload: unknown }
+  | { type: "trade"; playerIds: string[]; payload: unknown }
+  | { type: "tick"; playerId: string; payload: unknown }
+  | { type: "barge"; playerIds: string[]; payload: unknown }
+  | { type: "notify"; playerId: string; payload: NotificationItem };
+
+function defaultPrefs() {
+  return {
+    preferredPartners: [] as string[],
+    mutedPlayerIds: [] as string[],
+    notify: {
+      construction: true,
+      barge: true,
+      trade: true,
+      blessing: true,
+      envoy: true,
+      email: false,
+      push: true,
+    },
+    defaultChatChannel: "province" as const,
+  };
+}
+
+function defaultTutorial() {
+  return {
+    completed: false,
+    step: 0,
+    dismissedGoals: false,
+    goals: {
+      mudbrickYard: false,
+      rationHouse: false,
+      assignWorkers: false,
+      luxuryLesson: false,
+      firstTrade: false,
+      seeGhUpgrade: false,
+    },
+  };
+}
 
 function hashPassword(password: string, salt?: string): string {
   const s = salt ?? randomBytes(16).toString("hex");
@@ -95,9 +141,107 @@ function refundPartial(vault: VaultBalances, cost: ResourceStack[], rate: number
 export class Game {
   store: Store;
   sessions = new Map<string, string>(); // token -> playerId
+  private listeners = new Set<(ev: GameEvent) => void>();
 
   constructor(store = new Store()) {
     this.store = store;
+  }
+
+  onEvent(fn: (ev: GameEvent) => void) {
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
+  }
+
+  private emit(ev: GameEvent) {
+    for (const fn of this.listeners) {
+      try {
+        fn(ev);
+      } catch {
+        /* ignore fanout errors */
+      }
+    }
+  }
+
+  private notify(
+    playerId: string,
+    kind: NotificationItem["kind"],
+    title: string,
+    body: string
+  ) {
+    const player = this.store.world.players[playerId];
+    if (!player) return;
+    const prefs = player.prefs ?? defaultPrefs();
+    const map: Record<string, boolean> = {
+      construction: prefs.notify.construction,
+      barge: prefs.notify.barge,
+      trade: prefs.notify.trade,
+      blessing: prefs.notify.blessing,
+      envoy: prefs.notify.envoy,
+      system: true,
+    };
+    if (!map[kind]) return;
+    const item: NotificationItem = {
+      id: nanoid(),
+      playerId,
+      kind,
+      title,
+      body,
+      ts: Date.now(),
+      read: false,
+    };
+    this.store.world.notifications.push(item);
+    if (this.store.world.notifications.length > 2000) {
+      this.store.world.notifications = this.store.world.notifications.slice(-1500);
+    }
+    this.emit({ type: "notify", playerId, payload: item });
+    this.store.mark();
+  }
+
+  private ensurePlayerDefaults(playerId: string) {
+    const p = this.store.world.players[playerId];
+    if (!p) return;
+    if (!p.prefs) p.prefs = defaultPrefs();
+    if (!p.tutorial) p.tutorial = defaultTutorial();
+    if (!p.offerTemplates) p.offerTemplates = [];
+    if (!p.tradeHistory) p.tradeHistory = [];
+    if (!p.cosmeticsOwned) p.cosmeticsOwned = ["default"];
+    if (!p.cosmeticsEquipped) p.cosmeticsEquipped = { great_house: "default" };
+    if (!p.legacyAscensions) p.legacyAscensions = [];
+  }
+
+  private recordTrade(
+    aId: string,
+    bId: string,
+    kind: "market" | "wall" | "gift" | "barge",
+    summary: string
+  ) {
+    const a = this.store.world.players[aId];
+    const b = this.store.world.players[bId];
+    if (!a || !b) return;
+    this.ensurePlayerDefaults(aId);
+    this.ensurePlayerDefaults(bId);
+    const rowA = {
+      id: nanoid(),
+      withPlayerId: bId,
+      withName: b.name,
+      kind,
+      success: true,
+      ts: Date.now(),
+      summary,
+    };
+    const rowB = {
+      id: nanoid(),
+      withPlayerId: aId,
+      withName: a.name,
+      kind,
+      success: true,
+      ts: Date.now(),
+      summary,
+    };
+    a.tradeHistory!.push(rowA);
+    b.tradeHistory!.push(rowB);
+    a.tradeHistory = a.tradeHistory!.slice(-100);
+    b.tradeHistory = b.tradeHistory!.slice(-100);
   }
 
   private log(
@@ -204,6 +348,14 @@ export class Game {
       ascended: false,
       createdAt: now,
       lastSeenAt: now,
+      prefs: defaultPrefs(),
+      tutorial: defaultTutorial(),
+      offerTemplates: [],
+      tradeHistory: [],
+      cosmeticsOwned: ["default", "banner_papyrus"],
+      cosmeticsEquipped: { great_house: "default", banner: "banner_papyrus" },
+      pauseNonEssential: false,
+      legacyAscensions: [],
     };
     this.store.world.settlements[settlementId] = settlement;
     this.log(id, "rations", STARTER_RATIONS, "starter");
@@ -237,17 +389,25 @@ export class Game {
   tickPlayer(playerId: string) {
     const player = this.store.world.players[playerId];
     if (!player) throw new Error("Unknown player");
+    this.ensurePlayerDefaults(playerId);
     const now = Date.now();
     player.lastSeenAt = now;
     const summaries = [];
     for (const sid of player.settlementIds) {
       const s = this.store.world.settlements[sid];
       if (!s) continue;
+      const hadConstruction = !!s.construction;
       const bless = this.store.world.blessings[s.provinceId];
       const hasShrine = s.buildings.some((b) => b.kind === "shrine");
       const bMult =
         bless && bless.endsAt > now && hasShrine ? 1 + BLESSING_BONUS : 1;
-      const summary = applySettlementTick(s, player.vault, now, bMult);
+      const summary = applySettlementTick(
+        s,
+        player.vault,
+        now,
+        bMult,
+        !!player.pauseNonEssential
+      );
       summaries.push(summary);
       for (const p of summary.produced) {
         this.log(playerId, p.resource, p.amount, "tick_production", "settlement", sid);
@@ -255,9 +415,18 @@ export class Game {
       for (const c of summary.consumed) {
         this.log(playerId, c.resource, -c.amount, "upkeep", "settlement", sid);
       }
+      if (hadConstruction && !s.construction) {
+        this.notify(
+          playerId,
+          "construction",
+          "Construction finished",
+          "A building job completed on your shore."
+        );
+        this.refreshTutorialGoals(playerId);
+      }
     }
-    // barge arrivals
     this.resolveBargeArrivals(now);
+    this.emit({ type: "tick", playerId, payload: summaries[0] });
     this.store.mark();
     return summaries[0];
   }
@@ -276,6 +445,12 @@ export class Game {
               credit(owner.vault, c.resource, c.amount);
               this.log(ownerId, c.resource, c.amount, "barge_arrive", "barge", b.id);
             }
+            this.notify(ownerId, "barge", "Barge arrived", "Cargo delivered to a shore.");
+            this.emit({
+              type: "barge",
+              playerIds: [ownerId, s.playerId],
+              payload: { bargeId: b.id, status: "arrived" },
+            });
           }
           b.cargo = [];
         }
@@ -284,17 +459,38 @@ export class Game {
   }
 
   snapshot(playerId: string): PublicSnapshot {
+    this.ensurePlayerDefaults(playerId);
     const tickSummary = this.tickPlayer(playerId);
     const player = this.store.world.players[playerId]!;
     const settlements = player.settlementIds
       .map((id) => this.store.world.settlements[id])
-      .filter(Boolean);
+      .filter(Boolean) as import("@immortal/shared").SettlementState[];
+    const primary = settlements[0];
 
     const mail = this.store.world.mail
       .filter((m) => m.toId === playerId || m.fromId === playerId)
       .slice(-100);
-    const chat = this.store.world.chat.slice(-80);
-    const market = this.store.world.market.filter((o) => o.expiresAt > Date.now());
+    const muted = new Set(player.prefs?.mutedPlayerIds ?? []);
+    const chat = this.store.world.chat
+      .filter((c) => !muted.has(c.fromId))
+      .slice(-100);
+
+    // Market range by Market building level + province river distance
+    let marketLevel = 1;
+    if (primary) {
+      const mkt = primary.buildings.find((b) => b.kind === "market");
+      marketLevel = mkt?.level ?? 1;
+    }
+    const range = marketProvinceRange(marketLevel);
+    const myProv = PROVINCES.find((p) => p.id === primary?.provinceId);
+    const myRiver = myProv?.riverIndex ?? 0;
+    const market = this.store.world.market.filter((o) => {
+      if (o.expiresAt <= Date.now()) return false;
+      if (o.sellerId === playerId) return true;
+      const orderProv = PROVINCES.find((p) => p.id === o.provinceId);
+      return provinceInRange(myRiver, orderProv?.riverIndex ?? 0, range);
+    });
+
     const offers = this.store.world.offers.filter(
       (o) =>
         o.state === "posted" ||
@@ -302,13 +498,54 @@ export class Game {
         o.counterpartyId === playerId
     );
 
+    const production = primary
+      ? productionOverlay(primary, !!player.pauseNonEssential)
+      : [];
+    const rationHours = primary
+      ? hoursUntilRationEmpty(player.vault, primary, !!player.pauseNonEssential)
+      : null;
+
+    const notifications = this.store.world.notifications
+      .filter((n) => n.playerId === playerId)
+      .slice(-40);
+
+    const circles = this.store.world.circles.filter((c) =>
+      c.memberIds.includes(playerId)
+    );
+
+    // Reputation from trade history
+    const repMap = new Map<string, { playerId: string; name: string; successCount: number }>();
+    for (const row of player.tradeHistory ?? []) {
+      if (!row.success) continue;
+      const cur = repMap.get(row.withPlayerId) ?? {
+        playerId: row.withPlayerId,
+        name: row.withName,
+        successCount: 0,
+      };
+      cur.successCount += 1;
+      repMap.set(row.withPlayerId, cur);
+    }
+    const reputation = [...repMap.values()].sort(
+      (a, b) => b.successCount - a.successCount
+    );
+
     return {
       player: {
         id: player.id,
         name: player.name,
+        email: player.email,
         seals: player.seals,
         prestige: player.prestige,
         vault: { ...player.vault },
+        prefs: player.prefs,
+        tutorial: player.tutorial,
+        offerTemplates: player.offerTemplates,
+        tradeHistory: player.tradeHistory?.slice(-30),
+        cosmeticsOwned: player.cosmeticsOwned,
+        cosmeticsEquipped: player.cosmeticsEquipped,
+        pauseNonEssential: player.pauseNonEssential,
+        totpEnabled: !!player.totpEnabled,
+        legacyAscensions: player.legacyAscensions,
       },
       settlements: structuredClone(settlements),
       mail: structuredClone(mail),
@@ -321,6 +558,14 @@ export class Game {
       },
       serverTime: Date.now(),
       tickSummary,
+      production,
+      hoursUntilRationEmpty: rationHours,
+      notifications: structuredClone(notifications),
+      circles: structuredClone(circles),
+      seasonal: this.store.world.seasonal
+        ? structuredClone(this.store.world.seasonal)
+        : null,
+      reputation,
     };
   }
 
@@ -344,6 +589,7 @@ export class Game {
     }
     b.workers = workers;
     s.workersAssigned = s.buildings.reduce((n, x) => n + x.workers, 0);
+    if (workers > 0) this.markTutorialGoal(playerId, "assignWorkers");
     this.store.mark();
   }
 
@@ -414,6 +660,9 @@ export class Game {
       if (kind === "luxury_material") {
         luxury = s.uniqueLuxury;
       }
+      if (kind === "mudbrick_yard") this.markTutorialGoal(playerId, "mudbrickYard");
+      if (kind === "ration_house") this.markTutorialGoal(playerId, "rationHouse");
+      if (kind === "luxury_material") this.markTutorialGoal(playerId, "luxuryLesson");
     }
 
     if (sealCost > 0 && player.seals < sealCost) {
@@ -477,7 +726,8 @@ export class Game {
     this.tickPlayer(playerId);
     const player = this.store.world.players[playerId]!;
     if (amount <= 0 || priceRations <= 0) throw new Error("Invalid order");
-    if (resource === "seals") throw new Error("Use gift/escrow for Seals");
+    if (resource === "seals") throw new Error("Use gifts or Wall for Seals");
+    // Market listing: goods leave vault when listed (seller commits inventory to sale)
     if (!debit(player.vault, resource, amount)) throw new Error("Insufficient goods");
     this.log(playerId, resource, -amount, "market", "list");
     const order = {
@@ -502,6 +752,23 @@ export class Game {
     if (idx < 0) throw new Error("Order not found");
     const order = this.store.world.market[idx]!;
     if (order.sellerId === playerId) throw new Error("Cannot buy own order");
+    // Range check
+    const buyerSettlements = buyer.settlementIds
+      .map((id) => this.store.world.settlements[id])
+      .filter(Boolean);
+    const primary = buyerSettlements[0];
+    if (primary) {
+      const mkt = primary.buildings.find((b) => b.kind === "market");
+      const range = marketProvinceRange(mkt?.level ?? 1);
+      const myRiver =
+        PROVINCES.find((p) => p.id === primary.provinceId)?.riverIndex ?? 0;
+      const orderRiver =
+        PROVINCES.find((p) => p.id === order.provinceId)?.riverIndex ?? 0;
+      if (!provinceInRange(myRiver, orderRiver, range)) {
+        throw new Error("Order outside your Market province range");
+      }
+    }
+    // Atomic take: buyer pays Rations immediately
     if (!debit(buyer.vault, "rations", order.priceRations)) {
       throw new Error("Not enough Rations");
     }
@@ -513,35 +780,45 @@ export class Game {
     this.log(playerId, order.resource, order.amount, "market", "buy", orderId);
     this.log(order.sellerId, "rations", order.priceRations, "market", "sell", orderId);
     this.store.world.market.splice(idx, 1);
+    this.recordTrade(
+      playerId,
+      order.sellerId,
+      "market",
+      `${order.amount} ${order.resource} @ ${order.priceRations} rations`
+    );
+    this.notify(order.sellerId, "trade", "Market sale", `Sold ${order.amount} ${order.resource}`);
+    this.emit({
+      type: "trade",
+      playerIds: [playerId, order.sellerId],
+      payload: { kind: "market", orderId },
+    });
     this.store.mark();
   }
 
-  // --- Trade offers / escrow ---
+  /**
+   * Trust-based Tablet Wall offer — NO vault lock / escrow hold.
+   * Poster promises give[]; accepter must be able to pay want[] at accept time.
+   * Atomic swap only when accepter takes the offer.
+   */
   postOffer(
     playerId: string,
     give: ResourceStack[],
     want: ResourceStack[],
-    channel: "trade" | "province" | "private" = "trade"
+    channel: "trade" | "province" | "private" | "circle" = "trade",
+    circleId?: string
   ) {
     this.tickPlayer(playerId);
     const player = this.store.world.players[playerId]!;
     this.assertSealFloor(player, give);
-    // soft-hold give side
+    // Soft check only — do not debit (trust model)
     for (const g of give) {
       if (g.resource === "seals") {
-        if (player.seals < g.amount) throw new Error("Not enough Seals");
-      } else if (!debit(player.vault, g.resource, g.amount)) {
-        throw new Error(`Not enough ${g.resource}`);
+        if (player.seals < g.amount) throw new Error("Not enough Seals to promise");
+      } else if ((player.vault[g.resource] ?? 0) < g.amount) {
+        throw new Error(`Not enough ${g.resource} to promise (trust listing)`);
       }
     }
-    for (const g of give) {
-      if (g.resource === "seals") {
-        player.seals -= g.amount;
-        this.log(playerId, "seals", -g.amount, "escrow_lock");
-      } else {
-        this.log(playerId, g.resource, -g.amount, "escrow_lock");
-      }
-    }
+    const settlement = this.store.world.settlements[player.settlementIds[0]!];
     const offer = {
       id: nanoid(),
       posterId: playerId,
@@ -549,19 +826,23 @@ export class Game {
       want,
       state: "posted" as const,
       channel,
+      provinceId: settlement?.provinceId,
+      circleId,
       createdAt: Date.now(),
       expiresAt: Date.now() + 3 * 86400_000,
     };
     this.store.world.offers.push(offer);
     this.store.world.chat.push({
       id: nanoid(),
-      channel: "trade",
+      channel: channel === "circle" ? "trade" : channel === "private" ? "trade" : channel,
+      provinceId: settlement?.provinceId,
       fromId: playerId,
       fromName: player.name,
-      text: `Offer ${offer.id.slice(0, 6)}: give ${fmtStacks(give)} for ${fmtStacks(want)}`,
+      text: `Trust offer ${offer.id.slice(0, 6)}: give ${fmtStacks(give)} for ${fmtStacks(want)}`,
       offerId: offer.id,
       createdAt: Date.now(),
     });
+    this.emit({ type: "chat", payload: { offerId: offer.id } });
     this.store.mark();
     return offer;
   }
@@ -575,8 +856,19 @@ export class Game {
     if (offer.acceptKey && offer.acceptKey !== acceptKey) {
       throw new Error("Idempotent accept key mismatch");
     }
+    const poster = this.store.world.players[offer.posterId];
+    if (!poster) throw new Error("Poster gone");
+
+    // Atomic: both sides must hold goods NOW (trust — no prior escrow lock)
     this.assertSealFloor(acceptor, offer.want);
-    // lock acceptor's want side then swap
+    this.assertSealFloor(poster, offer.give);
+    for (const g of offer.give) {
+      if (g.resource === "seals") {
+        if (poster.seals < g.amount) throw new Error("Poster no longer has promised Seals");
+      } else if ((poster.vault[g.resource] ?? 0) < g.amount) {
+        throw new Error("Poster no longer has promised goods (trust failed)");
+      }
+    }
     for (const w of offer.want) {
       if (w.resource === "seals") {
         if (acceptor.seals < w.amount) throw new Error("Not enough Seals");
@@ -584,41 +876,53 @@ export class Game {
         throw new Error(`Not enough ${w.resource}`);
       }
     }
+
+    // Swap
+    for (const g of offer.give) {
+      if (g.resource === "seals") {
+        poster.seals -= g.amount;
+        acceptor.seals += g.amount;
+        this.log(poster.id, "seals", -g.amount, "trade_accept", "wall", offerId);
+        this.log(acceptor.id, "seals", g.amount, "trade_accept", "wall", offerId);
+      } else {
+        debit(poster.vault, g.resource, g.amount);
+        credit(acceptor.vault, g.resource, g.amount);
+        this.log(poster.id, g.resource, -g.amount, "trade_accept", "wall", offerId);
+        this.log(acceptor.id, g.resource, g.amount, "trade_accept", "wall", offerId);
+      }
+    }
     for (const w of offer.want) {
       if (w.resource === "seals") {
         acceptor.seals -= w.amount;
-        this.log(playerId, "seals", -w.amount, "escrow_settle");
+        poster.seals += w.amount;
+        this.log(acceptor.id, "seals", -w.amount, "trade_accept", "wall", offerId);
+        this.log(poster.id, "seals", w.amount, "trade_accept", "wall", offerId);
       } else {
         debit(acceptor.vault, w.resource, w.amount);
-        this.log(playerId, w.resource, -w.amount, "escrow_settle");
+        credit(poster.vault, w.resource, w.amount);
+        this.log(acceptor.id, w.resource, -w.amount, "trade_accept", "wall", offerId);
+        this.log(poster.id, w.resource, w.amount, "trade_accept", "wall", offerId);
       }
     }
-    // poster already locked give; credit acceptor
-    for (const g of offer.give) {
-      if (g.resource === "seals") {
-        acceptor.seals += g.amount;
-        this.log(playerId, "seals", g.amount, "escrow_settle");
-      } else {
-        credit(acceptor.vault, g.resource, g.amount);
-        this.log(playerId, g.resource, g.amount, "escrow_settle");
-      }
-    }
-    // credit poster the want
-    const poster = this.store.world.players[offer.posterId];
-    if (poster) {
-      for (const w of offer.want) {
-        if (w.resource === "seals") {
-          poster.seals += w.amount;
-          this.log(poster.id, "seals", w.amount, "escrow_settle");
-        } else {
-          credit(poster.vault, w.resource, w.amount);
-          this.log(poster.id, w.resource, w.amount, "escrow_settle");
-        }
-      }
-    }
+
     offer.state = "completed";
     offer.counterpartyId = playerId;
     offer.acceptKey = acceptKey ?? nanoid();
+    this.recordTrade(
+      playerId,
+      poster.id,
+      "wall",
+      `${fmtStacks(offer.give)} ↔ ${fmtStacks(offer.want)}`
+    );
+    this.notify(poster.id, "trade", "Wall trade completed", `Your offer was accepted by ${acceptor.name}`);
+    this.emit({
+      type: "trade",
+      playerIds: [playerId, poster.id],
+      payload: { kind: "wall", offerId },
+    });
+    // Tutorial goal
+    this.markTutorialGoal(playerId, "firstTrade");
+    this.markTutorialGoal(poster.id, "firstTrade");
     this.store.mark();
   }
 
@@ -705,12 +1009,14 @@ export class Game {
     offerId?: string
   ) {
     const player = this.store.world.players[playerId]!;
-    text = text.trim().slice(0, 500);
+    text = text.trim().slice(0, 800);
     if (!text) throw new Error("Empty message");
     // free text never executes transfers
+    const settlement = this.store.world.settlements[player.settlementIds[0]!];
     const msg = {
       id: nanoid(),
       channel,
+      provinceId: settlement?.provinceId,
       fromId: playerId,
       fromName: player.name,
       text,
@@ -721,6 +1027,7 @@ export class Game {
     if (this.store.world.chat.length > 500) {
       this.store.world.chat = this.store.world.chat.slice(-400);
     }
+    this.emit({ type: "chat", payload: msg });
     this.store.mark();
     return msg;
   }
@@ -794,6 +1101,16 @@ export class Game {
         this.log(playerId, "rations", 0, "barge_loss", "barge", bargeId);
       }
     }
+    this.emit({
+      type: "barge",
+      playerIds: [playerId, dest.playerId],
+      payload: {
+        bargeId,
+        departAt: barge.departAt,
+        arriveAt: barge.arriveAt,
+        etaHours: hours,
+      },
+    });
     this.store.mark();
     return barge;
   }
@@ -1089,6 +1406,301 @@ export class Game {
     };
   }
 
+  // --- Prompt 01.5 modern APIs ---
+
+  markTutorialGoal(
+    playerId: string,
+    goal: keyof NonNullable<
+      import("@immortal/shared").TutorialState["goals"]
+    >
+  ) {
+    this.ensurePlayerDefaults(playerId);
+    const t = this.store.world.players[playerId]!.tutorial!;
+    if (t.goals[goal]) return;
+    t.goals[goal] = true;
+    if (Object.values(t.goals).every(Boolean)) {
+      t.completed = true;
+      t.step = 99;
+    }
+    this.store.mark();
+  }
+
+  refreshTutorialGoals(playerId: string) {
+    const p = this.store.world.players[playerId];
+    if (!p) return;
+    this.ensurePlayerDefaults(playerId);
+    for (const sid of p.settlementIds) {
+      const s = this.store.world.settlements[sid];
+      if (!s) continue;
+      if (s.buildings.some((b) => b.kind === "mudbrick_yard")) {
+        this.markTutorialGoal(playerId, "mudbrickYard");
+      }
+      if (s.buildings.some((b) => b.kind === "ration_house")) {
+        this.markTutorialGoal(playerId, "rationHouse");
+      }
+      if (s.buildings.some((b) => b.workers > 0)) {
+        this.markTutorialGoal(playerId, "assignWorkers");
+      }
+      if (s.buildings.some((b) => b.kind === "luxury_material")) {
+        this.markTutorialGoal(playerId, "luxuryLesson");
+      }
+    }
+  }
+
+  setTutorialStep(playerId: string, step: number) {
+    this.ensurePlayerDefaults(playerId);
+    const t = this.store.world.players[playerId]!.tutorial!;
+    t.step = step;
+    if (step >= 5) this.markTutorialGoal(playerId, "seeGhUpgrade");
+    if (step >= 3) this.markTutorialGoal(playerId, "luxuryLesson");
+    this.store.mark();
+    return t;
+  }
+
+  dismissGoals(playerId: string) {
+    this.ensurePlayerDefaults(playerId);
+    this.store.world.players[playerId]!.tutorial!.dismissedGoals = true;
+    this.store.mark();
+  }
+
+  setPauseNonEssential(playerId: string, pause: boolean) {
+    this.ensurePlayerDefaults(playerId);
+    this.store.world.players[playerId]!.pauseNonEssential = pause;
+    this.store.mark();
+  }
+
+  applySuggestedWorkers(playerId: string, settlementId: string) {
+    this.tickPlayer(playerId);
+    const s = this.requireOwnedSettlement(playerId, settlementId);
+    const plan = suggestWorkerBalance(s);
+    for (const row of plan) {
+      const b = s.buildings.find((x) => x.id === row.buildingId);
+      if (!b) continue;
+      b.workers = row.workers;
+    }
+    s.workersAssigned = s.buildings.reduce((n, b) => n + b.workers, 0);
+    this.markTutorialGoal(playerId, "assignWorkers");
+    this.store.mark();
+  }
+
+  saveOfferTemplate(
+    playerId: string,
+    name: string,
+    give: ResourceStack[],
+    want: ResourceStack[]
+  ) {
+    this.ensurePlayerDefaults(playerId);
+    const p = this.store.world.players[playerId]!;
+    const t = { id: nanoid(), name, give, want };
+    p.offerTemplates!.push(t);
+    p.offerTemplates = p.offerTemplates!.slice(-20);
+    this.store.mark();
+    return t;
+  }
+
+  setPreferredPartner(playerId: string, partnerId: string, add: boolean) {
+    this.ensurePlayerDefaults(playerId);
+    const prefs = this.store.world.players[playerId]!.prefs!;
+    if (add) {
+      if (!prefs.preferredPartners.includes(partnerId)) {
+        prefs.preferredPartners.push(partnerId);
+      }
+    } else {
+      prefs.preferredPartners = prefs.preferredPartners.filter((id) => id !== partnerId);
+    }
+    this.store.mark();
+  }
+
+  mutePlayer(playerId: string, targetId: string, mute: boolean) {
+    this.ensurePlayerDefaults(playerId);
+    const prefs = this.store.world.players[playerId]!.prefs!;
+    if (mute) {
+      if (!prefs.mutedPlayerIds.includes(targetId)) prefs.mutedPlayerIds.push(targetId);
+    } else {
+      prefs.mutedPlayerIds = prefs.mutedPlayerIds.filter((id) => id !== targetId);
+    }
+    this.store.mark();
+  }
+
+  updateNotifyPrefs(
+    playerId: string,
+    patch: Partial<NonNullable<import("@immortal/shared").PlayerPrefs["notify"]>>
+  ) {
+    this.ensurePlayerDefaults(playerId);
+    Object.assign(this.store.world.players[playerId]!.prefs!.notify, patch);
+    this.store.mark();
+  }
+
+  setEmail(playerId: string, email: string) {
+    const p = this.store.world.players[playerId]!;
+    p.email = email.trim().toLowerCase().slice(0, 120);
+    this.store.mark();
+  }
+
+  /** Dev-friendly TOTP: stores secret; verify with 6-digit code when enabled */
+  setupTotp(playerId: string) {
+    const p = this.store.world.players[playerId]!;
+    // base32-ish secret for demo (not full RFC6238 library — simple shared secret)
+    const secret = nanoid(16).replace(/[^a-zA-Z2-7]/g, "A").slice(0, 16).toUpperCase();
+    p.totpSecret = secret;
+    p.totpEnabled = false;
+    this.store.mark();
+    return { secret, otpauth: `otpauth://totp/ImmortalShores:${p.name}?secret=${secret}&issuer=ImmortalShores` };
+  }
+
+  enableTotp(playerId: string, code: string) {
+    const p = this.store.world.players[playerId]!;
+    if (!p.totpSecret) throw new Error("Call setupTotp first");
+    if (!verifyTotp(p.totpSecret, code)) throw new Error("Invalid code");
+    p.totpEnabled = true;
+    this.store.mark();
+  }
+
+  loginWithTotp(name: string, password: string, code?: string) {
+    const result = this.login(name, password);
+    const p = this.store.world.players[result.playerId]!;
+    if (p.totpEnabled) {
+      if (!code || !p.totpSecret || !verifyTotp(p.totpSecret, code)) {
+        this.sessions.delete(result.token);
+        throw new Error("2FA code required");
+      }
+    }
+    return result;
+  }
+
+  createCircle(playerId: string, name: string) {
+    const circle = {
+      id: nanoid(),
+      name: name.slice(0, 40) || "Trading Circle",
+      ownerId: playerId,
+      memberIds: [playerId],
+      createdAt: Date.now(),
+      board: [] as import("@immortal/shared").ChatMessage[],
+    };
+    this.store.world.circles.push(circle);
+    this.store.mark();
+    return circle;
+  }
+
+  joinCircle(playerId: string, circleId: string) {
+    const c = this.store.world.circles.find((x) => x.id === circleId);
+    if (!c) throw new Error("Circle not found");
+    if (c.memberIds.includes(playerId)) return c;
+    if (c.memberIds.length >= 12) throw new Error("Circle full (max 12)");
+    c.memberIds.push(playerId);
+    this.store.mark();
+    return c;
+  }
+
+  postCircleBoard(playerId: string, circleId: string, text: string) {
+    const c = this.store.world.circles.find((x) => x.id === circleId);
+    if (!c || !c.memberIds.includes(playerId)) throw new Error("Not a member");
+    const player = this.store.world.players[playerId]!;
+    const msg = {
+      id: nanoid(),
+      channel: "trade" as const,
+      fromId: playerId,
+      fromName: player.name,
+      text: text.slice(0, 500),
+      createdAt: Date.now(),
+    };
+    c.board.push(msg);
+    c.board = c.board.slice(-100);
+    this.store.mark();
+    return msg;
+  }
+
+  listCircles() {
+    return this.store.world.circles.map((c) => ({
+      id: c.id,
+      name: c.name,
+      ownerId: c.ownerId,
+      members: c.memberIds.length,
+      max: 12,
+    }));
+  }
+
+  equipCosmetic(playerId: string, slot: string, cosmeticId: string) {
+    this.ensurePlayerDefaults(playerId);
+    const p = this.store.world.players[playerId]!;
+    if (!p.cosmeticsOwned!.includes(cosmeticId) && cosmeticId !== "default") {
+      throw new Error("Cosmetic not owned");
+    }
+    p.cosmeticsEquipped![slot] = cosmeticId;
+    this.store.mark();
+  }
+
+  purchaseCosmetic(playerId: string, cosmeticId: string, sealCost = 0) {
+    // Cosmetics only — Seals may fund cosmetics, never combat power
+    this.ensurePlayerDefaults(playerId);
+    const p = this.store.world.players[playerId]!;
+    if (p.cosmeticsOwned!.includes(cosmeticId)) return;
+    if (sealCost > 0) {
+      if (p.seals - sealCost < 10) throw new Error("Cannot go below 10 Seals");
+      p.seals -= sealCost;
+      this.log(playerId, "seals", -sealCost, "seal_purchase", "cosmetic", cosmeticId);
+    }
+    p.cosmeticsOwned!.push(cosmeticId);
+    this.store.mark();
+  }
+
+  ensureSeasonalEvent() {
+    const now = Date.now();
+    if (this.store.world.seasonal && this.store.world.seasonal.endsAt > now) {
+      return this.store.world.seasonal;
+    }
+    this.store.world.seasonal = {
+      id: nanoid(),
+      provinceId: "all",
+      title: "Provincial Harvest Week",
+      goalResource: "rations",
+      goalAmount: 50000,
+      progress: 0,
+      endsAt: now + 7 * 86400_000,
+      blessingHours: 24,
+      active: true,
+    };
+    this.store.mark();
+    return this.store.world.seasonal;
+  }
+
+  contributeSeasonal(playerId: string, amount: number) {
+    const ev = this.ensureSeasonalEvent();
+    if (!ev.active) throw new Error("No active event");
+    this.tickPlayer(playerId);
+    const p = this.store.world.players[playerId]!;
+    if (!debit(p.vault, ev.goalResource, amount)) throw new Error("Not enough resources");
+    this.log(playerId, ev.goalResource, -amount, "admin", "seasonal");
+    ev.progress += amount;
+    if (ev.progress >= ev.goalAmount) {
+      ev.active = false;
+      // temporary all-province blessing
+      for (const prov of PROVINCES) {
+        this.store.world.blessings[prov.id] = {
+          endsAt: Date.now() + ev.blessingHours * 3_600_000,
+          good: "rations",
+        };
+      }
+    }
+    this.store.mark();
+    return ev;
+  }
+
+  markNotificationsRead(playerId: string) {
+    for (const n of this.store.world.notifications) {
+      if (n.playerId === playerId) n.read = true;
+    }
+    this.store.mark();
+  }
+
+  longPoll(playerId: string, since: number) {
+    const chat = this.store.world.chat.filter((c) => c.createdAt > since).slice(-30);
+    const notes = this.store.world.notifications.filter(
+      (n) => n.playerId === playerId && n.ts > since
+    );
+    return { serverTime: Date.now(), chat, notifications: notes };
+  }
+
   // --- Dev/admin ---
   adminGrant(playerId: string, resource: ResourceId, amount: number) {
     const player = this.store.world.players[playerId];
@@ -1131,4 +1743,21 @@ export class Game {
 
 function fmtStacks(stacks: ResourceStack[]): string {
   return stacks.map((s) => `${s.amount} ${s.resource}`).join(", ");
+}
+
+/** Lightweight TOTP-ish check for rev 1.5 (30s window, SHA-less digit fold of secret+slot). */
+function verifyTotp(secret: string, code: string): boolean {
+  const slot = Math.floor(Date.now() / 30000);
+  for (const s of [slot - 1, slot, slot + 1]) {
+    const expected = simpleOtp(secret, s);
+    if (expected === code.trim()) return true;
+  }
+  return false;
+}
+
+function simpleOtp(secret: string, slot: number): string {
+  let h = 0;
+  const raw = `${secret}:${slot}`;
+  for (let i = 0; i < raw.length; i++) h = (h * 33 + raw.charCodeAt(i)) >>> 0;
+  return String(h % 1000000).padStart(6, "0");
 }

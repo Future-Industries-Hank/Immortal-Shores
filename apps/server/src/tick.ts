@@ -17,6 +17,7 @@ import {
   type TickSummary,
   type VaultBalances,
 } from "@immortal/shared";
+// BuildingState used for pause-non-essential effective workers
 
 function add(vault: VaultBalances, resource: ResourceId, amount: number) {
   vault[resource] = (vault[resource] ?? 0) + amount;
@@ -113,11 +114,20 @@ function produceFromBuilding(
   produced.set(rule.output, (produced.get(rule.output) ?? 0) + units);
 }
 
+const ESSENTIAL_KINDS = new Set([
+  "emmer_field",
+  "ration_house",
+  "river_clay_pit",
+  "marsh_reed_bed",
+  "mudbrick_yard",
+]);
+
 export function applySettlementTick(
   settlement: SettlementState,
   vault: VaultBalances,
   now: number,
-  blessingMult = 1
+  blessingMult = 1,
+  pauseNonEssential = false
 ): TickSummary {
   const elapsedMs = Math.max(0, now - settlement.lastTickAt);
   let hours = elapsedMs / 3_600_000;
@@ -133,19 +143,26 @@ export function applySettlementTick(
     };
   }
 
+  // Effective workers (pause non-essential without clearing assignments)
+  const effWorkers = (b: BuildingState) => {
+    if (pauseNonEssential && !ESSENTIAL_KINDS.has(b.kind)) return 0;
+    return b.workers;
+  };
+
   const assigned = settlement.buildings.reduce((s, b) => s + b.workers, 0);
+  const assignedEff = settlement.buildings.reduce((s, b) => s + effWorkers(b), 0);
   settlement.workersAssigned = assigned;
 
   const mult =
-    shortageMultiplier(get(vault, "rations"), assigned, hours) *
+    shortageMultiplier(get(vault, "rations"), assignedEff, hours) *
     monumentProdBonus(settlement) *
     blessingMult;
 
   const produced = new Map<ResourceId, number>();
   const consumed = new Map<ResourceId, number>();
 
-  // Upkeep first (partial if short)
-  const upkeepNeeded = assigned * RATION_UPKEEP_PER_WORKER_HOUR * hours;
+  // Upkeep first (partial if short) — only active production workers
+  const upkeepNeeded = assignedEff * RATION_UPKEEP_PER_WORKER_HOUR * hours;
   const upkeepPaid = Math.min(get(vault, "rations"), upkeepNeeded);
   if (upkeepPaid > 0) {
     add(vault, "rations", -upkeepPaid);
@@ -153,7 +170,8 @@ export function applySettlementTick(
   }
 
   for (const b of settlement.buildings) {
-    produceFromBuilding(b, hours, mult, vault, produced, consumed);
+    const active = { ...b, workers: effWorkers(b) };
+    produceFromBuilding(active, hours, mult, vault, produced, consumed);
   }
 
   // Monument limestone

@@ -7,10 +7,13 @@ import type {
   MailItem,
   MapSite,
   MarketOrder,
+  NotificationItem,
   PlayerState,
   Postcard,
+  SeasonalEvent,
   SettlementState,
   TradeOffer,
+  TradingCircle,
 } from "@immortal/shared";
 import { PROVINCES } from "@immortal/shared";
 
@@ -22,7 +25,7 @@ function dataPaths() {
 }
 
 export interface WorldState {
-  schemaVersion: 1;
+  schemaVersion: 2;
   players: Record<string, PlayerState>;
   settlements: Record<string, SettlementState>;
   market: MarketOrder[];
@@ -35,11 +38,14 @@ export interface WorldState {
   /** Province blessing ends at ms epoch, keyed by provinceId */
   blessings: Record<string, { endsAt: number; good: string }>;
   shrineOfferings: Record<string, number>;
+  circles: TradingCircle[];
+  notifications: NotificationItem[];
+  seasonal: SeasonalEvent | null;
 }
 
 function emptyWorld(): WorldState {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     players: {},
     settlements: {},
     market: [],
@@ -51,6 +57,23 @@ function emptyWorld(): WorldState {
     postcards: [],
     blessings: {},
     shrineOfferings: {},
+    circles: [],
+    notifications: [],
+    seasonal: null,
+  };
+}
+
+function migrateWorld(w: WorldState): WorldState {
+  const base = emptyWorld();
+  return {
+    ...base,
+    ...w,
+    schemaVersion: 2,
+    circles: w.circles ?? [],
+    notifications: w.notifications ?? [],
+    seasonal: w.seasonal ?? null,
+    players: w.players ?? {},
+    settlements: w.settlements ?? {},
   };
 }
 
@@ -97,7 +120,8 @@ export class Store {
     mkdirSync(DATA_DIR, { recursive: true });
     if (existsSync(DATA_FILE)) {
       try {
-        this.world = JSON.parse(readFileSync(DATA_FILE, "utf8")) as WorldState;
+        const raw = JSON.parse(readFileSync(DATA_FILE, "utf8")) as WorldState;
+        this.world = migrateWorld(raw);
       } catch {
         this.world = emptyWorld();
       }

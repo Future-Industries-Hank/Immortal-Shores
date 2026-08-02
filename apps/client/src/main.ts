@@ -6,6 +6,7 @@ import {
   selectBuilding,
   selectPad,
 } from "./ui.js";
+import { applyAppearance, initModern, renderModernHud } from "./modern.js";
 import type { PublicSnapshot } from "@immortal/shared";
 import { sfx } from "./audio.js";
 
@@ -27,6 +28,8 @@ function toast(msg: string) {
 function applySnapshot(s: PublicSnapshot) {
   snap = s;
   renderSnapshot(s);
+  renderModernHud(s);
+  applyAppearance(s);
   if (view && s.settlements[0]) view.sync(s.settlements[0]);
 }
 
@@ -69,6 +72,8 @@ async function enterGame() {
     onHighlightBuilding: (id) => view?.highlightBuilding(id),
     onHighlightPad: (plotId) => view?.highlightPad(plotId),
   });
+
+  initModern({ onSnapshot: applySnapshot, onToast: toast });
 
   const s = await api.me();
   applySnapshot(s);

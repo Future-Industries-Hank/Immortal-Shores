@@ -284,7 +284,159 @@ app.post<{ Body: { resource: string; amount: number } }>(
   }
 );
 
-// WebSocket push of snapshots
+// --- Prompt 01.5 routes ---
+app.post<{ Body: { settlementId: string } }>("/api/workers/suggest", async (req) => {
+  const id = auth(req);
+  game.applySuggestedWorkers(id, req.body.settlementId);
+  return game.snapshot(id);
+});
+
+app.post<{ Body: { pause: boolean } }>("/api/production/pause", async (req) => {
+  const id = auth(req);
+  game.setPauseNonEssential(id, !!req.body.pause);
+  return game.snapshot(id);
+});
+
+app.post<{ Body: { step: number } }>("/api/tutorial/step", async (req) => {
+  const id = auth(req);
+  game.setTutorialStep(id, req.body.step ?? 0);
+  return game.snapshot(id);
+});
+
+app.post("/api/tutorial/dismiss-goals", async (req) => {
+  const id = auth(req);
+  game.dismissGoals(id);
+  return game.snapshot(id);
+});
+
+app.post<{ Body: { goal: string } }>("/api/tutorial/goal", async (req) => {
+  const id = auth(req);
+  game.markTutorialGoal(id, req.body.goal as never);
+  return game.snapshot(id);
+});
+
+app.post<{
+  Body: {
+    name: string;
+    give: { resource: string; amount: number }[];
+    want: { resource: string; amount: number }[];
+  };
+}>("/api/templates", async (req) => {
+  const id = auth(req);
+  const t = game.saveOfferTemplate(
+    id,
+    req.body.name,
+    req.body.give as never,
+    req.body.want as never
+  );
+  return { template: t, ...game.snapshot(id) };
+});
+
+app.post<{ Body: { partnerId: string; add: boolean } }>(
+  "/api/partners",
+  async (req) => {
+    const id = auth(req);
+    game.setPreferredPartner(id, req.body.partnerId, !!req.body.add);
+    return game.snapshot(id);
+  }
+);
+
+app.post<{ Body: { targetId: string; mute: boolean } }>("/api/mute", async (req) => {
+  const id = auth(req);
+  game.mutePlayer(id, req.body.targetId, !!req.body.mute);
+  return game.snapshot(id);
+});
+
+app.post<{ Body: Record<string, boolean> }>("/api/notify-prefs", async (req) => {
+  const id = auth(req);
+  game.updateNotifyPrefs(id, req.body as never);
+  return game.snapshot(id);
+});
+
+app.post("/api/notifications/read", async (req) => {
+  const id = auth(req);
+  game.markNotificationsRead(id);
+  return game.snapshot(id);
+});
+
+app.post<{ Body: { email: string } }>("/api/account/email", async (req) => {
+  const id = auth(req);
+  game.setEmail(id, req.body.email);
+  return game.snapshot(id);
+});
+
+app.post("/api/account/totp/setup", async (req) => {
+  const id = auth(req);
+  return game.setupTotp(id);
+});
+
+app.post<{ Body: { code: string } }>("/api/account/totp/enable", async (req) => {
+  const id = auth(req);
+  game.enableTotp(id, req.body.code);
+  return game.snapshot(id);
+});
+
+app.post<{ Body: { name: string; password: string; code?: string } }>(
+  "/api/login-2fa",
+  async (req) => game.loginWithTotp(req.body.name, req.body.password, req.body.code)
+);
+
+app.get("/api/circles", async () => game.listCircles());
+
+app.post<{ Body: { name: string } }>("/api/circles", async (req) => {
+  const id = auth(req);
+  const c = game.createCircle(id, req.body.name);
+  return { circle: c, ...game.snapshot(id) };
+});
+
+app.post<{ Body: { circleId: string } }>("/api/circles/join", async (req) => {
+  const id = auth(req);
+  const c = game.joinCircle(id, req.body.circleId);
+  return { circle: c, ...game.snapshot(id) };
+});
+
+app.post<{ Body: { circleId: string; text: string } }>(
+  "/api/circles/post",
+  async (req) => {
+    const id = auth(req);
+    const msg = game.postCircleBoard(id, req.body.circleId, req.body.text);
+    return { msg, ...game.snapshot(id) };
+  }
+);
+
+app.post<{ Body: { slot: string; cosmeticId: string } }>(
+  "/api/cosmetics/equip",
+  async (req) => {
+    const id = auth(req);
+    game.equipCosmetic(id, req.body.slot, req.body.cosmeticId);
+    return game.snapshot(id);
+  }
+);
+
+app.post<{ Body: { cosmeticId: string; sealCost?: number } }>(
+  "/api/cosmetics/purchase",
+  async (req) => {
+    const id = auth(req);
+    game.purchaseCosmetic(id, req.body.cosmeticId, req.body.sealCost ?? 0);
+    return game.snapshot(id);
+  }
+);
+
+app.get("/api/seasonal", async () => game.ensureSeasonalEvent());
+
+app.post<{ Body: { amount: number } }>("/api/seasonal/contribute", async (req) => {
+  const id = auth(req);
+  const ev = game.contributeSeasonal(id, req.body.amount ?? 0);
+  return { event: ev, ...game.snapshot(id) };
+});
+
+app.get<{ Querystring: { since?: string } }>("/api/poll", async (req) => {
+  const id = auth(req);
+  const since = Number(req.query.since ?? 0);
+  return game.longPoll(id, since);
+});
+
+// WebSocket: snapshots + live events (chat, trade, barge, notify)
 app.register(async (instance) => {
   instance.get("/ws", { websocket: true }, (socket, req) => {
     const url = new URL(req.url, "http://localhost");
@@ -294,24 +446,47 @@ app.register(async (instance) => {
       socket.close();
       return;
     }
-    const send = () => {
+    const send = (obj: unknown) => {
       try {
-        socket.send(JSON.stringify({ type: "snapshot", data: game.snapshot(playerId) }));
+        socket.send(JSON.stringify(obj));
       } catch {
         /* closed */
       }
     };
-    send();
-    const iv = setInterval(send, 15_000);
+    send({ type: "snapshot", data: game.snapshot(playerId) });
+    const unsub = game.onEvent((ev) => {
+      if (ev.type === "chat") send({ type: "event", event: ev });
+      if (ev.type === "tick" && ev.playerId === playerId) {
+        send({ type: "event", event: ev });
+      }
+      if (ev.type === "trade" && ev.playerIds.includes(playerId)) {
+        send({ type: "event", event: ev });
+        send({ type: "snapshot", data: game.snapshot(playerId) });
+      }
+      if (ev.type === "barge" && ev.playerIds.includes(playerId)) {
+        send({ type: "event", event: ev });
+      }
+      if (ev.type === "notify" && ev.playerId === playerId) {
+        send({ type: "event", event: ev });
+      }
+    });
+    const iv = setInterval(() => {
+      send({ type: "ping", t: Date.now() });
+    }, 20_000);
     socket.on("message", (raw) => {
       try {
         const msg = JSON.parse(String(raw));
-        if (msg.type === "ping") send();
+        if (msg.type === "ping" || msg.type === "refresh") {
+          send({ type: "snapshot", data: game.snapshot(playerId) });
+        }
       } catch {
         /* ignore */
       }
     });
-    socket.on("close", () => clearInterval(iv));
+    socket.on("close", () => {
+      clearInterval(iv);
+      unsub();
+    });
   });
 });
 
