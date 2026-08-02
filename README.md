@@ -48,19 +48,19 @@ See [`HOSTING.md`](./HOSTING.md).
 Mechanics pre-check: [`CRITICAL-AUDIT-PRE-02.md`](./CRITICAL-AUDIT-PRE-02.md) (green).  
 Do not reopen escrow, plot counts, or GDD rates.
 
-### Planner kickoff — structure restart (current)
+### Director — approve storyboard (Phase 1.9) then rebuild
 
 ```text
-Pull latest main. Economy frozen.
-
-R10 ~6.1 FAIL with Structures inflated while buildings still read as squares.
-Execute prompts/PROMPT-02.7-RESTART-FROM-BOARDS.md (or paste PROMPT-02.7-KICKOFF.txt).
-
-Open docs/visual-inspiration/ boards FIRST. Blender-reauthor glTF heroes to match
-silhouettes (great_house, market, fields, shops, harbor). No more sand-only rounds.
-Structures ≤ 3 if still boxes. Then money-shot PASS, then loop to overall ≥ 8.0.
+1) Open ART-STORYBOARD-REVIEW.html — Yes / No / Revise each board.
+2) When all required Yes → ART-STORYBOARD-APPROVED.md (builder or you).
+3) Then agent: prompts/PROMPT-02.7-RESTART-FROM-BOARDS.md
+   Blender-reauthor glTF to match approved boards; boxes ⇒ Structures ≤ 3;
+   loop until overall ≥ 8.0.
 ```
----
+
+### Future packs (FI)
+
+Phase **1.9 art storyboard** is now mandatory in `fi-game-build` / `FI-PLAYBOOK` before multi-round visual overhaul. Browser titles use specialized skill **`fi-html-game`**.---
 
 ## Design docs
 
