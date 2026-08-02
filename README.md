@@ -35,17 +35,17 @@ See [`HOSTING.md`](./HOSTING.md).
 | Order | Prompt | Goal | Stop when |
 |---|---|---|---|
 | **1** | [`prompts/PROMPT-01-PLAYABLE.md`](./prompts/PROMPT-01-PLAYABLE.md) | Playable core | `PROMPT-01-COMPLETE.md` — **DONE** at `9f0479d` |
-| **1.5** | [`prompts/PROMPT-01.5-MODERN-2026.md`](./prompts/PROMPT-01.5-MODERN-2026.md) | 2026 modernization (trust trade, PWA, QoL, onboarding, social) | `PROMPT-01.5-COMPLETE.md` — **RUN NEXT** |
-| **2** | [`prompts/PROMPT-02-VISUAL.md`](./prompts/PROMPT-02-VISUAL.md) | Visual / production gauntlet | Impartial judge **PASS** |
+| **1.5** | [`prompts/PROMPT-01.5-MODERN-2026.md`](./prompts/PROMPT-01.5-MODERN-2026.md) | 2026 modernization (trust trade, PWA, QoL, onboarding, social) | `PROMPT-01.5-COMPLETE.md` — **DONE** |
+| **2** | [`prompts/PROMPT-02-VISUAL.md`](./prompts/PROMPT-02-VISUAL.md) | Visual / production gauntlet | Impartial judge **PASS** — **RUN NEXT** |
 
-**Do not start Prompt 02 until 01.5 is complete.**  
-**Prompt 01 is closed** — do not reopen the playable bar.
+**Prompt 01 + 01.5 are closed.** Open a new session with only Prompt 02 for the visual gauntlet.  
+Do not reopen escrow, plot counts, or GDD rates.
 
-### Planner / agent kickoff for 01.5
+### Planner / agent kickoff for 02
 
 ```text
-Pull main (at least 9f0479d). Read docs/REV1-REVIEW.md and docs/MODERN-2026.md.
-Execute only prompts/PROMPT-01.5-MODERN-2026.md. Stop at PROMPT-01.5-COMPLETE.md.
+Pull main. Read PROMPT-01.5-COMPLETE.md and docs/STYLE-CONTRACT.md.
+Execute only prompts/PROMPT-02-VISUAL.md. Stop at PROMPT-02-COMPLETE.md after judge PASS.
 ```
 
 ---
