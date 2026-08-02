@@ -3,6 +3,7 @@
  * Shop = hex, Special = diamond, Training = triangle.
  */
 import {
+  Color3,
   Mesh,
   MeshBuilder,
   Scene,
@@ -24,9 +25,11 @@ export function createPadCategoryMarker(
   if (!cfg || cfg.icon === "none") return null;
 
   const mat = new StandardMaterial(`padIconMat-${plotId}`, scene);
-  mat.diffuseColor = hexToColor3(cfg.fill);
-  mat.emissiveColor = hexToColor3(cfg.fill).scale(0.2);
-  mat.specularColor = hexToColor3(cfg.fill).scale(0.1);
+  // Soft ink markers — not neon candy gems
+  mat.diffuseColor = hexToColor3(cfg.fill).scale(0.55);
+  mat.emissiveColor = hexToColor3(cfg.fill).scale(0.06);
+  mat.specularColor = Color3.Black();
+  mat.alpha = 0.85;
 
   let mesh: Mesh;
   if (cfg.icon === "hex") {

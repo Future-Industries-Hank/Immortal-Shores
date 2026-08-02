@@ -3,6 +3,7 @@ import {
   Color3,
   Color4,
   DirectionalLight,
+  DynamicTexture,
   Engine,
   ExecuteCodeAction,
   HemisphericLight,
@@ -10,6 +11,7 @@ import {
   MeshBuilder,
   PointerEventTypes,
   Scene,
+  ShadowGenerator,
   StandardMaterial,
   TransformNode,
   Vector3,
@@ -38,10 +40,14 @@ import {
 import { Atmosphere } from "./atmosphere.js";
 import {
   animateBuildingKit,
-  createBuildingKit,
   type BuildingMeshes,
 } from "./buildings.js";
 import { hexToColor3 } from "./colors.js";
+import {
+  instantiateBuildingFromKit,
+  preloadBuildingKits,
+  type KitCache,
+} from "./kitLoader.js";
 import { createPadCategoryMarker } from "./padMarkers.js";
 
 export type Quality = "low" | "med" | "high";
@@ -72,7 +78,12 @@ export class SettlementView {
   private riverMesh: Mesh | null = null;
   private bargeNode: TransformNode | null = null;
   private foamMeshes: Mesh[] = [];
+  private dustRoot: TransformNode | null = null;
   private atmosphere: Atmosphere;
+  private sun: DirectionalLight;
+  private shadowGen: ShadowGenerator | null = null;
+  private kitCache: KitCache = new Map();
+  private kitsReady = false;
   private mapArch: MapArchetype = getMapArchetype("delta_mouth");
   private workers: WorkerAgent[] = [];
   private quality: Quality = "med";
@@ -100,8 +111,10 @@ export class SettlementView {
       stencil: true,
       adaptToDeviceRatio: true,
     });
+    this.engine.resize();
     this.scene = new Scene(this.engine);
     this.scene.clearColor = Color4.FromColor3(hexToColor3("#87A8B8"), 1);
+    this.scene.ambientColor = hexToColor3("#C8B8A0").scale(0.25);
 
     // Camera looks at settlement center; river is on the left (−X)
     this.camera = new ArcRotateCamera(
@@ -121,13 +134,22 @@ export class SettlementView {
     this.camera.panningSensibility = 90;
     this.camera.attachControl(canvas, true);
 
-    const sun = new DirectionalLight("sun", new Vector3(-0.55, -1, 0.3), this.scene);
-    sun.intensity = 1.05;
-    sun.diffuse = hexToColor3("#FFD9A0");
+    this.sun = new DirectionalLight("sun", new Vector3(-0.55, -1, 0.3), this.scene);
+    this.sun.intensity = 1.15;
+    this.sun.diffuse = hexToColor3("#FFD9A0");
+    this.sun.position = new Vector3(12, 28, -8);
+    this.sun.shadowEnabled = true;
     const hemi = new HemisphericLight("hemi", new Vector3(0.15, 1, 0.1), this.scene);
-    hemi.intensity = 0.45;
+    hemi.intensity = 0.48;
     hemi.groundColor = hexToColor3(STYLE.sandDeep);
-    this.atmosphere = new Atmosphere(this.scene, sun, hemi);
+    this.atmosphere = new Atmosphere(this.scene, this.sun, hemi);
+
+    // Soft contact shadows (Surviving Mars / Aven readability)
+    this.shadowGen = new ShadowGenerator(2048, this.sun);
+    this.shadowGen.useBlurExponentialShadowMap = true;
+    this.shadowGen.blurKernel = 16;
+    this.shadowGen.darkness = 0.35;
+    this.shadowGen.bias = 0.0008;
 
     this.root = new TransformNode("settlement", this.scene);
     this.rebuildEnvironment(this.mapArch);
@@ -135,6 +157,8 @@ export class SettlementView {
     this.buildFixedPads();
     this.buildSelectRing();
     this.wirePicking(canvas);
+
+    void this.bootKits();
 
     this.engine.runRenderLoop(() => {
       const now = performance.now() * 0.001;
@@ -155,6 +179,35 @@ export class SettlementView {
       this.engine.resize();
       this.setOrtho(this.camera.radius);
     });
+  }
+
+  private async bootKits() {
+    try {
+      this.kitCache = await preloadBuildingKits(this.scene);
+      this.kitsReady = this.kitCache.size > 0;
+      if (this.kitsReady && this.lastSettlement) {
+        // Rebuild buildings with glTF kit once assets arrive
+        for (const [id, node] of this.buildingNodes) {
+          node.dispose();
+          this.buildingNodes.delete(id);
+          this.buildingKits.delete(id);
+          this.hitMeshes.delete(id);
+        }
+        this.sync(this.lastSettlement);
+      }
+    } catch (e) {
+      console.warn("kit preload failed; procedural fallback", e);
+    }
+  }
+
+  resize() {
+    const canvas = this.engine.getRenderingCanvas();
+    if (canvas) {
+      canvas.style.width = "100%";
+      canvas.style.height = "100%";
+    }
+    this.engine.resize();
+    this.setOrtho(this.camera.radius);
   }
 
   getFps() {
@@ -375,9 +428,51 @@ export class SettlementView {
     return transformPlotPos(def.worldX, def.worldZ, this.mapArch.layout);
   }
 
+  private makeSandTexture(baseHex: string) {
+    try {
+      const size = this.quality === "low" ? 128 : 256;
+      const tex = new DynamicTexture("sandTex", size, this.scene, false);
+      const ctx = tex.getContext() as CanvasRenderingContext2D;
+      const base = baseHex.replace("#", "");
+      const br = parseInt(base.slice(0, 2), 16);
+      const bg = parseInt(base.slice(2, 4), 16);
+      const bb = parseInt(base.slice(4, 6), 16);
+      const img = ctx.createImageData(size, size);
+      for (let i = 0; i < size * size; i++) {
+        const n = (Math.random() - 0.5) * 36;
+        const n2 = ((i * 17) % 23) - 11;
+        img.data[i * 4] = Math.max(0, Math.min(255, br + n + n2));
+        img.data[i * 4 + 1] = Math.max(0, Math.min(255, bg + n * 0.9 + n2 * 0.5));
+        img.data[i * 4 + 2] = Math.max(0, Math.min(255, bb + n * 0.7));
+        img.data[i * 4 + 3] = 255;
+      }
+      ctx.putImageData(img, 0, 0);
+      // Soft mottles
+      for (let k = 0; k < 40; k++) {
+        const x = Math.random() * size;
+        const y = Math.random() * size;
+        const r = 8 + Math.random() * 22;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0, "rgba(160,120,70,0.18)");
+        g.addColorStop(1, "rgba(160,120,70,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      tex.update(false);
+      tex.uScale = 6;
+      tex.vScale = 5;
+      return tex;
+    } catch {
+      return null;
+    }
+  }
+
   private rebuildEnvironment(arch: MapArchetype) {
     this.envRoot?.dispose();
     this.foamMeshes = [];
+    this.dustRoot = null;
     this.bargeNode = null;
     this.riverMesh = null;
     this.envRoot = new TransformNode("env", this.scene);
@@ -385,71 +480,123 @@ export class SettlementView {
     this.mapArch = arch;
     const pal = arch.palette;
 
+    // Vast ground so ortho never shows "floating island" void
     const ground = MeshBuilder.CreateGround(
       "ground",
-      { width: 38, height: 30, subdivisions: this.quality === "low" ? 4 : 12 },
+      { width: 90, height: 70, subdivisions: this.quality === "low" ? 12 : 64 },
       this.scene
     );
-    ground.position.set(0, 0, 1);
+    ground.position.set(2, 0, 2);
     const mat = new StandardMaterial("groundMat", this.scene);
     mat.diffuseColor = hexToColor3(pal.sand);
-    mat.specularColor = Color3.Black();
-    mat.emissiveColor = hexToColor3(pal.sand).scale(0.04);
+    mat.specularColor = hexToColor3("#3A3020").scale(0.08);
+    mat.emissiveColor = hexToColor3(pal.sand).scale(0.03);
+    // Procedural grit so sand isn't a flat stamp
+    const grit = this.makeSandTexture(pal.sand);
+    if (grit) {
+      mat.diffuseTexture = grit;
+      mat.diffuseColor = Color3.White();
+    }
     ground.material = mat;
     ground.parent = this.envRoot;
     ground.isPickable = false;
+    ground.receiveShadows = true;
 
-    // Soft dune accents (spatial depth without clutter) — keep low so ortho never clips a giant ellipsoid
+    const wet = MeshBuilder.CreateGround(
+      "wetBank",
+      { width: 3.2, height: 28, subdivisions: 4 },
+      this.scene
+    );
+    wet.position.set(-10.4, 0.015, 1.5);
+    const wetMat = new StandardMaterial("wetMat", this.scene);
+    wetMat.diffuseColor = hexToColor3("#A89068");
+    wetMat.specularColor = hexToColor3(STYLE.riverLight).scale(0.2);
+    wetMat.emissiveColor = hexToColor3("#6A5840").scale(0.05);
+    wet.material = wetMat;
+    wet.parent = this.envRoot;
+    wet.isPickable = false;
+    wet.receiveShadows = true;
+
     if (this.quality !== "low") {
       const duneMat = new StandardMaterial("duneMat", this.scene);
       duneMat.diffuseColor = hexToColor3(STYLE.sandDeep);
       duneMat.specularColor = Color3.Black();
       for (const [x, z, sx, sz] of [
-        [7, -7.5, 2.4, 1.4],
-        [11, 3.5, 2.0, 1.2],
-        [9, 8.5, 2.2, 1.3],
+        [7, -7.5, 2.8, 1.6],
+        [11, 3.5, 2.4, 1.4],
+        [9, 8.5, 2.6, 1.5],
+        [4, -9, 2.0, 1.2],
       ] as const) {
         const d = MeshBuilder.CreateBox(
           `dune-${x}-${z}`,
-          { width: sx, height: 0.22, depth: sz },
+          { width: sx, height: 0.28, depth: sz },
           this.scene
         );
-        d.position.set(x, 0.08, z);
+        d.position.set(x, 0.1, z);
         d.material = duneMat;
         d.parent = this.envRoot;
         d.isPickable = false;
+        d.receiveShadows = true;
       }
     }
 
-    // River along the LEFT — harbor sits on this waterline
+    // Deep Nile channel (dark, not cyan candy) + mid + shallow lip
     const river = MeshBuilder.CreateBox(
       "river",
-      { width: 5.8, height: 0.14, depth: 28 },
+      { width: 8.5, height: 0.22, depth: 60 },
       this.scene
     );
-    river.position.set(-13.2, 0.02, 1.5);
+    river.position.set(-14.5, -0.06, 2);
     const rmat = new StandardMaterial("riverMat", this.scene);
-    rmat.diffuseColor = hexToColor3(pal.river);
-    rmat.specularColor = hexToColor3(pal.riverLight);
-    rmat.alpha = 0.9;
+    rmat.diffuseColor = hexToColor3("#153A52");
+    rmat.specularColor = hexToColor3("#6A9AB8").scale(0.45);
+    rmat.alpha = 0.94;
+    rmat.emissiveColor = hexToColor3("#0A2030").scale(0.15);
     river.material = rmat;
     river.parent = this.envRoot;
     river.isPickable = false;
     this.riverMesh = river;
 
-    // River foam patches (small, fully opaque-ish so ortho never washes)
+    const mid = MeshBuilder.CreateBox(
+      "riverMid",
+      { width: 2.2, height: 0.1, depth: 55 },
+      this.scene
+    );
+    mid.position.set(-11.6, 0.02, 2);
+    const midMat = new StandardMaterial("riverMidMat", this.scene);
+    midMat.diffuseColor = hexToColor3("#1E4D6B");
+    midMat.specularColor = hexToColor3("#5A8AAA").scale(0.35);
+    midMat.alpha = 0.9;
+    mid.material = midMat;
+    mid.parent = this.envRoot;
+    mid.isPickable = false;
+
+    const shallow = MeshBuilder.CreateBox(
+      "riverShallow",
+      { width: 1.5, height: 0.07, depth: 50 },
+      this.scene
+    );
+    shallow.position.set(-10.5, 0.04, 2);
+    const shMat = new StandardMaterial("shallowMat", this.scene);
+    shMat.diffuseColor = hexToColor3("#3A6A7A");
+    shMat.specularColor = hexToColor3("#8AB0C0").scale(0.3);
+    shMat.alpha = 0.8;
+    shallow.material = shMat;
+    shallow.parent = this.envRoot;
+    shallow.isPickable = false;
+
     const foamMat = new StandardMaterial("foamMat", this.scene);
-    foamMat.diffuseColor = hexToColor3("#C5D8E0");
-    foamMat.emissiveColor = hexToColor3("#C5D8E0").scale(0.05);
-    foamMat.alpha = 0.7;
+    foamMat.diffuseColor = hexToColor3("#D8E8F0");
+    foamMat.emissiveColor = hexToColor3("#D8E8F0").scale(0.08);
+    foamMat.alpha = 0.75;
     foamMat.specularColor = Color3.Black();
-    for (let i = 0; i < (this.quality === "low" ? 3 : 6); i++) {
+    for (let i = 0; i < (this.quality === "low" ? 4 : 8); i++) {
       const foam = MeshBuilder.CreateBox(
         `foam-${i}`,
-        { width: 0.45 + (i % 3) * 0.12, height: 0.03, depth: 0.22 },
+        { width: 0.5 + (i % 3) * 0.15, height: 0.04, depth: 0.28 },
         this.scene
       );
-      foam.position.set(-13.6 - (i % 2) * 0.25, 0.1, -7 + i * 3.0);
+      foam.position.set(-13.8 - (i % 2) * 0.3, 0.1, -8 + i * 2.8);
       foam.material = foamMat;
       foam.parent = this.envRoot;
       foam.isPickable = false;
@@ -470,22 +617,55 @@ export class SettlementView {
     bank.parent = this.envRoot;
     bank.isPickable = false;
 
-    if (this.quality !== "low") {
-      const reedMat = new StandardMaterial("envReed", this.scene);
-      reedMat.diffuseColor = hexToColor3(STYLE.reedGreen);
-      reedMat.specularColor = Color3.Black();
-      for (let i = 0; i < 14; i++) {
-        const r = MeshBuilder.CreateCylinder(
-          `envReed-${i}`,
-          { height: 0.55 + (i % 3) * 0.12, diameter: 0.07, tessellation: 5 },
-          this.scene
-        );
-        r.position.set(-10.0 + (i % 2) * 0.25, 0.28, -7 + i * 1.35);
-        r.material = reedMat;
-        r.parent = this.envRoot;
-        r.isPickable = false;
+    // Dense reed fringe along full bank (Aven/SM environmental coherence)
+    const reedMat = new StandardMaterial("envReed", this.scene);
+    reedMat.diffuseColor = hexToColor3(STYLE.reedGreen);
+    reedMat.specularColor = Color3.Black();
+    reedMat.emissiveColor = hexToColor3(STYLE.reedGreen).scale(0.05);
+    const reedCount = this.quality === "low" ? 18 : 40;
+    for (let i = 0; i < reedCount; i++) {
+      const r = MeshBuilder.CreateCylinder(
+        `envReed-${i}`,
+        {
+          height: 0.5 + (i % 4) * 0.14,
+          diameter: 0.06 + (i % 3) * 0.015,
+          tessellation: 5,
+        },
+        this.scene
+      );
+      r.position.set(
+        -10.15 + (i % 3) * 0.18 + (i % 5) * 0.02,
+        0.3,
+        -10 + i * (22 / reedCount)
+      );
+      r.material = reedMat;
+      r.parent = this.envRoot;
+      r.isPickable = false;
+      if (this.shadowGen && this.quality === "high") {
+        this.shadowGen.addShadowCaster(r, false);
       }
     }
+    // Scattered shore stones
+    if (this.quality !== "low") {
+      const rockMat = new StandardMaterial("rockMat", this.scene);
+      rockMat.diffuseColor = hexToColor3(STYLE.stonePale);
+      rockMat.specularColor = Color3.Black();
+      for (let i = 0; i < 10; i++) {
+        const rock = MeshBuilder.CreateBox(
+          `rock-${i}`,
+          { width: 0.35 + (i % 3) * 0.1, height: 0.18, depth: 0.3 },
+          this.scene
+        );
+        rock.position.set(-9.2 + (i % 2) * 0.4, 0.1, -8 + i * 2.1);
+        rock.rotation.y = i * 0.7;
+        rock.material = rockMat;
+        rock.parent = this.envRoot;
+        rock.isPickable = false;
+        rock.receiveShadows = true;
+      }
+    }
+
+    this.buildDustField();
 
     // Pier from bank into river toward harbor pad
     const pierLen = arch.layout.pierLength ?? 3.0;
@@ -594,6 +774,44 @@ export class SettlementView {
       this.bargeNode.position.y = 0.12 + Math.sin(now * 1.6) * 0.03;
       this.bargeNode.rotation.y = Math.sin(now * 0.2) * 0.08;
     }
+    // Dust motes (heat atmosphere readable in stills as soft particles)
+    if (this.dustRoot) {
+      this.dustRoot.rotation.y = now * 0.05;
+      for (const c of this.dustRoot.getChildMeshes()) {
+        c.visibility = 0.25 + Math.sin(now * 1.2 + c.position.x) * 0.15;
+      }
+    }
+  }
+
+  private buildDustField() {
+    this.dustRoot?.dispose();
+    if (this.quality === "low") {
+      this.dustRoot = null;
+      return;
+    }
+    this.dustRoot = new TransformNode("dust", this.scene);
+    this.dustRoot.parent = this.envRoot;
+    const dm = new StandardMaterial("dustMat", this.scene);
+    dm.diffuseColor = hexToColor3("#E8D4B0");
+    dm.emissiveColor = hexToColor3("#C4A574").scale(0.2);
+    dm.alpha = 0.35;
+    dm.disableLighting = true;
+    const n = this.quality === "high" ? 36 : 22;
+    for (let i = 0; i < n; i++) {
+      const p = MeshBuilder.CreateSphere(
+        `dust-${i}`,
+        { diameter: 0.12 + (i % 3) * 0.05, segments: 4 },
+        this.scene
+      );
+      p.position.set(
+        -8 + Math.random() * 18,
+        0.6 + Math.random() * 2.2,
+        -8 + Math.random() * 16
+      );
+      p.material = dm;
+      p.parent = this.dustRoot;
+      p.isPickable = false;
+    }
   }
 
   /** Sparse typed pads only — not a free city grid. */
@@ -606,48 +824,60 @@ export class SettlementView {
 
     for (const def of SETTLEMENT_PLOTS) {
       const pos = this.worldPos(def);
+      // Near-invisible sand plinths — category readable via icon only (kill candy pads)
       const mat = new StandardMaterial(`padMat-${def.id}`, this.scene);
-      mat.diffuseColor = hexToColor3(def.tint);
+      const baseSand = hexToColor3(STYLE.sandLight);
+      const tint = hexToColor3(def.tint);
+      mat.diffuseColor = Color3.Lerp(baseSand, hexToColor3(STYLE.sandDeep), 0.2);
       mat.specularColor = Color3.Black();
-      mat.emissiveColor = hexToColor3(def.tint).scale(0.12);
+      mat.emissiveColor = Color3.Black();
+      mat.alpha = 0.35;
       this.padMats.set(def.id, mat);
 
       const isHarbor = def.id === "special-harbor";
+      // Invisible pick volume — visual is thin ink rim only
       const pad = MeshBuilder.CreateBox(
         `pad-${def.id}`,
         {
-          width: isHarbor ? 2.8 : 2.6,
-          height: isHarbor ? 0.16 : 0.2,
-          depth: isHarbor ? 2.4 : 2.6,
+          width: isHarbor ? 2.6 : 2.35,
+          height: 0.06,
+          depth: isHarbor ? 2.2 : 2.35,
         },
         this.scene
       );
-      pad.position.set(pos.x, isHarbor ? 0.14 : 0.1, pos.z);
+      pad.position.set(pos.x, isHarbor ? 0.08 : 0.03, pos.z);
       pad.material = mat;
       pad.parent = this.root;
       pad.isPickable = !def.starterKind;
+      pad.receiveShadows = true;
+      pad.visibility = def.starterKind ? 0 : 0.4;
       pad.metadata = {
         plotId: def.id,
         category: def.category,
         label: def.label,
       };
 
-      const border = MeshBuilder.CreateBox(
+      const border = MeshBuilder.CreateTorus(
         `border-${def.id}`,
         {
-          width: isHarbor ? 3.0 : 2.85,
-          height: 0.06,
-          depth: isHarbor ? 2.6 : 2.85,
+          diameter: isHarbor ? 2.5 : 2.3,
+          thickness: 0.05,
+          tessellation: 24,
         },
         this.scene
       );
-      border.position.set(pos.x, isHarbor ? 0.06 : 0.03, pos.z);
+      border.rotation.x = Math.PI / 2;
+      border.position.set(pos.x, isHarbor ? 0.06 : 0.04, pos.z);
       const bm = new StandardMaterial(`borderMat-${def.id}`, this.scene);
-      bm.diffuseColor = hexToColor3(def.tint).scale(0.55);
+      bm.diffuseColor = Color3.Lerp(hexToColor3(STYLE.sandDeep), tint, 0.4);
       bm.specularColor = Color3.Black();
+      bm.emissiveColor = tint.scale(0.05);
+      bm.alpha = 0.65;
       border.material = bm;
       border.parent = this.root;
       border.isPickable = false;
+      border.receiveShadows = true;
+      if (def.starterKind) border.setEnabled(false);
 
       // Category icon (shape+color) for empty buildable pads
       if (!def.starterKind) {
@@ -718,7 +948,8 @@ export class SettlementView {
       const def = getPlot(id)!;
       // Construction sites stay pickable so players can inspect the job
       pad.isPickable = !taken || underConstruction;
-      pad.visibility = taken && !underConstruction ? 0.22 : underConstruction ? 0.55 : 1;
+      // Empty: nearly invisible pick volume (icon marks category). Occupied: gone.
+      pad.visibility = taken && !underConstruction ? 0 : underConstruction ? 0.25 : 0.12;
       pad.metadata = {
         plotId: def.id,
         category: def.category,
@@ -728,18 +959,21 @@ export class SettlementView {
       const mat = this.padMats.get(id);
       if (mat) {
         if (underConstruction) {
-          mat.emissiveColor = hexToColor3(STYLE.goldSoft).scale(0.2);
+          mat.emissiveColor = hexToColor3(STYLE.goldSoft).scale(0.12);
+          mat.alpha = 0.4;
         } else if (!taken) {
-          mat.emissiveColor = hexToColor3(def.tint).scale(0.12);
+          mat.emissiveColor = Color3.Black();
+          mat.alpha = 0.2;
         } else {
           mat.emissiveColor = Color3.Black();
+          mat.alpha = 0;
         }
       }
-      // Hide category icons on occupied pads
+      // Soft category icon only on empty plots
       const icon = this.padIcons.get(id);
       if (icon) {
-        icon.setEnabled(!taken || underConstruction);
-        icon.visibility = underConstruction ? 0.35 : 1;
+        icon.setEnabled(!taken);
+        icon.visibility = taken ? 0 : 0.75;
       }
     }
     this.syncScaffold(settlement);
@@ -832,7 +1066,12 @@ export class SettlementView {
   }
 
   private createBuilding(b: BuildingState): TransformNode {
-    const kit = createBuildingKit(this.scene, b);
+    const kit = instantiateBuildingFromKit(
+      this.scene,
+      this.kitCache,
+      b,
+      this.shadowGen
+    );
     kit.root.parent = this.root;
     this.buildingKits.set(b.id, kit);
     this.hitMeshes.set(b.id, kit.hit);
@@ -842,7 +1081,7 @@ export class SettlementView {
       new ExecuteCodeAction(ActionManager.OnPointerOverTrigger, () => {
         for (const e of kit.emissives) {
           const m = e.material as StandardMaterial | null;
-          if (m) m.emissiveColor = hexToColor3(STYLE.goldSoft).scale(0.3);
+          if (m) m.emissiveColor = hexToColor3(STYLE.goldSoft).scale(0.35);
         }
       })
     );
@@ -957,14 +1196,10 @@ export class SettlementView {
       this.activePlotIds.push("civic-market");
     }
 
-    const cap = this.quality === "low" ? 6 : this.quality === "med" ? 12 : 18;
-    // Assigned workers on roads; a few idle walkers when population exists
-    const assigned = Math.min(cap, settlement.workersAssigned);
-    const idle =
-      settlement.workers > 0
-        ? Math.min(4, Math.max(1, Math.ceil(settlement.workers / 6)))
-        : 0;
-    const show = Math.min(cap, Math.max(assigned, idle));
+    const cap = this.quality === "low" ? 10 : this.quality === "med" ? 18 : 28;
+    // Always show a living crowd when the settlement has workers
+    const base = settlement.workers > 0 ? Math.min(cap, Math.max(10, settlement.workersAssigned + 6)) : 0;
+    const show = base;
 
     while (this.workers.length < show) {
       this.workers.push(this.spawnWorker(this.workers.length));
@@ -987,24 +1222,25 @@ export class SettlementView {
       i % 3 === 0 ? "#3A2A20" : i % 3 === 1 ? "#6B3A3A" : "#3F5A38";
     const body = MeshBuilder.CreateCapsule(
       `workerBody-${i}`,
-      { height: 0.78, radius: 0.16 },
+      { height: 1.05, radius: 0.22 },
       this.scene
     );
-    body.position.y = 0.4;
+    body.position.y = 0.55;
     const mat = new StandardMaterial(`wm-${i}`, this.scene);
     mat.diffuseColor = hexToColor3(robe);
-    mat.emissiveColor = hexToColor3(robe).scale(0.08);
+    mat.emissiveColor = hexToColor3(robe).scale(0.12);
     mat.specularColor = Color3.Black();
     body.material = mat;
     body.isPickable = false;
     body.parent = root;
+    if (this.shadowGen) this.shadowGen.addShadowCaster(body, false);
     // Pale head + linen sash for silhouette pop
     const head = MeshBuilder.CreateSphere(
       `workerHead-${i}`,
-      { diameter: 0.26, segments: 6 },
+      { diameter: 0.34, segments: 6 },
       this.scene
     );
-    head.position.y = 0.88;
+    head.position.y = 1.15;
     const hm = new StandardMaterial(`wh-${i}`, this.scene);
     hm.diffuseColor = hexToColor3("#E8D4B0");
     hm.emissiveColor = hexToColor3("#E8D4B0").scale(0.12);
@@ -1070,11 +1306,21 @@ export class SettlementView {
       .map((pid) => this.entranceNodeForPlot(pid))
       .filter((id): id is string => !!id);
     if (entrances.length < 1) {
+      // Fallback: walk a long diagonal so agents are always visible
       const route = pathBetween("hub-res", "hub-train");
       w.poly = this.mapPoly(route);
+      if (w.poly.length < 2) {
+        w.poly = [
+          { x: -6, z: -4 },
+          { x: 2, z: 0 },
+          { x: 6, z: 4 },
+          { x: -2, z: 6 },
+          { x: -6, z: -4 },
+        ];
+      }
       w.seg = 0;
-      w.t = 0;
-      if (w.poly[0]) w.root.position.set(w.poly[0].x, 0.22, w.poly[0].z);
+      w.t = Math.random();
+      if (w.poly[0]) w.root.position.set(w.poly[0].x, 0.28, w.poly[0].z);
       return;
     }
     const from =

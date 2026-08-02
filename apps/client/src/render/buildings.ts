@@ -10,6 +10,7 @@ import {
   Scene,
   StandardMaterial,
   TransformNode,
+  type AbstractMesh,
 } from "@babylonjs/core";
 import { STYLE, type BuildingState } from "@immortal/shared";
 import { hexToColor3, KIND_COLOR } from "./colors.js";
@@ -627,14 +628,24 @@ export function animateBuildingKit(
 ) {
   for (const kit of kits.values()) {
     for (const e of kit.emissives) {
-      const m = e.material as StandardMaterial | null;
+      if (!e || e.isDisposed()) continue;
+      const m = e.material as StandardMaterial & {
+        albedoColor?: Color3;
+        emissiveColor?: Color3;
+      } | null;
       if (!m) continue;
-      // Night boosts emissives on prestige / kiln parts
-      const d = m.diffuseColor;
+      // StandardMaterial uses diffuseColor; PBR/glTF often uses albedoColor
+      const d = m.diffuseColor ?? m.albedoColor;
+      if (!d || typeof d.scale !== "function") continue;
       const boost = 0.12 + nightFactor * 0.7;
-      m.emissiveColor = d.scale(Math.min(0.95, boost));
+      try {
+        m.emissiveColor = d.scale(Math.min(0.95, boost));
+      } catch {
+        /* material variant without emissive */
+      }
     }
     for (const a of kit.anim) {
+      if (!a.mesh || a.mesh.isDisposed()) continue;
       if (a.kind === "spin") {
         a.mesh.rotation.z = t * 2.2;
       } else if (a.kind === "bob") {

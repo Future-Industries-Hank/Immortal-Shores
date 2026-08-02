@@ -96,18 +96,17 @@ export class Atmosphere {
         ? Color4.Lerp(clearDay, clearDusk, n * 2)
         : Color4.Lerp(clearDusk, clearNight, (n - 0.5) * 2);
 
-    // Optional night haze only (very light)
-    if (n > 0.55) {
-      this.scene.fogMode = Scene.FOGMODE_EXP2;
-      this.scene.fogDensity = 0.004 * (n - 0.55) * 2;
-      this.scene.fogColor = Color3.Lerp(
-        hexToColor3("#D09070"),
-        hexToColor3("#1A2430"),
-        (n - 0.5) * 2
-      );
+    // Readable heat haze / distance air (must show in screenshots)
+    this.scene.fogMode = Scene.FOGMODE_EXP2;
+    if (n < 0.35) {
+      this.scene.fogDensity = 0.012;
+      this.scene.fogColor = hexToColor3("#D4C4A0");
+    } else if (n < 0.7) {
+      this.scene.fogDensity = 0.014;
+      this.scene.fogColor = hexToColor3("#C89870");
     } else {
-      this.scene.fogMode = Scene.FOGMODE_NONE;
-      this.scene.fogDensity = 0;
+      this.scene.fogDensity = 0.016;
+      this.scene.fogColor = hexToColor3("#1A2838");
     }
 
     if (river) {

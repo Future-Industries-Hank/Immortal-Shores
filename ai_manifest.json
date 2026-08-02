@@ -4,14 +4,18 @@
   "slug": "immortal-shores",
   "track": "browser-isometric",
   "visual_tier_requested": 3,
-  "visual_tier_achieved": 3,
+  "visual_tier_achieved": 2,
   "has_complete_loop": true,
   "modern_2026_systems": true,
   "visual_judge": {
-    "overall": "PASS",
-    "round": 2,
-    "verdict_path": "tools/judge/ROUND-2-VERDICT.md",
-    "evidence_dir": "tools/judge/evidence"
+    "overall": "FAIL",
+    "prompt": "02.5",
+    "terminal_overall": 4.8,
+    "terminal_min": 2,
+    "rounds": 6,
+    "verdict_path": "tools/judge/evidence/gauntlet-02.5/JUDGE-R6.md",
+    "evidence_dir": "tools/judge/evidence/gauntlet-02.5",
+    "note": "Prompt 02.5 gauntlet exhausted without ≥8.0; prior Prompt 02 PASS void for shipping pride"
   },
   "playtested_minutes": 55,
   "social_model": "persistent-async-server-tick-postcard-visits-market-tablet-barges-trust-trade",

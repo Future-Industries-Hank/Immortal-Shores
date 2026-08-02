@@ -10,11 +10,14 @@
   --gold-soft: #d4a84b;
   --ink-ui: #2a2118;
   --papyrus: #f3e6c8;
+  --papyrus-glass: rgba(243, 230, 200, 0.88);
+  --ink-panel: rgba(32, 26, 20, 0.72);
+  --rim-gold: rgba(212, 168, 75, 0.45);
   --seal-accent: #8b3a4a;
-  --bar-h: 2.65rem;
+  --bar-h: 2.75rem;
   --warn-yellow: #c9a227;
   --warn-red: #a33;
-  font-family: "Segoe UI", system-ui, sans-serif;
+  font-family: "Segoe UI", "Segoe UI Historic", system-ui, sans-serif;
   color: var(--ink-ui);
 }
 
@@ -28,16 +31,21 @@ html.dark {
 }
 
 html.dark #hub {
+  background: linear-gradient(0deg, #12100e 0%, #1e1a14 100%);
+}
+
+html.dark #hud-top {
   background: linear-gradient(180deg, #2a241c 0%, #1e1a14 100%);
+  box-shadow: 0 1px 0 rgba(212, 168, 75, 0.2);
 }
 
 html.dark #nav {
-  background: rgba(20, 16, 12, 0.45);
+  background: transparent;
 }
 
 html.dark #nav button:hover {
-  background: rgba(90, 74, 56, 0.5);
-  color: var(--ink-ui);
+  background: rgba(90, 74, 56, 0.45);
+  color: var(--papyrus);
 }
 
 html.cb {
@@ -186,10 +194,18 @@ button.small {
   height: var(--bar-h);
   min-height: var(--bar-h);
   max-height: var(--bar-h);
-  padding: 0 0.55rem;
-  background: var(--papyrus);
+  padding: 0 0.65rem;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 250, 240, 0.94) 0%,
+    rgba(243, 230, 200, 0.9) 100%
+  );
   border-bottom: 1px solid var(--sand-deep);
+  box-shadow:
+    0 1px 0 rgba(212, 168, 75, 0.25),
+    0 6px 18px rgba(20, 14, 10, 0.18);
   overflow: hidden;
+  backdrop-filter: blur(8px);
 }
 
 #resources {
@@ -262,15 +278,20 @@ button.small {
   touch-action: none;
 }
 
-/* Thin bottom tab bar only */
+/* Thin bottom tab bar only — IXION-like density, papyrus/ink skin */
 #hub {
   display: flex;
   align-items: center;
   height: var(--bar-h);
   min-height: var(--bar-h);
   max-height: var(--bar-h);
-  background: var(--papyrus);
-  border-top: 1px solid var(--sand-deep);
+  background: linear-gradient(
+    0deg,
+    rgba(36, 28, 22, 0.92) 0%,
+    rgba(52, 42, 32, 0.88) 100%
+  );
+  border-top: 1px solid var(--rim-gold);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.28);
   z-index: 6;
   overflow: hidden;
 }
@@ -293,10 +314,12 @@ button.small {
 #nav button {
   flex: 1 1 auto;
   background: transparent;
-  color: var(--ink-ui);
+  color: var(--papyrus);
   border: 1px solid transparent;
   border-radius: 6px;
   font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   min-height: 32px;
   height: 32px;
   padding: 0 0.65rem;
@@ -304,35 +327,46 @@ button.small {
 }
 
 #nav button:hover {
-  background: rgba(232, 212, 176, 0.75);
-  color: var(--ink-ui);
+  background: rgba(243, 230, 200, 0.12);
+  color: #fff8e8;
+  border-color: rgba(212, 168, 75, 0.35);
 }
 
 #nav button.active {
-  background: var(--river-deep);
+  background: linear-gradient(180deg, #2a6a8a 0%, #1e4d6b 100%);
   color: #f5f0e6;
-  border-color: transparent;
+  border-color: var(--gold-soft);
+  box-shadow: 0 0 0 1px rgba(212, 168, 75, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.12);
   outline: none;
 }
 
-/* Floating menu popup — appears over the world, not permanent real-estate */
+/* Floating menu popup — premium management panel over 3D */
 .menu-popup {
   position: absolute;
   left: 50%;
   bottom: 0.65rem;
   transform: translateX(-50%);
-  width: min(440px, calc(100% - 1rem));
-  max-height: min(58vh, 480px);
+  width: min(460px, calc(100% - 1rem));
+  max-height: min(58vh, 500px);
   z-index: 20;
   display: flex;
   flex-direction: column;
-  background: var(--papyrus);
-  border: 1px solid var(--sand-deep);
-  border-radius: 12px;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+  background: linear-gradient(
+    165deg,
+    rgba(255, 252, 245, 0.96) 0%,
+    rgba(243, 230, 200, 0.94) 55%,
+    rgba(232, 212, 176, 0.92) 100%
+  );
+  border: 1px solid rgba(212, 168, 75, 0.55);
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 1px rgba(42, 33, 24, 0.12),
+    0 16px 40px rgba(20, 14, 10, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
   overflow: hidden;
   pointer-events: auto;
   animation: popup-up 0.16s ease;
+  backdrop-filter: blur(10px);
 }
 
 /* display:flex above would otherwise win over the [hidden] UA rule */
