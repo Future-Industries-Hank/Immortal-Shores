@@ -637,9 +637,9 @@ export function animateBuildingKit(
       // StandardMaterial uses diffuseColor; PBR/glTF often uses albedoColor
       const d = m.diffuseColor ?? m.albedoColor;
       if (!d || typeof d.scale !== "function") continue;
-      const boost = 0.12 + nightFactor * 0.7;
+      const boost = 0.2 + nightFactor * 0.85;
       try {
-        m.emissiveColor = d.scale(Math.min(0.95, boost));
+        m.emissiveColor = d.scale(Math.min(1.0, boost));
       } catch {
         /* material variant without emissive */
       }

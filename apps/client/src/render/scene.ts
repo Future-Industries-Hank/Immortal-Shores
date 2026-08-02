@@ -148,10 +148,11 @@ export class SettlementView {
     // Soft contact shadows (Surviving Mars / Aven readability)
     this.shadowGen = new ShadowGenerator(2048, this.sun);
     this.shadowGen.useBlurExponentialShadowMap = true;
-    this.shadowGen.blurKernel = 24;
-    this.shadowGen.darkness = 0.48;
-    this.shadowGen.bias = 0.0005;
-    this.shadowGen.normalBias = 0.02;
+    this.shadowGen.blurKernel = 32;
+    this.shadowGen.darkness = 0.55;
+    this.shadowGen.bias = 0.0004;
+    this.shadowGen.normalBias = 0.015;
+    this.shadowGen.contactHardeningLightSizeUVRatio = 0.05;
 
     this.root = new TransformNode("settlement", this.scene);
     this.rebuildEnvironment(this.mapArch);
@@ -597,32 +598,26 @@ export class SettlementView {
     shallow.parent = this.envRoot;
     shallow.isPickable = false;
 
-    // Thick white foam lip + broken foam blobs (must read in mid-iso still)
+    // Broken organic foam — irregular clusters, not a solid white curb
     const flMat = new StandardMaterial("foamLineMat", this.scene);
-    flMat.diffuseColor = hexToColor3("#FFFFFF");
-    flMat.emissiveColor = Color3.White().scale(0.7);
-    flMat.alpha = 1;
+    flMat.diffuseColor = hexToColor3("#E8F0F4");
+    flMat.emissiveColor = hexToColor3("#D8E8F0").scale(0.5);
+    flMat.alpha = 0.9;
     flMat.disableLighting = true;
-    const foamLine = MeshBuilder.CreateBox(
-      "foamLine",
-      { width: 1.1, height: 0.14, depth: 50 },
-      this.scene
-    );
-    foamLine.position.set(-9.4, 0.12, 2);
-    foamLine.material = flMat;
-    foamLine.parent = this.envRoot;
-    foamLine.isPickable = false;
-    for (let i = 0; i < 18; i++) {
+    flMat.zOffset = -2;
+    for (let i = 0; i < 28; i++) {
       const blob = MeshBuilder.CreateSphere(
         `foamBlob-${i}`,
-        { diameter: 0.35 + (i % 3) * 0.12, segments: 5 },
+        { diameter: 0.28 + (i % 4) * 0.1, segments: 6 },
         this.scene
       );
-      blob.position.set(-9.2 - (i % 2) * 0.25, 0.14, -10 + i * 1.35);
-      blob.scaling.y = 0.35;
+      const along = -14 + i * 1.05 + (i % 3) * 0.15;
+      blob.position.set(-9.75 - (i % 2) * 0.35, 0.14, along);
+      blob.scaling.set(1.2 + (i % 3) * 0.3, 0.3, 0.8 + (i % 2) * 0.3);
       blob.material = flMat;
       blob.parent = this.envRoot;
       blob.isPickable = false;
+      blob.renderingGroupId = 1;
     }
 
     const foamMat = new StandardMaterial("foamMat", this.scene);
@@ -662,7 +657,7 @@ export class SettlementView {
     reedMat.diffuseColor = hexToColor3(STYLE.reedGreen);
     reedMat.specularColor = Color3.Black();
     reedMat.emissiveColor = hexToColor3(STYLE.reedGreen).scale(0.05);
-    const reedCount = this.quality === "low" ? 18 : 40;
+    const reedCount = this.quality === "low" ? 28 : 70;
     for (let i = 0; i < reedCount; i++) {
       const r = MeshBuilder.CreateCylinder(
         `envReed-${i}`,
@@ -855,40 +850,40 @@ export class SettlementView {
     }
   }
 
-  /** Soft volume planes — heat haze that survives mid-iso stills. */
+  /** Soft volume — heat haze + bank mist puffs (reads as air, not hard plane). */
   private buildHazePlanes() {
-    // Warm air slab across settlement (visible milky band in stills)
+    // Soft distance wash: large low-alpha plane far side only
     const hazeMat = new StandardMaterial("hazeMat", this.scene);
-    hazeMat.diffuseColor = hexToColor3("#E8D4B0");
-    hazeMat.emissiveColor = hexToColor3("#E0D0B0").scale(0.25);
-    hazeMat.alpha = 0.18;
+    hazeMat.diffuseColor = hexToColor3("#D4C4A0");
+    hazeMat.emissiveColor = hexToColor3("#C8B890").scale(0.2);
+    hazeMat.alpha = 0.14;
     hazeMat.disableLighting = true;
     hazeMat.backFaceCulling = false;
-    for (let i = 0; i < 4; i++) {
-      const plane = MeshBuilder.CreateGround(
-        `hazePlane-${i}`,
-        { width: 50, height: 40 },
-        this.scene
-      );
-      plane.position.set(-2, 0.7 + i * 0.55, 2);
-      plane.material = hazeMat;
-      plane.parent = this.envRoot;
-      plane.isPickable = false;
-    }
-    // Thick bank mist — stacked translucent volumes (must read in day PNG)
+    const farHaze = MeshBuilder.CreateGround(
+      "farHaze",
+      { width: 30, height: 40 },
+      this.scene
+    );
+    farHaze.position.set(8, 1.4, 2);
+    farHaze.material = hazeMat;
+    farHaze.parent = this.envRoot;
+    farHaze.isPickable = false;
+
+    // Bank mist: soft elongated clouds (not perfect spheres / not hard box)
     const mm = new StandardMaterial("bankMistMat", this.scene);
-    mm.diffuseColor = hexToColor3("#E0ECF0");
-    mm.emissiveColor = hexToColor3("#C8DCE8").scale(0.45);
-    mm.alpha = 0.48;
+    mm.diffuseColor = hexToColor3("#D8E4E8");
+    mm.emissiveColor = hexToColor3("#C0D4DC").scale(0.25);
+    mm.alpha = 0.22;
     mm.disableLighting = true;
     mm.backFaceCulling = false;
-    for (let i = 0; i < 3; i++) {
-      const mist = MeshBuilder.CreateBox(
+    for (let i = 0; i < 12; i++) {
+      const mist = MeshBuilder.CreateSphere(
         `bankMist-${i}`,
-        { width: 3.8 - i * 0.4, height: 1.1 + i * 0.25, depth: 48 },
+        { diameter: 2.2 + (i % 4) * 0.4, segments: 10 },
         this.scene
       );
-      mist.position.set(-10.8 + i * 0.15, 0.55 + i * 0.4, 2);
+      mist.position.set(-11.8 + (i % 2) * 0.55, 0.7 + (i % 3) * 0.15, -11 + i * 2.1);
+      mist.scaling.set(1.6, 0.35, 1.1);
       mist.material = mm;
       mist.parent = this.envRoot;
       mist.isPickable = false;

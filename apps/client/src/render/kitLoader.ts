@@ -122,6 +122,20 @@ export function instantiateBuildingFromKit(
       c.receiveShadows = true;
       c.metadata = { buildingId: b.id, kind: b.kind, plotId: b.plotId };
       if (shadow) shadow.addShadowCaster(c, true);
+      // Boost material separation for grayscale readability
+      const mat = c.material as StandardMaterial | null;
+      if (mat && mat.diffuseColor) {
+        const n = c.name.toLowerCase();
+        if (n.includes("stone") || n.includes("gh_") || n.includes("obelisk")) {
+          mat.specularColor = new Color3(0.25, 0.24, 0.22);
+          mat.specularPower = 32;
+        } else if (n.includes("mud") || n.includes("body") || n.includes("stall")) {
+          mat.specularColor = new Color3(0.04, 0.03, 0.02);
+          mat.specularPower = 8;
+        } else if (n.includes("wood") || n.includes("deck") || n.includes("pier") || n.includes("post")) {
+          mat.specularColor = new Color3(0.08, 0.06, 0.04);
+        }
+      }
       const name = c.name.toLowerCase();
       if (
         name.includes("gold") ||

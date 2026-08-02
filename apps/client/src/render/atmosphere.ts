@@ -76,11 +76,11 @@ export class Atmosphere {
         ? Color3.Lerp(dayColor, duskColor, n * 2)
         : Color3.Lerp(duskColor, nightColor, (n - 0.5) * 2);
     this.sun.diffuse = sunCol;
-    // Stronger key for contact-shadow staging (day); deep cut for night
-    this.sun.intensity = 1.45 - n * 1.2;
-    // Raking low sun at dusk for long contact shadows
-    const elev = n < 0.5 ? -0.95 : -0.55 - (n - 0.5) * 0.6;
-    this.sun.direction = new Vector3(-0.75 + n * 0.15, elev, 0.45 - n * 0.2);
+    // Strong key + raking angle for long contact shadows (day & dusk)
+    this.sun.intensity = 1.55 - n * 1.25;
+    // More horizontal sun = longer shadows on ground
+    const elev = n < 0.35 ? -0.55 : n < 0.7 ? -0.4 : -0.35;
+    this.sun.direction = new Vector3(-0.95, elev, 0.55);
 
     this.hemi.intensity = 0.55 - n * 0.42;
     this.hemi.diffuse = Color3.Lerp(
@@ -99,17 +99,17 @@ export class Atmosphere {
         ? Color4.Lerp(clearDay, clearDusk, n * 2)
         : Color4.Lerp(clearDusk, clearNight, (n - 0.5) * 2);
 
-    // Soft distance air — haze planes carry still-readable volume; fog softens edges
+    // Distance falloff so far sand softens (depth + atmosphere in stills)
     this.scene.fogMode = Scene.FOGMODE_EXP2;
     if (n < 0.35) {
-      this.scene.fogDensity = 0.014;
-      this.scene.fogColor = hexToColor3("#C8B898");
+      this.scene.fogDensity = 0.019;
+      this.scene.fogColor = hexToColor3("#C4B490");
     } else if (n < 0.7) {
-      this.scene.fogDensity = 0.018;
-      this.scene.fogColor = hexToColor3("#C09068");
+      this.scene.fogDensity = 0.024;
+      this.scene.fogColor = hexToColor3("#B88860");
     } else {
-      this.scene.fogDensity = 0.022;
-      this.scene.fogColor = hexToColor3("#152030");
+      this.scene.fogDensity = 0.028;
+      this.scene.fogColor = hexToColor3("#101820");
     }
 
     if (river) {
