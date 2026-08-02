@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "title": "Immortal Shores",
+  "slug": "immortal-shores",
+  "track": "browser-isometric",
+  "visual_tier_requested": 3,
+  "visual_tier_achieved": null,
+  "has_complete_loop": false,
+  "playtested_minutes": 0,
+  "social_model": "persistent-async-server-tick-postcard-visits-market-tablet-barges-mail-escrow",
+  "uniqueness_answers": {
+    "differentiator": "Unique per-settlement luxury forces social trade from minute one on an eternal-river province map, with barge logistics and permanent Ascension legacy on the world.",
+    "rejected_suggestion": "Live shared 3D co-op city sandbox / pure idle clicker without negotiation / real-time action combat MMO.",
+    "why_play_twice": "Persistent hourly production, barge ETAs, province blessing windows, monument pressure, and the long climb to Eternal Name retirement."
+  },
+  "stack": {
+    "client": "TypeScript + Babylon.js isometric + Vite",
+    "server": "TypeScript REST+WS + PostgreSQL authoritative ticks and ledger",
+    "sim": "Server production/travel ticks; optional WASM for client density",
+    "graphics": "WebGPU primary / WebGL2 fallback; isometric orthographic",
+    "trade": "Market + Tablet Wall + River Barges + mail/escrow/gifts"
+  },
+  "percentages": {
+    "code": 0,
+    "art": 0,
+    "audio": 0,
+    "design": 100
+  },
+  "notes": "GDD and architecture locked 2026-08-02. Implementation not started."
+}
