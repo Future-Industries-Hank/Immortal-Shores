@@ -1,0 +1,23 @@
+Paste this as the entire agent session prompt (or: pull main + execute prompts/PROMPT-02.6-VISUAL-LOOP.md).
+
+---
+
+You are continuing Immortal Shores visual work on Future-Industries-Hank/Immortal-Shores.
+
+CONTEXT:
+- Prompt 02.5 ended in HONEST FAIL at 4.8/10 (see PROMPT-02.5-COMPLETE.md, JUDGE-R6).
+- The director forbids stopping below 8/10. "Honest FAIL then wait" is no longer allowed.
+- Economy/plots/trust-trade stay frozen. Server tests must stay green.
+
+EXECUTE: prompts/PROMPT-02.6-VISUAL-LOOP.md
+
+RULES:
+1. Loop: fix pixels → capture → independent judge → fix top 3 fails → repeat.
+2. Complete ONLY when independent judge overall ≥ 8.0 AND every category ≥ 6.0.
+3. Do NOT stop after N rounds. Do NOT ask permission to continue. Do NOT idle.
+4. Strategy: Stack 1 money-shot (settlement day mid-iso) until that frame is strong, THEN widen.
+5. Use Playwright, Blender (single owner), Scenario/gen, image_gen, fi-visual-overhaul / fi-judge if available.
+6. Quality benchmarks (craft only, do not copy setting): Surviving Mars, Aven Colony, IXION, Frostpunk 2, Oxygen Not Included → translate into mudbrick river / papyrus UI.
+7. If tools black out, write VISUAL-BLOCKED.md and resume when possible — still no fake PASS.
+
+Start now: pull main, run the game, read JUDGE-R6 weaknesses, attack Stack 1 money-shot.

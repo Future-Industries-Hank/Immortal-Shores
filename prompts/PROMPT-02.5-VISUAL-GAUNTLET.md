@@ -128,9 +128,10 @@ Kill: seams, z-fighting, banding, popping, aliasing, flat lighting, dead idle, U
 2. Provide evidence pack + benchmark craft instructions (quality only).  
 3. Require numeric scorecard (categories + overall).  
 4. If overall < 8 or any category < 6 → fix the **named** failures → re-capture → re-judge.  
-5. Max **6** judge rounds this gauntlet. If still < 8: honest FAIL + what would unlock 8 (tools, time, scope).  
+5. **Do not stop at a fixed round budget.** Keep looping until ≥ 8.0 / min ≥ 6.0.  
+   (If a prior run wrote HONEST FAIL at &lt; 8 after 6 rounds, that was a process error — continue via `PROMPT-02.6-VISUAL-LOOP.md`.)  
 
-**Integrity:** Builder may not edit judge criteria. Factual rebuttal with new screenshots only.
+**Integrity:** Builder may not edit judge criteria or fake PASS. Integrity ≠ stop iterating. Factual rebuttal with new screenshots only.
 
 ---
 
