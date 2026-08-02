@@ -20,6 +20,8 @@
 | **Too many people** | Crowd not tied to economy | `syncWorkers`: **forces 14–26 agents** for “life stills” (`cap` by quality), **ignores real worker count** |
 | **Zoomable “play map”** | Feels like navigable 3D, not a board | Camera attachControl + zoom radius limits |
 | **Too zoomed in / people focus** | Misses whole shore | Money-shot radius ~24–32, workers oversized and dense |
+| **Thick black rings around riverside plots** | Emmer field, clay pit, reed bed, etc. | Fake contact shadows: `shadowBlob` / kit **disc or box blobs** under meshes + possible double shadow with ShadowGenerator |
+| **Weird shadow boxes** | Hard rectangular dark stamps on sand | `kitLoader.ts` “contact shadow + elongated rake bar” (`CreateBox` shadows, alpha ~0.28) and worker under-boxes — **read as geometry, not light** |
 
 ### What director likes (do not burn)
 
@@ -101,7 +103,19 @@ Frame order of visual importance:
 
 If stills for judge crop people as the subject, framing is wrong.
 
-### 5. Keep / don’t regress
+### 5. Kill fake shadow stamps (binding — new director notes)
+
+Director: **thick black circles of fog/shadow around water-edge models** (emmer, pit, reeds, etc.) and **lots of weird shadow boxes**.
+
+**Required:**
+
+- Remove or redesign **mesh-based contact shadows** that are opaque black boxes/discs under buildings and workers (`buildings.ts` `shadowBlob`, `kitLoader` rake bar / densify overlays, worker `CreateBox` under-shadow).  
+- Prefer **one** real `ShadowGenerator` soft contact on ground receivers only — **or** a single very soft low-alpha blob (alpha ≤ ~0.12, soft edges, no hard box silhouette).  
+- No stacked systems: fake blob **plus** shadow map **plus** dark emissive under-mesh.  
+- After fix: riverside resource plots must **not** wear a black halo; open sand must **not** show rectangular shadow stamps.  
+- Capture `no-shadow-boxes.png` money-shot proving clean ground around emmer/clay/reed/GH.
+
+### 6. Keep / don’t regress
 
 - Building glTF detail, desert palette, plot markers, pier/harbor if good  
 - Inspiration boards still guide silhouettes — do not re-box buildings  
@@ -128,7 +142,9 @@ Write `DIRECTOR-PLAY-PASS.md` with before/after and checkboxes:
 - [ ] Worker count tracks sim (screenshot + numbers from settlement.workers / assignments)  
 - [ ] Workers clearly smaller than buildings; not the focus of the frame  
 - [ ] No walking through solid buildings on a 10s watch  
-- [ ] Playwright: `settlement-board-day.png` full board; close-ups optional  
+- [ ] **No black rings** under emmer / clay / reed / riverside kits  
+- [ ] **No rectangular shadow-box stamps** on open sand  
+- [ ] Playwright: `settlement-board-day.png` full board; `no-shadow-boxes.png`  
 
 Only after those, optional independent scorecard — **director list above is the gate**.
 
@@ -138,9 +154,11 @@ Only after those, optional independent scorecard — **director list above is th
 
 | File | Change |
 |---|---|
-| `apps/client/src/render/scene.ts` | Camera lock; `syncWorkers` count; worker scale; pathing |
+| `apps/client/src/render/scene.ts` | Camera lock; `syncWorkers` count; worker scale; pathing; drop worker box-shadows |
 | `apps/client/src/render/moneyShot.ts` | Wider fixed board framing |
 | `apps/client/src/render/atmosphere.ts` | Fog density cut / mode |
+| `apps/client/src/render/kitLoader.ts` | Remove hard rake-bar / box contact stamps; soft real shadows only |
+| `apps/client/src/render/buildings.ts` | Retire or soften `shadowBlob` |
 | Worker path assign | Road graph only |
 
 ---
