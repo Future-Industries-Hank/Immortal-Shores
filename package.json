@@ -11,7 +11,9 @@
     "build": "npm run build -w @immortal/shared && npm run build -w @immortal/server && npm run build -w @immortal/client",
     "start": "npm run start -w @immortal/server",
     "test": "npm run test -w @immortal/server",
-    "typecheck": "npm run typecheck -w @immortal/shared && npm run typecheck -w @immortal/server && npm run typecheck -w @immortal/client"
+    "typecheck": "npm run typecheck -w @immortal/shared && npm run typecheck -w @immortal/server && npm run typecheck -w @immortal/client",
+    "storyboard": "python3 -m http.server 8765 --directory .",
+    "storyboard:open": "echo Open http://127.0.0.1:5173/storyboard/  after npm run dev   OR   http://127.0.0.1:8765/ART-STORYBOARD-REVIEW.html after npm run storyboard"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

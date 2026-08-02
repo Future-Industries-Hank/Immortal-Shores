@@ -9,15 +9,21 @@ Execute prompts/PROMPT-02.9-APPROVAL-THEN-CRAFT.md in order. Do not skip.
 ══════════════════════════════════════
 STEP 1 — ART STORYBOARD (do this first)
 ══════════════════════════════════════
-1. Start a simple static server from repo root if needed:
-   python3 -m http.server 8765 --directory .
-2. Tell the director to open:
-   http://127.0.0.1:8765/ART-STORYBOARD-REVIEW.html
-3. Boards are under docs/visual-inspiration/ (inspiration only, not final assets).
-4. Director marks Yes / No / Revise per image. WAIT for them.
-5. On all required Yes → write ART-STORYBOARD-APPROVED.md
-6. Do NOT implement craft until Step 1 is done.
+Storyboard is served from the Vite client public folder (NOT the repo root URL).
 
+PREFERRED (with game already on npm run dev):
+  → http://127.0.0.1:5173/storyboard/
+  (files: apps/client/public/storyboard/index.html + images)
+
+ALTERNATE (repo root static server):
+  npm run storyboard
+  → http://127.0.0.1:8765/ART-STORYBOARD-REVIEW.html
+  (must run from repo root; do NOT use /storyboard on port 8765)
+
+Tell the director the exact working URL. WAIT for Yes/No/Revise.
+On all required Yes → ART-STORYBOARD-APPROVED.md
+Do NOT craft until Step 1 is done.
+Do NOT use http://127.0.0.1:5173/ART-STORYBOARD-REVIEW.html (404).
 ══════════════════════════════════════
 STEP 2 — STANDARD VIEW (POV + scale)
 ══════════════════════════════════════

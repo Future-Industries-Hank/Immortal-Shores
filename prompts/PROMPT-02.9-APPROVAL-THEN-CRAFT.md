@@ -21,20 +21,24 @@
 
    **`ART-STORYBOARD-REVIEW.html`** (repo root)
 
-   How to open (pick one):
+   How to open (**use these exact URLs** — wrong path = 404):
 
    ```bash
-   npm run dev
-   # then open in browser, e.g.:
-   # http://127.0.0.1:5173/../ART-STORYBOARD-REVIEW.html
-   # OR simpler:
-   python3 -m http.server 8765 --directory .
+   # PREFERRED — with npm run dev (Vite serves public/)
+   # → http://127.0.0.1:5173/storyboard/
+   # (apps/client/public/storyboard/index.html)
+
+   # ALTERNATE — from repo root only:
+   npm run storyboard
    # → http://127.0.0.1:8765/ART-STORYBOARD-REVIEW.html
    ```
 
-4. **Tell the director in plain language:**  
-   > “Open the art storyboard in your browser. For each image: **Yes** (use as style target), **No** (discard), or **Revise** (leave notes). These are inspiration only — not final game assets. Export when done.”
+   **404 traps:**  
+   - `http://127.0.0.1:5173/ART-STORYBOARD-REVIEW.html` → **404** (file is not at Vite root)  
+   - `http://127.0.0.1:8765/storyboard/` → **404** unless you cd into public  
 
+4. **Tell the director in plain language:**  
+   > “Open **http://127.0.0.1:5173/storyboard/** (with the game dev server running). For each image: **Yes** / **No** / **Revise**. Inspiration only — not final assets.”
 5. **STOP and wait** for director decisions.  
    - Do **not** assume Yes.  
    - Do **not** start Blender/fog/worker rewrites until Step 1 is finished.  
