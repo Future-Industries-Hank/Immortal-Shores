@@ -41,8 +41,9 @@ See [`HOSTING.md`](./HOSTING.md).
 | **2.5–2.6** | primer + loop | Toward 8/10 | Stalled ~6.x; boxes still |
 | **2.7** | [`prompts/PROMPT-02.7-RESTART-FROM-BOARDS.md`](./prompts/PROMPT-02.7-RESTART-FROM-BOARDS.md) | Rebuild glTF from boards | Ran / partial |
 | **2.8** | [`prompts/PROMPT-02.8-DIRECTOR-PLAY-PASS.md`](./prompts/PROMPT-02.8-DIRECTOR-PLAY-PASS.md) | Director play issues (reference) | Nested in 02.9 Step 3 |
-| **2.9** | [`prompts/PROMPT-02.9-APPROVAL-THEN-CRAFT.md`](./prompts/PROMPT-02.9-APPROVAL-THEN-CRAFT.md) | **Storyboard → standard view → craft** | **RUN THIS** |
-| Kickoff | [`prompts/PROMPT-02.9-KICKOFF.txt`](./prompts/PROMPT-02.9-KICKOFF.txt) | Paste block | Copy-paste |
+| **2.9** | [`prompts/PROMPT-02.9-APPROVAL-THEN-CRAFT.md`](./prompts/PROMPT-02.9-APPROVAL-THEN-CRAFT.md) | Storyboard → standard view | **DONE** (locked) |
+| **03** | [`prompts/PROMPT-03-APPROVED-GAUNTLET.md`](./prompts/PROMPT-03-APPROVED-GAUNTLET.md) | **Boards + AAA quality → ≥ 8/10** | **RUN THIS** |
+| Kickoff | [`prompts/PROMPT-03-KICKOFF.txt`](./prompts/PROMPT-03-KICKOFF.txt) | Paste block | Copy-paste |
 | Review UI | [`ART-STORYBOARD-REVIEW.html`](./ART-STORYBOARD-REVIEW.html) | Yes/No boards | Open when locking look |
 | Inspiration | [`docs/visual-inspiration/`](./docs/visual-inspiration/) | Style guide JPGs | Generated |
 

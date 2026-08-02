@@ -1,0 +1,30 @@
+Paste as full session prompt:
+
+---
+
+Pull latest main Future-Industries-Hank/Immortal-Shores. Economy frozen.
+
+Artboard + POV are LOCKED (director approved). Do not re-open storyboard or change the fixed full-settlement camera product model.
+
+Execute: prompts/PROMPT-03-APPROVED-GAUNTLET.md
+
+BINDING:
+1) Inspiration = docs/visual-inspiration/ (and /storyboard/) — implement in-engine/glTF to match silhouettes; do NOT import JPGs as final art.
+2) Standard view = full shore, NO wheel zoom, buildings/pads/desert are heroes.
+3) Director play fixes MUST stay green:
+   - cut fog soup
+   - remove black rings + rectangular mesh shadow boxes (kitLoader rake/shadowBlob/worker foot boxes)
+   - workers small, sparse, count from sim (NO forced 14–26 crowd), no ghosting through buildings
+4) Keep building detail and desert setting.
+
+QUALITY BAR (craft only — do not copy setting/UI layouts):
+- Surviving Mars & Aven Colony → readable high-angle colony board, modular building clarity, env coherence
+- IXION & Frostpunk 2 → premium panel materials / soft edge light / dense management polish → papyrus/ink skin
+- Oxygen Not Included → readout clarity and info density
+
+GATE: Independent judge overall ≥ 8.0 and min category ≥ 6.0.
+If buildings still read as cubes vs artboard → Structures ≤ 3 always.
+Do not stop below 8 with "honest FAIL then wait" — keep iterating.
+Do not celebrate R17 vanity 8.0 if director checklist fails.
+
+Start: confirm fixed board camera → kill shadow stamps + worker scale/count → board-matched Blender/glTF for weak heroes → capture gauntlet-03 → judge loop until gate.
