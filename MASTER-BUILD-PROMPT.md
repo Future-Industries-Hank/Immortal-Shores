@@ -1,13 +1,11 @@
 # Immortal Shores — prompt index
 
-Three sequential agent prompts. Do not combine into one run.
+| Phase | File | Status |
+|---|---|---|
+| 01 Playable | `prompts/PROMPT-01-PLAYABLE.md` | DONE |
+| 01.5 Modern systems | `prompts/PROMPT-01.5-MODERN-2026.md` | DONE |
+| 02 Visual (first) | `prompts/PROMPT-02-VISUAL.md` | Ran; ~1.5/10 — **not enough** |
+| **02.5 Primer** | `prompts/PROMPT-02.5-PRIMER-READINESS.md` | **Run first** |
+| **02.5 Gauntlet** | `prompts/PROMPT-02.5-VISUAL-GAUNTLET.md` | **≥ 8/10 bar** |
 
-| Phase | File | Purpose | Status |
-|---|---|---|---|
-| **01** | [`prompts/PROMPT-01-PLAYABLE.md`](./prompts/PROMPT-01-PLAYABLE.md) | Playable core | **COMPLETE** (`9f0479d`, see `PROMPT-01-COMPLETE.md`) |
-| **01.5** | [`prompts/PROMPT-01.5-MODERN-2026.md`](./prompts/PROMPT-01.5-MODERN-2026.md) | 2026 systems / trust trade / QoL / onboarding | **NEXT** |
-| **02** | [`prompts/PROMPT-02-VISUAL.md`](./prompts/PROMPT-02-VISUAL.md) | Visual gauntlet + impartial judge | After 01.5 |
-
-Design canon: `docs/GDD.md`, `docs/MODERN-2026.md`, `docs/ECONOMY.md`, `docs/STYLE-CONTRACT.md`, `docs/REV1-REVIEW.md`.
-
-See root [`README.md`](./README.md).
+Mechanics audit (green for art spend): `CRITICAL-AUDIT-PRE-02.md`.
