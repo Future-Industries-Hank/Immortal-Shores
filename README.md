@@ -36,13 +36,14 @@ See [`HOSTING.md`](./HOSTING.md).
 |---|---|---|---|
 | **1** | [`prompts/PROMPT-01-PLAYABLE.md`](./prompts/PROMPT-01-PLAYABLE.md) | Playable core | **DONE** |
 | **1.5** | [`prompts/PROMPT-01.5-MODERN-2026.md`](./prompts/PROMPT-01.5-MODERN-2026.md) | 2026 systems | **DONE** |
-| **2** | [`prompts/PROMPT-02-VISUAL.md`](./prompts/PROMPT-02-VISUAL.md) | First visual pass | Ran — director ~**1.5/10** (not enough) |
-| **2.5 primer** | [`prompts/PROMPT-02.5-PRIMER-READINESS.md`](./prompts/PROMPT-02.5-PRIMER-READINESS.md) | MCP/skills readiness | Ran |
-| **2.5 goal** | [`prompts/PROMPT-02.5-VISUAL-GAUNTLET.md`](./prompts/PROMPT-02.5-VISUAL-GAUNTLET.md) | First 8/10 attempt | **FAIL 4.8** — do not stop there |
-| **2.6 loop** | [`prompts/PROMPT-02.6-VISUAL-LOOP.md`](./prompts/PROMPT-02.6-VISUAL-LOOP.md) | Loop until ≥ 8/10 | Ran — stalled ~6.x while buildings still boxy |
-| **2.7 restart** | [`prompts/PROMPT-02.7-RESTART-FROM-BOARDS.md`](./prompts/PROMPT-02.7-RESTART-FROM-BOARDS.md) | **Rebuild buildings from Imagine boards** | **RUN THIS** |
-| Kickoff | [`prompts/PROMPT-02.7-KICKOFF.txt`](./prompts/PROMPT-02.7-KICKOFF.txt) | Paste for new session | Copy-paste |
-| Inspiration | [`docs/visual-inspiration/`](./docs/visual-inspiration/) | Reference JPGs (not ship assets) | Required for 02.7 |
+| **1.9** | [`prompts/PROMPT-01.9-ART-STORYBOARD.md`](./prompts/PROMPT-01.9-ART-STORYBOARD.md) | **Art storyboard — director Yes/No** | Boards ready → **you approve** |
+| **2** | [`prompts/PROMPT-02-VISUAL.md`](./prompts/PROMPT-02-VISUAL.md) | First visual pass | Ran — ~1.5/10 (not enough) |
+| **2.5–2.6** | primer + loop | Toward 8/10 | Stalled ~6.x; boxes still |
+| **2.7** | [`prompts/PROMPT-02.7-RESTART-FROM-BOARDS.md`](./prompts/PROMPT-02.7-RESTART-FROM-BOARDS.md) | Rebuild glTF from approved boards | After 1.9 Yes |
+| Review UI | [`ART-STORYBOARD-REVIEW.html`](./ART-STORYBOARD-REVIEW.html) | Click Yes/No/Revise per board | **Open this** |
+| Inspiration | [`docs/visual-inspiration/`](./docs/visual-inspiration/) | Style guide JPGs (not final art) | Generated |
+
+**FI skills (general pack):** `fi-art-storyboard` · specialized HTML: `fi-html-game` (Future Industries `.claude/skills/`).
 
 Mechanics pre-check: [`CRITICAL-AUDIT-PRE-02.md`](./CRITICAL-AUDIT-PRE-02.md) (green).  
 Do not reopen escrow, plot counts, or GDD rates.

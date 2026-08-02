@@ -2,11 +2,11 @@
 
 | Phase | File | Status |
 |---|---|---|
-| 01–01.5 | playable + modern systems | DONE |
-| 02 / 02.5 | early visual | Insufficient |
-| 02.6 | loop until 8 | Stalled ~6.x; buildings still boxy |
-| **02.7** | `prompts/PROMPT-02.7-RESTART-FROM-BOARDS.md` | **Active — rebuild from inspiration boards** |
-| Kickoff | `prompts/PROMPT-02.7-KICKOFF.txt` | Paste into agent |
-| Boards | `docs/visual-inspiration/` | Imagine refs (not final art) |
+| 01 Playable | `PROMPT-01-PLAYABLE.md` | DONE |
+| 01.5 Modern systems | `PROMPT-01.5-MODERN-2026.md` | DONE |
+| **01.9 Art storyboard** | `PROMPT-01.9-ART-STORYBOARD.md` | **Director Yes/No** → `ART-STORYBOARD-REVIEW.html` |
+| 02–02.6 Visual attempts | various | Insufficient / stalled |
+| **02.7 Restart from boards** | `PROMPT-02.7-RESTART-FROM-BOARDS.md` | After 1.9 approved |
 
-**Rule:** If buildings look like squares, Structures ≤ 3. Do not celebrate 6.x overall.
+**FI general:** skills `fi-art-storyboard` + `fi-html-game` in Future-Industries pack.  
+**Rule:** No multi-round visual gauntlet without approved storyboard. Boxes vs boards ⇒ structure fail.

@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FI Art Storyboard Review</title>
+  <style>
+    :root {
+      --bg: #1a1612; --panel: #2a231c; --ink: #f3e6c8; --muted: #a89880;
+      --yes: #3d7a4a; --no: #8b3a4a; --rev: #8a6a2a; --accent: #d4a84b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg); color: var(--ink); line-height: 1.45;
+    }
+    header {
+      position: sticky; top: 0; z-index: 10;
+      background: #120f0c; border-bottom: 1px solid #3a3228;
+      padding: 0.75rem 1.25rem; display: flex; flex-wrap: wrap;
+      gap: 0.75rem; align-items: center; justify-content: space-between;
+    }
+    h1 { font-size: 1.1rem; margin: 0; color: var(--accent); font-weight: 600; }
+    .meta { color: var(--muted); font-size: 0.85rem; }
+    main { max-width: 1100px; margin: 0 auto; padding: 1rem 1.25rem 4rem; }
+    .banner {
+      background: var(--panel); border: 1px solid #3a3228; border-radius: 8px;
+      padding: 0.85rem 1rem; margin-bottom: 1.25rem; font-size: 0.95rem;
+    }
+    .banner strong { color: var(--accent); }
+    .card {
+      display: grid; grid-template-columns: minmax(200px, 280px) 1fr;
+      gap: 1rem; background: var(--panel); border: 1px solid #3a3228;
+      border-radius: 10px; padding: 1rem; margin-bottom: 1rem;
+    }
+    @media (max-width: 720px) {
+      .card { grid-template-columns: 1fr; }
+    }
+    .card img {
+      width: 100%; border-radius: 6px; background: #000; display: block;
+      aspect-ratio: 1; object-fit: cover;
+    }
+    .card h2 { margin: 0 0 0.35rem; font-size: 1rem; }
+    .card .id { font-family: ui-monospace, monospace; color: var(--muted); font-size: 0.8rem; }
+    .path { font-size: 0.8rem; color: var(--muted); word-break: break-all; margin: 0.25rem 0 0.75rem; }
+    .btns { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0; }
+    button {
+      border: 0; border-radius: 6px; padding: 0.45rem 0.85rem; cursor: pointer;
+      font-weight: 600; font-size: 0.85rem; color: #fff;
+    }
+    button.yes { background: var(--yes); }
+    button.no { background: var(--no); }
+    button.rev { background: var(--rev); }
+    button.export {
+      background: var(--accent); color: #1a1612;
+    }
+    button.active { outline: 2px solid #fff; outline-offset: 2px; }
+    textarea {
+      width: 100%; min-height: 4rem; border-radius: 6px; border: 1px solid #4a4034;
+      background: #1a1612; color: var(--ink); padding: 0.5rem; font: inherit;
+    }
+    .status { font-size: 0.85rem; margin-top: 0.35rem; }
+    .status.yes { color: #7dcea0; }
+    .status.no { color: #f1948a; }
+    .status.revise { color: #f7dc6f; }
+    .status.pending { color: var(--muted); }
+    footer {
+      position: sticky; bottom: 0; background: #120f0c; border-top: 1px solid #3a3228;
+      padding: 0.75rem 1.25rem; display: flex; flex-wrap: wrap; gap: 0.75rem;
+      align-items: center; justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Art Storyboard Review · Phase 1.9</h1>
+      <div class="meta">Inspiration only — not final assets. Yes unlocks visual overhaul.</div>
+    </div>
+    <div class="meta" id="progress">0 / 0 required approved</div>
+  </header>
+  <main>
+    <div class="banner">
+      <strong>Director:</strong> For each board, mark <strong>Yes</strong> (use as style target),
+      <strong>No</strong> (discard direction), or <strong>Revise</strong> (notes for regenerating).
+      Required slots must all be <strong>Yes</strong> before the builder may start multi-round visual polish.
+      Boards guide silhouettes, palette, and composition — they are <em>not</em> imported as game sprites.
+    </div>
+    <div id="cards"></div>
+  </main>
+  <footer>
+    <div class="meta" id="summary">Load boards into <code>window.STORYBOARD</code> or edit this file’s default data.</div>
+    <button type="button" class="export" id="btnExport">Export decisions → ART-STORYBOARD-ANSWERS.json</button>
+  </footer>
+  <script>
+    /**
+     * Builder: replace STORYBOARD with your inventory after generating boards.
+     * path is relative to this HTML file (or absolute URL).
+     */
+    window.STORYBOARD = window.STORYBOARD || {
+      title: "Immortal Shores",
+      requiredIds: ["S01","B01","B02","B03","B04","B05","B06","B07","B08","B09"],
+      items: [
+        { id: "S01", title: "Settlement money-shot", guides: "composition / money-shot", path: "docs/visual-inspiration/settlement/10-settlement-money-shot.jpg", required: true },
+        { id: "B01", title: "Great House", guides: "great_house", path: "docs/visual-inspiration/buildings/01-great-house.jpg", required: true },
+        { id: "B02", title: "Market", guides: "market", path: "docs/visual-inspiration/buildings/02-market.jpg", required: true },
+        { id: "B03", title: "Mudbrick Yard", guides: "mudbrick_yard", path: "docs/visual-inspiration/buildings/03-mudbrick-yard.jpg", required: true },
+        { id: "B04", title: "Harbor + barge", guides: "harbor, barge", path: "docs/visual-inspiration/buildings/04-harbor-pier-barge.jpg", required: true },
+        { id: "B05", title: "Training Grounds", guides: "training_grounds", path: "docs/visual-inspiration/buildings/05-training-grounds.jpg", required: true },
+        { id: "B06", title: "Shrine", guides: "shrine", path: "docs/visual-inspiration/buildings/06-shrine.jpg", required: true },
+        { id: "B07", title: "Luxury Works", guides: "luxury_material / luxury_workshop", path: "docs/visual-inspiration/buildings/07-luxury-works.jpg", required: true },
+        { id: "B08", title: "Emmer Field", guides: "emmer_field (+ clay/reed analogy)", path: "docs/visual-inspiration/buildings/08-emmer-field.jpg", required: true },
+        { id: "B09", title: "Ration House", guides: "ration_house (+ shops analogy)", path: "docs/visual-inspiration/buildings/09-ration-house.jpg", required: true }
+      ]
+    };
+
+    const KEY = "fi-art-storyboard-v1";
+    const state = load();
+
+    function load() {
+      try {
+        return JSON.parse(localStorage.getItem(KEY) || "{}");
+      } catch {
+        return {};
+      }
+    }
+    function save() {
+      localStorage.setItem(KEY, JSON.stringify(state));
+      renderProgress();
+    }
+
+    function renderProgress() {
+      const items = window.STORYBOARD.items || [];
+      const req = items.filter((i) => i.required !== false);
+      const yes = req.filter((i) => state[i.id]?.decision === "yes").length;
+      document.getElementById("progress").textContent =
+        yes + " / " + req.length + " required approved";
+      const allYes = req.length > 0 && yes === req.length;
+      document.getElementById("summary").textContent = allYes
+        ? "All required boards Yes — builder may write ART-STORYBOARD-APPROVED.md and continue."
+        : "Approve all required boards before multi-round visual work.";
+    }
+
+    function setDecision(id, decision) {
+      state[id] = state[id] || {};
+      state[id].decision = decision;
+      state[id].updatedAt = new Date().toISOString();
+      save();
+      render();
+    }
+
+    function setNotes(id, notes) {
+      state[id] = state[id] || {};
+      state[id].notes = notes;
+      save();
+    }
+
+    function render() {
+      const root = document.getElementById("cards");
+      root.innerHTML = "";
+      for (const item of window.STORYBOARD.items || []) {
+        const st = state[item.id] || {};
+        const d = st.decision || "pending";
+        const card = document.createElement("article");
+        card.className = "card";
+        card.innerHTML =
+          '<div><img alt="" src="' +
+          encodeURI(item.path) +
+          '" onerror="this.style.opacity=0.3;this.alt=\'missing\'" />' +
+          '<div class="path">' +
+          item.path +
+          "</div></div><div>" +
+          "<h2>" +
+          item.title +
+          "</h2>" +
+          '<div class="id">' +
+          item.id +
+          (item.required === false ? " · optional" : " · required") +
+          "</div>" +
+          "<p>Guides: <code>" +
+          (item.guides || "—") +
+          "</code></p>" +
+          '<div class="btns">' +
+          '<button type="button" class="yes' +
+          (d === "yes" ? " active" : "") +
+          '" data-act="yes">Yes</button>' +
+          '<button type="button" class="no' +
+          (d === "no" ? " active" : "") +
+          '" data-act="no">No</button>' +
+          '<button type="button" class="rev' +
+          (d === "revise" ? " active" : "") +
+          '" data-act="revise">Revise</button>' +
+          "</div>" +
+          '<div class="status ' +
+          d +
+          '">Status: ' +
+          d +
+          "</div>" +
+          "<label>Notes<br/><textarea data-notes></textarea></label>" +
+          "</div>";
+        card.querySelectorAll("button[data-act]").forEach((btn) => {
+          btn.onclick = () => setDecision(item.id, btn.getAttribute("data-act"));
+        });
+        const ta = card.querySelector("textarea");
+        ta.value = st.notes || "";
+        ta.onchange = () => setNotes(item.id, ta.value);
+        root.appendChild(card);
+      }
+      renderProgress();
+    }
+
+    document.getElementById("btnExport").onclick = () => {
+      const payload = {
+        title: window.STORYBOARD.title,
+        exportedAt: new Date().toISOString(),
+        decisions: state,
+        items: window.STORYBOARD.items
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {
+        type: "application/json"
+      });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "ART-STORYBOARD-ANSWERS.json";
+      a.click();
+    };
+
+    render();
+  </script>
+</body>
+</html>

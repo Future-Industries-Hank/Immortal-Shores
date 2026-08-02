@@ -5,7 +5,8 @@
 
 > **Director fact (non-negotiable):** After R10 the **live game still reads as square/box buildings**.  
 > Judge scores that put **Structures at 6–7** while the money-shot is cubes are **invalid for completion**.  
-> **You will restart structure craft from `docs/visual-inspiration/`**, not from “slightly better boxes.”
+> **You will restart structure craft from `docs/visual-inspiration/`**, not from “slightly better boxes.”  
+> **Phase 1.9:** Boards must be director-approved (`ART-STORYBOARD-APPROVED.md` or explicit Yes export). If not approved yet, run `PROMPT-01.9-ART-STORYBOARD.md` first — do not Blender for days against unapproved looks.
 
 ---
 
