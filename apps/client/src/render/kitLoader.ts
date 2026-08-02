@@ -179,8 +179,9 @@ export function instantiateBuildingFromKit(
     hit.metadata = { buildingId: b.id, kind: b.kind, plotId: b.plotId };
     hit.parent = root;
 
-    // Structure densify overlays (wall relief / cornice / stalls) — mid-iso mass
-    densifyKitOverlay(scene, root, b.kind, b.id, shadow);
+    // Structure densify overlays (wall relief / cornice / stalls) — board-distance mass
+    // Skip heavy double-stack when glTF already multi-part (reduces wire noise)
+    densifyKitOverlay(scene, root, b.kind, b.id, shadow, true);
 
     return { root, hit, emissives, anim };
   }
@@ -194,8 +195,11 @@ function densifyKitOverlay(
   root: TransformNode,
   kind: string,
   id: string,
-  shadow?: ShadowGenerator | null
+  shadow?: ShadowGenerator | null,
+  gltfAlreadyDense = false
 ) {
+  // Light touch when Blender kit already carries multi-part mass
+  const light = gltfAlreadyDense;
   const mud = new StandardMaterial(`dens-mud-${id}`, scene);
   mud.diffuseColor = new Color3(0.55, 0.42, 0.3);
   mud.specularColor = new Color3(0.04, 0.03, 0.02);
@@ -232,90 +236,58 @@ function densifyKitOverlay(
   pale.specularColor = new Color3(0.15, 0.14, 0.12);
 
   if (kind === "great_house") {
-    // Artboard 01: multi-tier pale stone mass + gold lintel + gallery
-    const base = MeshBuilder.CreateBox(`dens-gh-base-${id}`, { width: 2.8, height: 0.28, depth: 2.5 }, scene);
-    base.position.y = 0.14;
-    add(base, mud);
-    const mid = MeshBuilder.CreateBox(`dens-gh-mid-${id}`, { width: 2.4, height: 1.15, depth: 2.1 }, scene);
-    mid.position.y = 0.85;
-    add(mid, stone);
-    const upper = MeshBuilder.CreateBox(`dens-gh-up-${id}`, { width: 1.7, height: 0.75, depth: 1.5 }, scene);
-    upper.position.y = 1.75;
-    add(upper, pale);
-    const cornice = MeshBuilder.CreateBox(`dens-cornice-${id}`, { width: 2.55, height: 0.12, depth: 2.2 }, scene);
-    cornice.position.y = 2.15;
-    add(cornice, stone);
+    // Artboard 01: gold lintel + windows always; full mass only if glTF thin
+    if (!light) {
+      const base = MeshBuilder.CreateBox(`dens-gh-base-${id}`, { width: 2.8, height: 0.28, depth: 2.5 }, scene);
+      base.position.y = 0.14;
+      add(base, mud);
+      const mid = MeshBuilder.CreateBox(`dens-gh-mid-${id}`, { width: 2.4, height: 1.15, depth: 2.1 }, scene);
+      mid.position.y = 0.85;
+      add(mid, stone);
+      const upper = MeshBuilder.CreateBox(`dens-gh-up-${id}`, { width: 1.7, height: 0.75, depth: 1.5 }, scene);
+      upper.position.y = 1.75;
+      add(upper, pale);
+      const cornice = MeshBuilder.CreateBox(`dens-cornice-${id}`, { width: 2.55, height: 0.12, depth: 2.2 }, scene);
+      cornice.position.y = 2.15;
+      add(cornice, stone);
+      for (const x of [-0.95, 0, 0.95]) {
+        const pil = MeshBuilder.CreateBox(`dens-pil-${id}-${x}`, { width: 0.2, height: 1.6, depth: 0.2 }, scene);
+        pil.position.set(x, 0.85, -1.0);
+        add(pil, stone);
+      }
+      const roof = MeshBuilder.CreateBox(`dens-roofcap-${id}`, { width: 1.9, height: 0.22, depth: 1.65 }, scene);
+      roof.position.y = 2.35;
+      add(roof, darkRoof);
+    }
     const lintel = MeshBuilder.CreateBox(`dens-lintel-${id}`, { width: 1.6, height: 0.1, depth: 0.14 }, scene);
     lintel.position.set(0, 1.15, -1.08);
     add(lintel, gold);
-    for (const x of [-0.95, 0, 0.95]) {
-      const pil = MeshBuilder.CreateBox(`dens-pil-${id}-${x}`, { width: 0.2, height: 1.6, depth: 0.2 }, scene);
-      pil.position.set(x, 0.85, -1.0);
-      add(pil, stone);
-    }
-    const roof = MeshBuilder.CreateBox(`dens-roofcap-${id}`, { width: 1.9, height: 0.22, depth: 1.65 }, scene);
-    roof.position.y = 2.35;
-    add(roof, darkRoof);
-    // Gallery windows (day-readable facade)
     for (let i = 0; i < 4; i++) {
       const win = MeshBuilder.CreateBox(`dens-win-${id}-${i}`, { width: 0.22, height: 0.32, depth: 0.06 }, scene);
       win.position.set(-0.6 + i * 0.4, 1.35, -1.08);
       add(win, gold);
     }
   } else if (kind === "market") {
-    // Artboard 02: open colonnade + stall mass + cloth awning
+    if (light) return; // glTF market already multi-part
     for (const x of [-0.55, 0.55]) {
       const stall = MeshBuilder.CreateBox(`dens-stall-${id}-${x}`, { width: 0.9, height: 0.7, depth: 0.6 }, scene);
       stall.position.set(x, 0.38, 0.2);
       add(stall, mud);
     }
-    const back = MeshBuilder.CreateBox(`dens-mkt-back-${id}`, { width: 2.0, height: 0.95, depth: 0.22 }, scene);
-    back.position.set(0, 0.5, 0.75);
-    add(back, mud);
     const awn = MeshBuilder.CreateBox(`dens-awn-${id}`, { width: 2.25, height: 0.1, depth: 1.75 }, scene);
     awn.position.y = 1.28;
     const awnMat = new StandardMaterial(`dens-awnm-${id}`, scene);
     awnMat.diffuseColor = new Color3(0.72, 0.5, 0.28);
     awnMat.specularColor = Color3.Black();
     add(awn, awnMat);
-    for (const [x, z] of [
-      [-0.9, -0.65],
-      [0.9, -0.65],
-      [-0.9, 0.65],
-      [0.9, 0.65],
-    ] as const) {
-      const p = MeshBuilder.CreateCylinder(`dens-post-${id}-${x}${z}`, { height: 1.25, diameter: 0.13, tessellation: 6 }, scene);
-      p.position.set(x, 0.62, z);
-      add(p, wood);
-    }
-    const crate = MeshBuilder.CreateBox(`dens-crate-${id}`, { width: 0.4, height: 0.3, depth: 0.35 }, scene);
-    crate.position.set(0, 0.2, -0.55);
-    add(crate, wood);
   } else if (kind === "harbor" || kind === "pier") {
-    // Artboard 04: pier deck + posts + warehouse shed
+    if (light) return;
     const deck = MeshBuilder.CreateBox(`dens-deck-${id}`, { width: 2.6, height: 0.14, depth: 1.8 }, scene);
     deck.position.y = 0.18;
     add(deck, wood);
-    for (const x of [-1.0, 0, 1.0]) {
-      const pile = MeshBuilder.CreateCylinder(`dens-pile-${id}-${x}`, { height: 0.55, diameter: 0.16, tessellation: 6 }, scene);
-      pile.position.set(x, 0.05, -0.7);
-      add(pile, wood);
-    }
-    const shed = MeshBuilder.CreateBox(`dens-shed-${id}`, { width: 1.4, height: 0.9, depth: 1.1 }, scene);
-    shed.position.set(0.3, 0.55, 0.35);
-    add(shed, mud);
-    const shedRoof = MeshBuilder.CreateBox(`dens-shedroof-${id}`, { width: 1.55, height: 0.12, depth: 1.2 }, scene);
-    shedRoof.position.set(0.3, 1.05, 0.35);
-    add(shedRoof, darkRoof);
   } else if (kind === "emmer_field" || kind === "marsh_reed_bed") {
-    // Artboard 08: soil bed + crop rows + tiny shed
-    const soil = MeshBuilder.CreateBox(`dens-soil-${id}`, { width: 2.2, height: 0.12, depth: 2.0 }, scene);
-    soil.position.y = 0.06;
-    const soilM = new StandardMaterial(`dens-soilm-${id}`, scene);
-    soilM.diffuseColor = new Color3(0.45, 0.35, 0.2);
-    soilM.specularColor = Color3.Black();
-    add(soil, soilM);
-    for (let i = 0; i < 9; i++) {
+    if (light) return;
+    for (let i = 0; i < 6; i++) {
       const row = MeshBuilder.CreateBox(
         `dens-crop-${id}-${i}`,
         { width: 0.5, height: 0.32 + (i % 3) * 0.08, depth: 0.32 },
@@ -323,80 +295,34 @@ function densifyKitOverlay(
       );
       row.position.set(-0.7 + (i % 3) * 0.55, 0.22, -0.55 + Math.floor(i / 3) * 0.5);
       const cm = new StandardMaterial(`dens-cropm-${id}-${i}`, scene);
-      cm.diffuseColor =
-        kind === "marsh_reed_bed"
-          ? new Color3(0.28, 0.45, 0.28)
-          : new Color3(0.42 + (i % 2) * 0.08, 0.52, 0.2);
-      cm.emissiveColor = new Color3(0.04, 0.06, 0.015);
+      cm.diffuseColor = new Color3(0.42, 0.52, 0.2);
       cm.specularColor = Color3.Black();
       add(row, cm);
     }
-    const shed = MeshBuilder.CreateBox(`dens-fshed-${id}`, { width: 0.55, height: 0.45, depth: 0.5 }, scene);
-    shed.position.set(0.85, 0.28, 0.7);
-    add(shed, mud);
   } else if (kind === "mudbrick_yard" || kind === "river_clay_pit") {
-    // Artboard 03: clay piles + kiln mass
-    const yard = MeshBuilder.CreateBox(`dens-yard-${id}`, { width: 2.1, height: 0.1, depth: 1.9 }, scene);
-    yard.position.y = 0.05;
-    add(yard, mud);
+    if (light) return;
     const pile = MeshBuilder.CreateBox(`dens-pile-${id}`, { width: 1.3, height: 0.65, depth: 1.0 }, scene);
     pile.position.set(-0.35, 0.38, 0.1);
     add(pile, mud);
-    const kiln = MeshBuilder.CreateCylinder(`dens-kiln-${id}`, { height: 0.85, diameter: 0.65, tessellation: 8 }, scene);
-    kiln.position.set(0.65, 0.48, -0.25);
-    add(kiln, mud);
-    const glow = MeshBuilder.CreateBox(`dens-kilnglow-${id}`, { width: 0.2, height: 0.15, depth: 0.12 }, scene);
-    glow.position.set(0.65, 0.35, -0.55);
-    const gm = new StandardMaterial(`dens-kilngm-${id}`, scene);
-    gm.diffuseColor = new Color3(0.9, 0.45, 0.15);
-    gm.emissiveColor = new Color3(0.35, 0.12, 0.02);
-    add(glow, gm);
   } else if (kind === "shrine") {
-    // Artboard 06: pale vertical sacred mass
-    const plinth = MeshBuilder.CreateBox(`dens-shplinth-${id}`, { width: 1.6, height: 0.2, depth: 1.5 }, scene);
-    plinth.position.y = 0.1;
-    add(plinth, pale);
+    if (light) return;
     const body = MeshBuilder.CreateBox(`dens-shbody-${id}`, { width: 1.2, height: 1.5, depth: 1.15 }, scene);
     body.position.y = 0.95;
     add(body, pale);
-    const cap = MeshBuilder.CreateBox(`dens-shcap-${id}`, { width: 1.35, height: 0.18, depth: 1.25 }, scene);
-    cap.position.y = 1.8;
-    add(cap, stone);
-    const tip = MeshBuilder.CreateBox(`dens-shtip-${id}`, { width: 0.35, height: 0.45, depth: 0.35 }, scene);
-    tip.position.y = 2.15;
-    add(tip, gold);
   } else if (kind === "training_grounds") {
-    // Artboard 05: packed earth + racks
-    const earth = MeshBuilder.CreateBox(`dens-earth-${id}`, { width: 2.3, height: 0.08, depth: 2.1 }, scene);
-    earth.position.y = 0.04;
-    const em = new StandardMaterial(`dens-earthm-${id}`, scene);
-    em.diffuseColor = new Color3(0.55, 0.42, 0.28);
-    em.specularColor = Color3.Black();
-    add(earth, em);
+    // Keep light training marks only
     for (const x of [-0.7, 0.7]) {
-      const post = MeshBuilder.CreateCylinder(`dens-tpost-${id}-${x}`, { height: 1.0, diameter: 0.12, tessellation: 6 }, scene);
-      post.position.set(x, 0.5, -0.5);
+      const post = MeshBuilder.CreateCylinder(`dens-tpost-${id}-${x}`, { height: 0.9, diameter: 0.1, tessellation: 6 }, scene);
+      post.position.set(x, 0.45, -0.5);
       add(post, wood);
     }
-    const rack = MeshBuilder.CreateBox(`dens-rack-${id}`, { width: 1.4, height: 0.12, depth: 0.15 }, scene);
-    rack.position.set(0, 0.75, -0.5);
-    add(rack, wood);
-    const shed = MeshBuilder.CreateBox(`dens-tshed-${id}`, { width: 0.9, height: 0.7, depth: 0.8 }, scene);
-    shed.position.set(0.6, 0.4, 0.6);
-    add(shed, mud);
   } else if (kind.includes("shop") || kind === "ration_house" || kind === "luxury_material" || kind === "luxury_workshop" || kind === "warehouse") {
-    // Artboard 07/09: mudbrick body + dark roof + door lintel
+    if (light && (kind === "ration_house")) return;
     const body = MeshBuilder.CreateBox(`dens-shop-${id}`, { width: 1.75, height: 1.15, depth: 1.45 }, scene);
     body.position.y = 0.58;
     add(body, mud);
     const roof = MeshBuilder.CreateBox(`dens-shoproof-${id}`, { width: 1.95, height: 0.16, depth: 1.6 }, scene);
     roof.position.y = 1.25;
     add(roof, darkRoof);
-    const door = MeshBuilder.CreateBox(`dens-door-${id}`, { width: 0.4, height: 0.65, depth: 0.08 }, scene);
-    door.position.set(0, 0.4, -0.75);
-    add(door, wood);
-    const lintel = MeshBuilder.CreateBox(`dens-shoplintel-${id}`, { width: 0.55, height: 0.08, depth: 0.1 }, scene);
-    lintel.position.set(0, 0.78, -0.76);
-    add(lintel, kind.includes("luxury") ? gold : stone);
   }
 }

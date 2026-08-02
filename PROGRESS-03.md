@@ -20,7 +20,8 @@
 | R2 | 7.0 | 6 | Softer shadows, material boost |
 | R3 | 7.2 | 7 | Blender GH+market re-export; Structures 8 |
 | R4 | 7.3 | 7 | Harbor/shrine/field/ration/yard densify; UI 8 |
+| R5 | **7.6** | 7 | Wet shore + clean densify; Ground/Materials/Cohesion 8 |
 
 ## Next
 
-R5+: materials wet shore + grit; clean densify noise; loop until overall ≥ 8.0 (no early stop).
+R6+: Lighting/Depth/Atmosphere 7→8 for overall ≥ 8.0. Keep locks green. No early stop.

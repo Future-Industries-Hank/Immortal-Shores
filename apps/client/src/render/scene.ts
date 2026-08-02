@@ -649,22 +649,38 @@ export class SettlementView {
     silt.isPickable = false;
     silt.receiveShadows = true;
 
-    // Wet specular shoreline strip (Materials craft — shiny wet line)
+    // Wet specular shoreline strip (Materials craft — shiny wet line at board distance)
     const wetLine = MeshBuilder.CreateBox(
       "wetSpecular",
-      { width: 0.45, height: 0.04, depth: 34 },
+      { width: 0.65, height: 0.05, depth: 40 },
       this.scene
     );
-    wetLine.position.set(-10.55, 0.05, 1.5);
+    wetLine.position.set(-10.55, 0.06, 1.5);
     const wetLineMat = new StandardMaterial("wetSpecularMat", this.scene);
-    wetLineMat.diffuseColor = hexToColor3("#5A7068");
-    wetLineMat.specularColor = hexToColor3("#C0E0F0").scale(0.85);
-    wetLineMat.specularPower = 96;
-    wetLineMat.emissiveColor = hexToColor3("#3A5048").scale(0.12);
-    wetLineMat.alpha = 0.9;
+    wetLineMat.diffuseColor = hexToColor3("#4A6860");
+    wetLineMat.specularColor = hexToColor3("#D0E8F0").scale(1.0);
+    wetLineMat.specularPower = 128;
+    wetLineMat.emissiveColor = hexToColor3("#3A5850").scale(0.18);
+    wetLineMat.alpha = 0.92;
     wetLine.material = wetLineMat;
     wetLine.parent = this.envRoot;
     wetLine.isPickable = false;
+    // Second wet band for shore readability on full-board camera
+    const wetLine2 = MeshBuilder.CreateBox(
+      "wetSpecular2",
+      { width: 0.35, height: 0.03, depth: 38 },
+      this.scene
+    );
+    wetLine2.position.set(-10.15, 0.055, 1.5);
+    const wetLine2Mat = new StandardMaterial("wetSpecular2Mat", this.scene);
+    wetLine2Mat.diffuseColor = hexToColor3("#6A8078");
+    wetLine2Mat.specularColor = hexToColor3("#E0F0F8").scale(0.7);
+    wetLine2Mat.specularPower = 64;
+    wetLine2Mat.emissiveColor = hexToColor3("#4A6058").scale(0.1);
+    wetLine2Mat.alpha = 0.75;
+    wetLine2.material = wetLine2Mat;
+    wetLine2.parent = this.envRoot;
+    wetLine2.isPickable = false;
 
     if (this.quality !== "low") {
       const duneMat = new StandardMaterial("duneMat", this.scene);
