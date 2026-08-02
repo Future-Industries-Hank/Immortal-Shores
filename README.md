@@ -37,25 +37,25 @@ See [`HOSTING.md`](./HOSTING.md).
 | **1** | [`prompts/PROMPT-01-PLAYABLE.md`](./prompts/PROMPT-01-PLAYABLE.md) | Playable core | **DONE** |
 | **1.5** | [`prompts/PROMPT-01.5-MODERN-2026.md`](./prompts/PROMPT-01.5-MODERN-2026.md) | 2026 systems | **DONE** |
 | **2** | [`prompts/PROMPT-02-VISUAL.md`](./prompts/PROMPT-02-VISUAL.md) | First visual pass | Ran — director ~**1.5/10** (not enough) |
-| **2.5 primer** | [`prompts/PROMPT-02.5-PRIMER-READINESS.md`](./prompts/PROMPT-02.5-PRIMER-READINESS.md) | MCP/skills readiness, go-no-go | **Run first** |
-| **2.5 goal** | [`prompts/PROMPT-02.5-VISUAL-GAUNTLET.md`](./prompts/PROMPT-02.5-VISUAL-GAUNTLET.md) | Graphics **≥ 8/10** | After primer **GO** |
+| **2.5 primer** | [`prompts/PROMPT-02.5-PRIMER-READINESS.md`](./prompts/PROMPT-02.5-PRIMER-READINESS.md) | MCP/skills readiness | Ran |
+| **2.5 goal** | [`prompts/PROMPT-02.5-VISUAL-GAUNTLET.md`](./prompts/PROMPT-02.5-VISUAL-GAUNTLET.md) | First 8/10 attempt | **FAIL 4.8** — do not stop there |
+| **2.6 loop** | [`prompts/PROMPT-02.6-VISUAL-LOOP.md`](./prompts/PROMPT-02.6-VISUAL-LOOP.md) | **Keep iterating until ≥ 8/10** | **RUN THIS** |
+| Kickoff paste | [`prompts/PROMPT-02.6-KICKOFF.txt`](./prompts/PROMPT-02.6-KICKOFF.txt) | One-block session prompt | Copy-paste |
 
 Mechanics pre-check: [`CRITICAL-AUDIT-PRE-02.md`](./CRITICAL-AUDIT-PRE-02.md) (green).  
 Do not reopen escrow, plot counts, or GDD rates.
 
-### Planner kickoff — 8/10 visual gauntlet
+### Planner kickoff — loop until 8/10 (current)
 
 ```text
-Pull latest main. Economy is frozen.
+Pull latest main. Economy frozen.
 
-1) ONLY prompts/PROMPT-02.5-PRIMER-READINESS.md
-   → VISUAL-READY.md (probe Playwright, Blender, Scenario, image_gen, fi-* skills).
-   NO-GO if no eyes (Playwright) or no mesh path (Blender/3D gen) for an honest 8/10.
+02.5 ended HONEST FAIL at 4.8/10 — that is NOT done.
+Execute prompts/PROMPT-02.6-VISUAL-LOOP.md (or paste PROMPT-02.6-KICKOFF.txt).
 
-2) If GO → prompts/PROMPT-02.5-VISUAL-GAUNTLET.md
-   Stop only when independent judge overall ≥ 8.0 (min category ≥ 6).
-   Prior ~1.5/10 is FAIL. Quality benchmarks (craft only, do not copy setting):
-   Surviving Mars, Aven Colony, IXION, Frostpunk 2, Oxygen Not Included.
+Rules: fix→capture→judge→fix top-3→repeat until overall ≥ 8.0 and min category ≥ 6.0.
+Forbidden: stop after N rounds, wait for director, fake PASS, idle.
+Start Stack 1 money-shot (settlement day mid-iso). Use Playwright + Blender + skills.
 ```
 ---
 
