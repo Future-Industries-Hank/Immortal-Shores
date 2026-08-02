@@ -1,0 +1,24 @@
+{
+  "name": "immortal-shores",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,green \"npm run dev -w @immortal/server\" \"npm run dev -w @immortal/client\"",
+    "build": "npm run build -w @immortal/shared && npm run build -w @immortal/server && npm run build -w @immortal/client",
+    "start": "npm run start -w @immortal/server",
+    "test": "npm run test -w @immortal/server",
+    "typecheck": "npm run typecheck -w @immortal/shared && npm run typecheck -w @immortal/server && npm run typecheck -w @immortal/client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.8.2"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "esbuild@0.25.12": true
+  }
+}

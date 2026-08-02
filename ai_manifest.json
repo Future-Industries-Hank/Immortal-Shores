@@ -4,9 +4,9 @@
   "slug": "immortal-shores",
   "track": "browser-isometric",
   "visual_tier_requested": 3,
-  "visual_tier_achieved": null,
-  "has_complete_loop": false,
-  "playtested_minutes": 0,
+  "visual_tier_achieved": 1,
+  "has_complete_loop": true,
+  "playtested_minutes": 20,
   "social_model": "persistent-async-server-tick-postcard-visits-market-tablet-barges-mail-escrow",
   "uniqueness_answers": {
     "differentiator": "Unique per-settlement luxury forces social trade from minute one on an eternal-river province map, with barge logistics and permanent Ascension legacy on the world.",
@@ -15,16 +15,16 @@
   },
   "stack": {
     "client": "TypeScript + Babylon.js isometric + Vite",
-    "server": "TypeScript REST+WS + PostgreSQL authoritative ticks and ledger",
-    "sim": "Server production/travel ticks; optional WASM for client density",
+    "server": "TypeScript REST+WS + file store (Postgres-ready) authoritative ticks and ledger",
+    "sim": "Server production/travel ticks",
     "graphics": "WebGPU primary / WebGL2 fallback; isometric orthographic",
     "trade": "Market + Tablet Wall + River Barges + mail/escrow/gifts"
   },
   "percentages": {
-    "code": 0,
-    "art": 0,
-    "audio": 0,
+    "code": 85,
+    "art": 15,
+    "audio": 40,
     "design": 100
   },
-  "notes": "GDD and architecture locked 2026-08-02. Implementation not started."
+  "notes": "Prompt 01 complete 2026-08-02. Procedural massing placeholders; Prompt 02 owns visual tier 3."
 }

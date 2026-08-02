@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Immortal Shores</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <div id="auth" class="panel auth-panel">
+        <h1>Immortal Shores</h1>
+        <p class="tagline">Found a shore. Build on the pads. Feed the workshops. Trade the river.</p>
+        <label>Name <input id="auth-name" autocomplete="username" maxlength="24" /></label>
+        <label>Password <input id="auth-pass" type="password" autocomplete="current-password" /></label>
+        <div class="row">
+          <button id="btn-register" type="button">Found settlement</button>
+          <button id="btn-login" type="button" class="secondary">Return</button>
+        </div>
+        <p id="auth-error" class="error" hidden></p>
+      </div>
+
+      <div id="game" hidden>
+        <canvas id="view"></canvas>
+        <header id="hud-top">
+          <div id="resources"></div>
+          <div id="seals"></div>
+          <div class="row gap">
+            <select id="quality">
+              <option value="high">High</option>
+              <option value="med" selected>Med</option>
+              <option value="low">Low</option>
+            </select>
+            <button id="btn-map" type="button" title="World Map">Map</button>
+            <button id="btn-postcard" type="button" title="Postcard">✉</button>
+          </div>
+        </header>
+        <nav id="nav">
+          <button data-panel="settlement" class="active" type="button">Shore</button>
+          <button data-panel="harbor" type="button">Harbor</button>
+          <button data-panel="tablets" type="button">Tablets</button>
+          <button data-panel="allies" type="button">Allies</button>
+          <button data-panel="wall" type="button">Wall</button>
+          <button data-panel="build" type="button">Build</button>
+          <button data-panel="military" type="button">Military</button>
+        </nav>
+        <aside id="side">
+          <div id="panel-settlement" class="side-panel"></div>
+          <div id="panel-harbor" class="side-panel" hidden></div>
+          <div id="panel-tablets" class="side-panel" hidden></div>
+          <div id="panel-allies" class="side-panel" hidden></div>
+          <div id="panel-wall" class="side-panel" hidden></div>
+          <div id="panel-build" class="side-panel" hidden></div>
+          <div id="panel-military" class="side-panel" hidden></div>
+          <div id="panel-map" class="side-panel" hidden></div>
+        </aside>
+        <div id="building-inspect" class="inspect-panel" hidden></div>
+        <p id="hint" class="hint">Colored pads = build sites (shop / special / training) · click buildings to manage</p>
+        <div id="toast" hidden></div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
