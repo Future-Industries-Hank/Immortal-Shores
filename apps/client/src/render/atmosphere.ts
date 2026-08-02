@@ -93,17 +93,16 @@ export class Atmosphere {
         ? Color3.Lerp(dayColor, duskColor, n * 2)
         : Color3.Lerp(duskColor, nightColor, (n - 0.5) * 2);
     this.sun.diffuse = sunCol;
-    // Clear readable day key for colony board (not stamp-hard; Surviving Mars clarity)
-    this.sun.intensity = 1.65 - n * 1.2;
-    const elev = n < 0.35 ? -0.45 : n < 0.7 ? -0.38 : -0.32;
-    this.sun.direction = new Vector3(-0.85, elev, 0.55);
-    this.sun.position = new Vector3(18, 22, -12);
+    // Clear colony-board day key + gentle contact (Surviving Mars readability)
+    this.sun.intensity = 1.75 - n * 1.25;
+    const elev = n < 0.35 ? -0.5 : n < 0.7 ? -0.4 : -0.34;
+    this.sun.direction = new Vector3(-0.75, elev, 0.48);
+    this.sun.position = new Vector3(16, 24, -10);
 
-    // Balanced fill so board stays readable without washing materials
-    this.hemi.intensity = 0.42 - n * 0.28;
+    this.hemi.intensity = 0.48 - n * 0.3;
     this.hemi.diffuse = Color3.Lerp(
-      hexToColor3("#D8E4EC"),
-      hexToColor3("#121C28"),
+      hexToColor3("#F0E8D8"),
+      hexToColor3("#1A2840"),
       n
     );
     this.hemi.groundColor = hexToColor3(STYLE.sandDeep).scale(0.28 * (1 - n * 0.75));
@@ -117,16 +116,16 @@ export class Atmosphere {
         ? Color4.Lerp(clearDay, clearDusk, n * 2)
         : Color4.Lerp(clearDusk, clearNight, (n - 0.5) * 2);
 
-    // Subtle desert heat only — never soup, never zoom-linked (02.8/02.9)
+    // Subtle desert heat + soft far falloff (depth without soup) (02.8/03)
     this.scene.fogMode = Scene.FOGMODE_EXP2;
     if (n < 0.35) {
-      this.scene.fogDensity = this.boardApprovalFog ? 0.005 : 0.01;
-      this.scene.fogColor = hexToColor3("#C8C0A8");
+      this.scene.fogDensity = 0.012;
+      this.scene.fogColor = hexToColor3("#C4B898");
     } else if (n < 0.7) {
-      this.scene.fogDensity = this.boardApprovalFog ? 0.008 : 0.014;
-      this.scene.fogColor = hexToColor3("#B8A888");
+      this.scene.fogDensity = 0.015;
+      this.scene.fogColor = hexToColor3("#B8A080");
     } else {
-      this.scene.fogDensity = 0.016;
+      this.scene.fogDensity = 0.018;
       this.scene.fogColor = hexToColor3("#101820");
     }
 
