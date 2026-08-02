@@ -27,6 +27,8 @@ export class Atmosphere {
   /** Full cycle seconds (default ~90s for readable TOD in playtest). */
   cycleSeconds = 90;
   private pausedPhase: DayPhase | null = null;
+  /** 02.9 Step 2 — minimal fog for board readability */
+  private boardApprovalFog = false;
 
   constructor(
     private scene: Scene,
@@ -77,6 +79,10 @@ export class Atmosphere {
     this.pausedPhase = phase;
   }
 
+  setBoardApprovalFog(on: boolean) {
+    this.boardApprovalFog = on;
+  }
+
   update(now = performance.now() * 0.001, river?: Mesh | null) {
     const n = this.phase01(now);
     const dayColor = hexToColor3("#FFE0A8");
@@ -87,14 +93,14 @@ export class Atmosphere {
         ? Color3.Lerp(dayColor, duskColor, n * 2)
         : Color3.Lerp(duskColor, nightColor, (n - 0.5) * 2);
     this.sun.diffuse = sunCol;
-    // Hard key + very low rake = long black bars on open sand (day money-shot)
-    this.sun.intensity = 2.05 - n * 1.55;
-    const elev = n < 0.35 ? -0.28 : n < 0.7 ? -0.24 : -0.22;
-    this.sun.direction = new Vector3(-1.35, elev, 0.85);
-    this.sun.position = new Vector3(28, 14, -18);
+    // Clear readable day key for colony board (not stamp-hard; Surviving Mars clarity)
+    this.sun.intensity = 1.65 - n * 1.2;
+    const elev = n < 0.35 ? -0.45 : n < 0.7 ? -0.38 : -0.32;
+    this.sun.direction = new Vector3(-0.85, elev, 0.55);
+    this.sun.position = new Vector3(18, 22, -12);
 
-    // Low fill so rakes survive stills
-    this.hemi.intensity = 0.28 - n * 0.2;
+    // Balanced fill so board stays readable without washing materials
+    this.hemi.intensity = 0.42 - n * 0.28;
     this.hemi.diffuse = Color3.Lerp(
       hexToColor3("#D8E4EC"),
       hexToColor3("#121C28"),
@@ -102,8 +108,8 @@ export class Atmosphere {
     );
     this.hemi.groundColor = hexToColor3(STYLE.sandDeep).scale(0.28 * (1 - n * 0.75));
 
-    // Day sky cooler-haze so far sand falloff is readable against clear color
-    const clearDay = Color4.FromColor3(hexToColor3("#9AA8A0"), 1);
+    // Day clear matches desert sand so map fringe never reads as void edge
+    const clearDay = Color4.FromColor3(hexToColor3("#C4B490"), 1);
     const clearDusk = Color4.FromColor3(hexToColor3("#B86848"), 1);
     const clearNight = Color4.FromColor3(hexToColor3("#070C12"), 1);
     this.scene.clearColor =
@@ -111,17 +117,17 @@ export class Atmosphere {
         ? Color4.Lerp(clearDay, clearDusk, n * 2)
         : Color4.Lerp(clearDusk, clearNight, (n - 0.5) * 2);
 
-    // Aggressive EXP2 fog — far sand MUST desaturate vs near at mid-iso
+    // Subtle desert heat only — never soup, never zoom-linked (02.8/02.9)
     this.scene.fogMode = Scene.FOGMODE_EXP2;
     if (n < 0.35) {
-      this.scene.fogDensity = 0.056;
-      this.scene.fogColor = hexToColor3("#A09880");
+      this.scene.fogDensity = this.boardApprovalFog ? 0.005 : 0.01;
+      this.scene.fogColor = hexToColor3("#C8C0A8");
     } else if (n < 0.7) {
-      this.scene.fogDensity = 0.06;
-      this.scene.fogColor = hexToColor3("#906848");
+      this.scene.fogDensity = this.boardApprovalFog ? 0.008 : 0.014;
+      this.scene.fogColor = hexToColor3("#B8A888");
     } else {
-      this.scene.fogDensity = 0.062;
-      this.scene.fogColor = hexToColor3("#0A1016");
+      this.scene.fogDensity = 0.016;
+      this.scene.fogColor = hexToColor3("#101820");
     }
 
     // Night local lamps (window/hearth falloff — not roof flood)

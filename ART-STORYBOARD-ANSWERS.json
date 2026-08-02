@@ -1,0 +1,28 @@
+{
+  "title": "Immortal Shores",
+  "exportedAt": "2026-08-02T23:13:32.112Z",
+  "decisions": {
+    "S01": { "decision": "yes", "updatedAt": "2026-08-02T23:13:17.978Z" },
+    "B01": { "decision": "yes", "updatedAt": "2026-08-02T23:13:18.930Z" },
+    "B02": { "decision": "yes", "updatedAt": "2026-08-02T23:13:20.071Z" },
+    "B03": { "decision": "yes", "updatedAt": "2026-08-02T23:13:21.568Z" },
+    "B04": { "decision": "yes", "updatedAt": "2026-08-02T23:13:22.972Z" },
+    "B05": { "decision": "yes", "updatedAt": "2026-08-02T23:13:24.114Z" },
+    "B06": { "decision": "yes", "updatedAt": "2026-08-02T23:13:25.262Z" },
+    "B07": { "decision": "yes", "updatedAt": "2026-08-02T23:13:26.855Z" },
+    "B08": { "decision": "yes", "updatedAt": "2026-08-02T23:13:28.743Z" },
+    "B09": { "decision": "yes", "updatedAt": "2026-08-02T23:13:30.605Z" }
+  },
+  "items": [
+    { "id": "S01", "title": "Settlement money-shot", "guides": "composition / money-shot", "path": "docs/visual-inspiration/settlement/10-settlement-money-shot.jpg", "required": true },
+    { "id": "B01", "title": "Great House", "guides": "great_house", "path": "docs/visual-inspiration/buildings/01-great-house.jpg", "required": true },
+    { "id": "B02", "title": "Market", "guides": "market", "path": "docs/visual-inspiration/buildings/02-market.jpg", "required": true },
+    { "id": "B03", "title": "Mudbrick Yard", "guides": "mudbrick_yard", "path": "docs/visual-inspiration/buildings/03-mudbrick-yard.jpg", "required": true },
+    { "id": "B04", "title": "Harbor + barge", "guides": "harbor, barge", "path": "docs/visual-inspiration/buildings/04-harbor-pier-barge.jpg", "required": true },
+    { "id": "B05", "title": "Training Grounds", "guides": "training_grounds", "path": "docs/visual-inspiration/buildings/05-training-grounds.jpg", "required": true },
+    { "id": "B06", "title": "Shrine", "guides": "shrine", "path": "docs/visual-inspiration/buildings/06-shrine.jpg", "required": true },
+    { "id": "B07", "title": "Luxury Works", "guides": "luxury_material / luxury_workshop", "path": "docs/visual-inspiration/buildings/07-luxury-works.jpg", "required": true },
+    { "id": "B08", "title": "Emmer Field", "guides": "emmer_field (+ clay/reed analogy)", "path": "docs/visual-inspiration/buildings/08-emmer-field.jpg", "required": true },
+    { "id": "B09", "title": "Ration House", "guides": "ration_house (+ shops analogy)", "path": "docs/visual-inspiration/buildings/09-ration-house.jpg", "required": true }
+  ]
+}

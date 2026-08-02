@@ -101,9 +101,33 @@ async function enterGame() {
 
   const s = await api.me();
   applySnapshot(s);
-  // Default money-shot framing after first sync
-  view.prepareMoneyShot();
-  requestAnimationFrame(() => view?.prepareMoneyShot());
+  // 02.9: fixed full-settlement board is the product default (no free zoom)
+  const showBoardLabel =
+    new URLSearchParams(location.search).get("board") === "1" ||
+    new URLSearchParams(location.search).get("standard") === "1";
+  view.prepareStandardBoard();
+  requestAnimationFrame(() => view?.prepareStandardBoard());
+  (window as unknown as {
+    __prepareStandardBoard?: () => void;
+    __boardDebug?: () => unknown;
+  }).__prepareStandardBoard = () => view?.prepareStandardBoard();
+  (window as unknown as { __boardDebug?: () => unknown }).__boardDebug = () => ({
+    board: view?.isBoardApprovalMode(),
+    radius: view?.camera.radius,
+    beta: view?.camera.beta,
+    alpha: view?.camera.alpha,
+    fps: view?.getFps(),
+  });
+  if (showBoardLabel) {
+    const lab = document.createElement("div");
+    lab.id = "standard-view-label";
+    lab.textContent = "STANDARD VIEW — approve POV & scale";
+    lab.style.cssText =
+      "position:fixed;top:52px;left:50%;transform:translateX(-50%);z-index:20;" +
+      "background:rgba(20,16,12,0.85);color:#f3e6c8;padding:0.35rem 0.85rem;" +
+      "border:1px solid rgba(212,168,75,0.5);border-radius:6px;font:600 0.8rem system-ui;pointer-events:none";
+    document.body.appendChild(lab);
+  }
 
   // Show province + map + unique luxury on first load
   const st0 = s.settlements[0];
@@ -118,6 +142,11 @@ async function enterGame() {
 
   window.addEventListener("keydown", (e) => {
     if (!view) return;
+    // Fixed board product: no pan via arrows (02.9/03 camera lock)
+    if (view.isBoardApprovalMode()) {
+      if (e.key === "Escape") selectBuilding(null, { fromScene: true });
+      return;
+    }
     const step = 0.9;
     if (e.key === "ArrowLeft") view.camera.target.x -= step;
     if (e.key === "ArrowRight") view.camera.target.x += step;

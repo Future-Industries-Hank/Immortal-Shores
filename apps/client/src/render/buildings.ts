@@ -42,29 +42,14 @@ function mat(
   return m;
 }
 
+/** No-op: fake shadow discs/boxes read as black rings (02.8 director hard fail). */
 function shadowBlob(
-  scene: Scene,
-  parent: TransformNode,
-  name: string,
-  diameter: number
-): Mesh {
-  // Thin box (not disc) — discs can silhouette badly in ortho iso
-  const shadow = MeshBuilder.CreateBox(
-    name,
-    { width: diameter, height: 0.04, depth: diameter * 0.85 },
-    scene
-  );
-  shadow.position.y = 0.025;
-  const sm = new StandardMaterial(`${name}-mat`, scene);
-  sm.diffuseColor = Color3.Black();
-  sm.specularColor = Color3.Black();
-  sm.emissiveColor = Color3.Black();
-  sm.alpha = 0.22;
-  sm.disableLighting = true;
-  shadow.material = sm;
-  shadow.parent = parent;
-  shadow.isPickable = false;
-  return shadow;
+  _scene: Scene,
+  _parent: TransformNode,
+  _name: string,
+  _diameter: number
+): Mesh | null {
+  return null;
 }
 
 function box(
@@ -152,6 +137,7 @@ export function createBuildingKit(scene: Scene, b: BuildingState): BuildingMeshe
   const anim: BuildingMeshes["anim"] = [];
   const level = Math.max(1, b.level);
 
+  // Real shadows via ShadowGenerator only (no black ring stamps)
   shadowBlob(scene, root, `sh-${b.id}`, b.kind === "great_house" ? 3.2 : 2.4);
 
   switch (b.kind) {

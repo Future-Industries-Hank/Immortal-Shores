@@ -13,6 +13,30 @@ export function applyMoneyShotCamera(camera: ArcRotateCamera) {
   camera.target.set(-1.5, 0.2, 1.8);
 }
 
+/**
+ * Standard board view (02.9 Step 2): high classic isometric full settlement.
+ * Matches director POV law — whole river + pads + buildings visible, no people close-up.
+ */
+export function applyStandardBoardCamera(camera: ArcRotateCamera) {
+  // High classic isometric full-board (director POV law)
+  camera.alpha = -Math.PI / 3.5;
+  camera.beta = 0.78; // more top-down than mid-iso money-shot
+  // Slightly tighter than full pull-back (director: zoom in just a little)
+  camera.radius = 48;
+  camera.target.set(-3.0, 0, 2.2);
+  camera.lowerRadiusLimit = 48;
+  camera.upperRadiusLimit = 48;
+  camera.lowerBetaLimit = 0.78;
+  camera.upperBetaLimit = 0.78;
+  camera.lowerAlphaLimit = camera.alpha;
+  camera.upperAlphaLimit = camera.alpha;
+  camera.panningSensibility = 0;
+  camera.wheelPrecision = 100000;
+  camera.pinchPrecision = 100000;
+  camera.angularSensibilityX = 1000000;
+  camera.angularSensibilityY = 1000000;
+}
+
 /** Hide junk overlays so capture is world + top resource strip only. */
 export function hideCaptureChrome() {
   for (const id of [

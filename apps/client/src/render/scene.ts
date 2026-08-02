@@ -48,7 +48,7 @@ import {
   preloadBuildingKits,
   type KitCache,
 } from "./kitLoader.js";
-import { applyMoneyShotCamera } from "./moneyShot.js";
+import { applyMoneyShotCamera, applyStandardBoardCamera } from "./moneyShot.js";
 import { createPadCategoryMarker } from "./padMarkers.js";
 
 export type Quality = "low" | "med" | "high";
@@ -106,6 +106,8 @@ export class SettlementView {
   private lastSettlement: SettlementState | null = null;
   /** When true, next clearSelection from UI will not re-notify */
   private suppressNotify = false;
+  /** 02.9 Step 2 — fixed full-board approval view */
+  private boardApprovalMode = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.engine = new Engine(canvas, true, {
@@ -115,7 +117,8 @@ export class SettlementView {
     });
     this.engine.resize();
     this.scene = new Scene(this.engine);
-    this.scene.clearColor = Color4.FromColor3(hexToColor3("#87A8B8"), 1);
+    // Clear color matches desert so any fringe never reads as void map-edge
+    this.scene.clearColor = Color4.FromColor3(hexToColor3("#C4B490"), 1);
     this.scene.ambientColor = hexToColor3("#C8B8A0").scale(0.25);
 
     // Camera looks at settlement center; river is on the left (−X)
@@ -146,14 +149,13 @@ export class SettlementView {
     hemi.groundColor = hexToColor3(STYLE.sandDeep);
     this.atmosphere = new Atmosphere(this.scene, this.sun, hemi);
 
-    // Soft contact shadows — darker so raking sun sells long ground bars
-    this.shadowGen = new ShadowGenerator(2048, this.sun);
+    // One soft real shadow system only (no mesh stamp boxes)
+    this.shadowGen = new ShadowGenerator(1024, this.sun);
     this.shadowGen.useBlurExponentialShadowMap = true;
-    this.shadowGen.blurKernel = 28;
-    this.shadowGen.darkness = 0.82;
-    this.shadowGen.bias = 0.00035;
-    this.shadowGen.normalBias = 0.012;
-    this.shadowGen.contactHardeningLightSizeUVRatio = 0.05;
+    this.shadowGen.blurKernel = 48;
+    this.shadowGen.darkness = 0.32;
+    this.shadowGen.bias = 0.0005;
+    this.shadowGen.normalBias = 0.02;
 
     this.root = new TransformNode("settlement", this.scene);
     this.rebuildEnvironment(this.mapArch);
@@ -216,10 +218,40 @@ export class SettlementView {
 
   /** Stack-1 money shot framing (day mid-iso). */
   prepareMoneyShot() {
+    if (this.boardApprovalMode) {
+      this.prepareStandardBoard();
+      return;
+    }
     this.atmosphere.setPhase("day");
     applyMoneyShotCamera(this.camera);
     this.setOrtho(this.camera.radius);
     this.engine.resize();
+  }
+
+  /**
+   * 02.9 Step 2 — fixed high-iso full settlement, no zoom, 0–3 tiny workers, min fog.
+   */
+  prepareStandardBoard() {
+    this.boardApprovalMode = true;
+    this.atmosphere.setPhase("day");
+    this.atmosphere.setBoardApprovalFog(true);
+    applyStandardBoardCamera(this.camera);
+    this.setOrtho(this.camera.radius);
+    // No wheel zoom / orbit / pan for approval frame
+    try {
+      this.camera.inputs.clear();
+    } catch {
+      this.camera.detachControl();
+    }
+    this.engine.resize();
+    // Rebuild workers at tiny scale (dispose old large LODs)
+    for (const w of this.workers) w.root.dispose();
+    this.workers = [];
+    if (this.lastSettlement) this.syncWorkers(this.lastSettlement);
+  }
+
+  isBoardApprovalMode() {
+    return this.boardApprovalMode;
   }
 
   getFps() {
@@ -434,6 +466,7 @@ export class SettlementView {
     this.buildFixedPads();
     this.buildRoads(this.roadTier);
     if (this.lastSettlement) this.sync(this.lastSettlement);
+    if (this.boardApprovalMode) this.prepareStandardBoard();
   }
 
   private worldPos(def: { worldX: number; worldZ: number; id?: string }) {
@@ -494,13 +527,13 @@ export class SettlementView {
     this.mapArch = arch;
     const pal = arch.palette;
 
-    // Near sand plate
+    // Vast continuous desert — player must never see a hard map edge (02.9)
     const ground = MeshBuilder.CreateGround(
       "ground",
-      { width: 48, height: 42, subdivisions: this.quality === "low" ? 16 : 56 },
+      { width: 160, height: 140, subdivisions: this.quality === "low" ? 12 : 32 },
       this.scene
     );
-    ground.position.set(-2, 0, 1.5);
+    ground.position.set(0, 0, 2);
     const mat = new StandardMaterial("groundMat", this.scene);
     mat.diffuseColor = hexToColor3(pal.sand);
     mat.specularColor = hexToColor3("#3A3020").scale(0.08);
@@ -509,95 +542,79 @@ export class SettlementView {
     if (grit) {
       mat.diffuseTexture = grit;
       mat.diffuseColor = Color3.White();
+      grit.uScale = 18;
+      grit.vScale = 16;
     }
     ground.material = mat;
     ground.parent = this.envRoot;
     ground.isPickable = false;
     ground.receiveShadows = true;
 
-    // Mid-distance cooler strip (step falloff across settlement board)
-    const midSand = MeshBuilder.CreateGround(
-      "midSand",
-      { width: 55, height: 48, subdivisions: 4 },
+    // Outer skirt — same sand, slightly cooler, extends beyond any ortho framing
+    const skirt = MeshBuilder.CreateGround(
+      "sandSkirt",
+      { width: 220, height: 200, subdivisions: 4 },
       this.scene
     );
-    midSand.position.set(6, -0.012, 4);
+    skirt.position.set(2, -0.03, 3);
+    const skirtMat = new StandardMaterial("sandSkirtMat", this.scene);
+    skirtMat.diffuseColor = hexToColor3("#A09070");
+    skirtMat.emissiveColor = hexToColor3("#6A6048").scale(0.05);
+    skirtMat.specularColor = Color3.Black();
+    skirt.material = skirtMat;
+    skirt.parent = this.envRoot;
+    skirt.isPickable = false;
+    skirt.receiveShadows = true;
+
+    // Mid-distance cooler strip (subtle falloff, not an edge)
+    const midSand = MeshBuilder.CreateGround(
+      "midSand",
+      { width: 70, height: 60, subdivisions: 4 },
+      this.scene
+    );
+    midSand.position.set(8, -0.01, 5);
     const midSandMat = new StandardMaterial("midSandMat", this.scene);
     midSandMat.diffuseColor = hexToColor3("#908060");
-    midSandMat.emissiveColor = hexToColor3("#5A5040").scale(0.06);
+    midSandMat.emissiveColor = hexToColor3("#5A5040").scale(0.05);
     midSandMat.specularColor = Color3.Black();
     midSand.material = midSandMat;
     midSand.parent = this.envRoot;
     midSand.isPickable = false;
     midSand.receiveShadows = true;
 
-    // Soft haze carpet over FAR THIRD of board (Depth — mid-iso soft far ground)
+    // Soft far wash (atmospheric, not a wall)
     const farCarpetMat = new StandardMaterial("farCarpetMat", this.scene);
     farCarpetMat.diffuseColor = hexToColor3("#8A8470");
-    farCarpetMat.emissiveColor = hexToColor3("#6A6858").scale(0.2);
-    farCarpetMat.alpha = 0.28;
+    farCarpetMat.emissiveColor = hexToColor3("#6A6858").scale(0.15);
+    farCarpetMat.alpha = 0.18;
     farCarpetMat.disableLighting = true;
     farCarpetMat.backFaceCulling = false;
     const farCarpet = MeshBuilder.CreateGround(
       "farCarpet",
-      { width: 36, height: 40 },
+      { width: 90, height: 80 },
       this.scene
     );
-    farCarpet.position.set(10, 0.12, 6);
+    farCarpet.position.set(14, 0.1, 8);
     farCarpet.material = farCarpetMat;
     farCarpet.parent = this.envRoot;
     farCarpet.isPickable = false;
 
-    // Far sand — cooler/darker than near (first-glance distance)
-    const far = MeshBuilder.CreateGround(
-      "farSand",
-      { width: 100, height: 85, subdivisions: 4 },
-      this.scene
-    );
-    far.position.set(16, -0.05, 8);
-    const farMat = new StandardMaterial("farSandMat", this.scene);
-    farMat.diffuseColor = hexToColor3("#585448");
-    farMat.emissiveColor = hexToColor3("#2E2C28").scale(0.12);
-    farMat.specularColor = Color3.Black();
-    far.material = farMat;
-    far.parent = this.envRoot;
-    far.isPickable = false;
-    far.receiveShadows = true;
-
-    // Soft far haze sheets — stacked so far board washes out in stills
+    // Soft far haze (low alpha — continuous desert, no edge wall)
     const farWashMat = new StandardMaterial("farWashMat", this.scene);
-    farWashMat.diffuseColor = hexToColor3("#989078");
-    farWashMat.emissiveColor = hexToColor3("#787060").scale(0.22);
-    farWashMat.alpha = 0.4;
+    farWashMat.diffuseColor = hexToColor3("#A89878");
+    farWashMat.emissiveColor = hexToColor3("#807860").scale(0.12);
+    farWashMat.alpha = 0.12;
     farWashMat.disableLighting = true;
     farWashMat.backFaceCulling = false;
-    for (const [name, x, y, w, h] of [
-      ["farWash0", 12, 0.4, 50, 48],
-      ["farWash1", 18, 0.9, 42, 44],
-      ["farWash2", 22, 1.6, 36, 40],
-    ] as const) {
-      const farWash = MeshBuilder.CreateGround(name, { width: w, height: h }, this.scene);
-      farWash.position.set(x, y, 6);
-      farWash.material = farWashMat;
-      farWash.parent = this.envRoot;
-      farWash.isPickable = false;
-    }
-    // Vertical soft wall on far-right edge (kills hard horizon diorama)
-    const farWallMat = new StandardMaterial("farWallMat", this.scene);
-    farWallMat.diffuseColor = hexToColor3("#8A8470");
-    farWallMat.emissiveColor = hexToColor3("#6A6858").scale(0.2);
-    farWallMat.alpha = 0.28;
-    farWallMat.disableLighting = true;
-    farWallMat.backFaceCulling = false;
-    const farWall = MeshBuilder.CreateBox(
-      "farWall",
-      { width: 1.2, height: 6, depth: 55 },
+    const farWash = MeshBuilder.CreateGround(
+      "farWash0",
+      { width: 100, height: 90 },
       this.scene
     );
-    farWall.position.set(24, 2.2, 4);
-    farWall.material = farWallMat;
-    farWall.parent = this.envRoot;
-    farWall.isPickable = false;
+    farWash.position.set(16, 0.25, 8);
+    farWash.material = farWashMat;
+    farWash.parent = this.envRoot;
+    farWash.isPickable = false;
 
     // Wet silt bank — brown-green wet mud, not dry sand
     const wet = MeshBuilder.CreateGround(
@@ -1094,25 +1111,20 @@ export class SettlementView {
     veil.parent = this.envRoot;
     veil.isPickable = false;
 
-    // Mid-field heat haze volumes (Atmosphere craft — air over plaza, not only bank)
-    const heatMat = new StandardMaterial("heatHazeMat", this.scene);
-    heatMat.diffuseColor = hexToColor3("#D8C8A8");
-    heatMat.emissiveColor = hexToColor3("#C8B898").scale(0.18);
-    heatMat.alpha = 0.14;
-    heatMat.disableLighting = true;
-    heatMat.backFaceCulling = false;
-    for (const [x, z, sx, sz] of [
-      [0, 2, 8, 6],
-      [4, -2, 7, 5],
-      [8, 4, 9, 7],
-      [-2, 6, 5, 4],
-    ] as const) {
-      const heat = MeshBuilder.CreateBox(
-        `heatHaze-${x}-${z}`,
-        { width: sx, height: 1.4, depth: sz },
+    // Very light heat wash only (not fog soup volumes over the campus)
+    if (this.quality !== "low") {
+      const heatMat = new StandardMaterial("heatHazeMat", this.scene);
+      heatMat.diffuseColor = hexToColor3("#D8C8A8");
+      heatMat.emissiveColor = hexToColor3("#C8B898").scale(0.1);
+      heatMat.alpha = 0.06;
+      heatMat.disableLighting = true;
+      heatMat.backFaceCulling = false;
+      const heat = MeshBuilder.CreateGround(
+        "heatHazeFar",
+        { width: 40, height: 36 },
         this.scene
       );
-      heat.position.set(x, 1.3, z);
+      heat.position.set(10, 0.5, 6);
       heat.material = heatMat;
       heat.parent = this.envRoot;
       heat.isPickable = false;
@@ -1164,27 +1176,8 @@ export class SettlementView {
         label: def.label,
       };
 
-      const border = MeshBuilder.CreateTorus(
-        `border-${def.id}`,
-        {
-          diameter: isHarbor ? 2.5 : 2.3,
-          thickness: 0.05,
-          tessellation: 24,
-        },
-        this.scene
-      );
-      border.rotation.x = Math.PI / 2;
-      border.position.set(pos.x, isHarbor ? 0.06 : 0.04, pos.z);
-      const bm = new StandardMaterial(`borderMat-${def.id}`, this.scene);
-      bm.diffuseColor = Color3.Lerp(hexToColor3(STYLE.sandDeep), tint, 0.4);
-      bm.specularColor = Color3.Black();
-      bm.emissiveColor = tint.scale(0.05);
-      bm.alpha = 0.65;
-      border.material = bm;
-      border.parent = this.root;
-      border.isPickable = false;
-      border.receiveShadows = true;
-      if (def.starterKind) border.setEnabled(false);
+      // No torus rings — director hard-fail on black rings under pads (02.8/03)
+      // Category readable via icon + solid ghost only
 
       // Category icon + packed-earth ghost foundation for empty buildable pads
       if (!def.starterKind) {
@@ -1583,9 +1576,22 @@ export class SettlementView {
       this.activePlotIds.push("civic-market");
     }
 
-    // Force a readable crowd in stills (02.6 life category)
-    const cap = this.quality === "low" ? 14 : this.quality === "med" ? 20 : 26;
-    const show = settlement.workers > 0 ? cap : Math.max(14, cap);
+    // Sim-driven count only — never invent 14–26 for stills (02.8/02.9)
+    const assigned = settlement.buildings.reduce(
+      (n, b) => n + (typeof (b as { workers?: number }).workers === "number"
+        ? (b as { workers: number }).workers
+        : 0),
+      0
+    );
+    const pool = Math.max(settlement.workers ?? 0, assigned);
+    let show: number;
+    if (this.boardApprovalMode) {
+      show = Math.min(2, Math.max(1, pool > 0 ? 2 : 1));
+    } else {
+      // Soft cap 8 on high; 0 assigned → 0–1 idle near GH
+      const softMax = this.quality === "low" ? 4 : this.quality === "med" ? 6 : 8;
+      show = pool <= 0 ? 1 : Math.min(softMax, Math.max(1, pool));
+    }
 
     while (this.workers.length < show) {
       this.workers.push(this.spawnWorker(this.workers.length));
@@ -1618,8 +1624,8 @@ export class SettlementView {
   private spawnWorker(i: number): WorkerAgent {
     const root = new TransformNode(`worker-${i}`, this.scene);
     root.parent = this.root;
-    // Slightly larger mid-iso LOD so labor reads without zoom
-    root.scaling.setAll(1.18);
+    // Tiny people vs buildings (door-relative) — never dominate board
+    root.scaling.setAll(0.42);
     // Thin human silhouette: torso + head + arms + legs (not barrel/silo)
     const linen = hexToColor3("#FFF8EC");
     const skin = hexToColor3("#C9956C");
@@ -1700,20 +1706,7 @@ export class SettlementView {
     sash.isPickable = false;
 
     if (this.shadowGen) this.shadowGen.addShadowCaster(torso, false);
-
-    const shadow = MeshBuilder.CreateBox(
-      `wsh-${i}`,
-      { width: 0.5, height: 0.04, depth: 0.4 },
-      this.scene
-    );
-    shadow.position.y = 0.02;
-    const sm = new StandardMaterial(`wshm-${i}`, this.scene);
-    sm.diffuseColor = Color3.Black();
-    sm.alpha = 0.4;
-    sm.disableLighting = true;
-    shadow.material = sm;
-    shadow.parent = root;
-    shadow.isPickable = false;
+    // No fake foot shadow boxes (02.8 hard fail)
 
     const agent: WorkerAgent = {
       root,
@@ -1755,32 +1748,38 @@ export class SettlementView {
   }
 
   private assignRoute(w: WorkerAgent) {
-    // Prefer fixed promenade (always on money-shot frame), mix with path graph
-    if (Math.random() < 0.65 || this.activePlotIds.length < 2) {
-      w.poly = this.promenadePoly().map((p) => ({ ...p }));
-      // Phase-stagger along route
-      w.seg = Math.floor(Math.random() * Math.max(1, w.poly.length - 1));
-      w.t = Math.random();
-      const a = w.poly[w.seg]!;
-      w.root.position.set(a.x, 0.32, a.z);
-      return;
-    }
+    // Road / pad-entrance graph ONLY — no free promenade through building mass (02.8/03)
     const entrances = this.activePlotIds
       .map((pid) => this.entranceNodeForPlot(pid))
       .filter((id): id is string => !!id);
-    const from =
-      entrances[Math.floor(Math.random() * entrances.length)] ?? "hub-civic";
+    const hubs = PATH_NODES.filter((n) => n.id.startsWith("hub-")).map((n) => n.id);
+    const pool = entrances.length > 0 ? entrances : hubs.length > 0 ? hubs : ["hub-civic"];
+    const from = pool[Math.floor(Math.random() * pool.length)] ?? "hub-civic";
     let to = from;
     let guard = 0;
-    while (to === from && guard++ < 8 && entrances.length > 1) {
-      to = entrances[Math.floor(Math.random() * entrances.length)]!;
+    while (to === from && guard++ < 10 && pool.length > 1) {
+      to = pool[Math.floor(Math.random() * pool.length)]!;
     }
     const ids = pathBetween(from, to);
     w.poly = this.mapPoly(ids);
-    if (w.poly.length < 2) w.poly = this.promenadePoly();
+    // Fallback: hub ring only (still road nodes), never free-space promenade
+    if (w.poly.length < 2) {
+      const hubIds = hubs.length >= 2 ? hubs : pool;
+      w.poly = this.mapPoly(hubIds.length >= 2 ? [hubIds[0]!, hubIds[1]!, hubIds[0]!] : [from, to]);
+    }
+    if (w.poly.length < 2) {
+      // Last resort: two PATH_NODES world points
+      const a = PATH_NODES[0];
+      const b = PATH_NODES[1] ?? PATH_NODES[0];
+      if (a && b) {
+        const la = transformPlotPos(a.x, a.z, this.mapArch.layout);
+        const lb = transformPlotPos(b.x, b.z, this.mapArch.layout);
+        w.poly = [la, lb, la];
+      }
+    }
     w.seg = 0;
     w.t = Math.random() * 0.3;
-    if (w.poly[0]) w.root.position.set(w.poly[0].x, 0.32, w.poly[0].z);
+    if (w.poly[0]) w.root.position.set(w.poly[0].x, 0.28, w.poly[0].z);
   }
 
   private animateWorkers() {
@@ -1805,8 +1804,8 @@ export class SettlementView {
         if (w.t < 1) {
           const x = a.x + dx * w.t;
           const z = a.z + dz * w.t;
-          const bob = Math.sin(now * 8 + w.bobPhase) * 0.04;
-          w.root.position.set(x, 0.32 + bob, z);
+          const bob = Math.sin(now * 8 + w.bobPhase) * 0.02;
+          w.root.position.set(x, 0.28 + bob, z);
           // Face travel direction
           w.root.rotation.y = Math.atan2(dx, dz);
           break;

@@ -5,6 +5,13 @@
   "track": "browser-isometric",
   "visual_tier_requested": 3,
   "visual_tier_achieved": 2,
+  "art_storyboard_approved": true,
+  "art_storyboard_approved_at": "2026-08-02T23:13:32.112Z",
+  "art_storyboard_answers": "ART-STORYBOARD-ANSWERS.json",
+  "standard_view_approved": true,
+  "standard_view_approved_at": "2026-08-02",
+  "standard_view_capture": "tools/judge/evidence/standard-view/STANDARD-VIEW-DAY.png",
+  "director_play_pass": "DIRECTOR-PLAY-PASS.md",
   "has_complete_loop": true,
   "modern_2026_systems": true,
   "visual_judge": {
