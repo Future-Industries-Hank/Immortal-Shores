@@ -48,28 +48,29 @@ Persistent **async** browser city/empire builder. Server-authoritative ticks and
 
 ## Authority
 
-Server owns: production ticks, Worker growth, construction, vaults, Seals, mail, escrow, market, barges, military outcomes, chat fan-out.  
+Server owns: production ticks, Worker growth, construction, vaults, Seals, mail, market, barges, military outcomes, chat fan-out.  
 Client owns: camera, presentation, input intents, cosmetic prediction.
 
 ## Economy spine
 
-Vault + mail + escrow/pay-on-receive + Market + barges + double-entry ledger.  
-Chat free text is never executable; structured `offer_id` only.
+Vault + mail + **trust-based** Market/Tablet Wall atomic takes + barges + double-entry ledger.  
+**No escrow.** Chat free text is never executable; structured `offer_id` only.
 
 ## FI hosting
 
 ```
 Browser
-  → hosted-games/immortal-shores/     # static client
+  → hosted-games/immortal-shores/     # static client (PWA)
   → /api/...  and  /chat  WS          # game server (tunnel)
-  → Postgres (private)
+  → Postgres (private; file store OK for single-node dev)
 ```
 
-See `HOSTING.md` (created during Prompt 01).
+See `HOSTING.md`.
 
 ## Build phases
 
-1. **Prompt 01** — playable core until `PROMPT-01-COMPLETE.md`  
-2. **Prompt 02** — visual overhaul until impartial judge PASS  
+1. **Prompt 01** — playable core → `PROMPT-01-COMPLETE.md` (**done** at `9f0479d`)  
+2. **Prompt 01.5** — 2026 modernization (trust trade, PWA, QoL, onboarding, social) → `PROMPT-01.5-COMPLETE.md`  
+3. **Prompt 02** — visual gauntlet → impartial judge PASS → `PROMPT-02-COMPLETE.md`  
 
-Do not merge the two phases into one agent run unless the director explicitly requests it.
+Do not skip 01.5 before 02. Do not merge phases unless the director requests it.

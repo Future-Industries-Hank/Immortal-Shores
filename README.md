@@ -21,37 +21,46 @@ npm run dev
 
 ### How to play (rev 1)
 
-1. **Found settlement** (new name) — only **Great House, Market, Emmer Field, Clay Pit, Reed Bed**. Workers start **unassigned**. You are assigned **one unique luxury specialty** (not a building yet).  
-2. **Sparse typed pads** (not a free grid): **5 shop**, **4 special** (Harbor / Warehouse / Shrine / Luxury Works), **3 training**. Click a pad — only allowed buildings for that category appear.  
-3. Early order matters: Mudbrick Yard + Ration House on shop pads, then vessels/baskets for GH upgrades, Luxury Works on its special pad to produce *your* luxury.  
-4. **Other luxuries only via multiplayer trade** (Market / Tablet Wall / barges) inside your **Province**.  
-5. Construction is real-time sequential. Shore → **Time** (+1h / +8h) is the only speed-up for testing.
+1. **Found settlement** — Great House, Market, Emmer Field, Clay Pit, Reed Bed; workers unassigned; one unique luxury specialty.  
+2. **Sparse typed pads:** **5 shop**, **4 special**, **3 training**.  
+3. Place Mudbrick Yard + Ration House early; Luxury Works on special pad; trade for other luxuries.  
+4. Shore → **Time** (+1h / +8h) is debug-only speed for testing.
 
-See [`HOSTING.md`](./HOSTING.md) for env vars, backups, and FI Arcade shape.
+See [`HOSTING.md`](./HOSTING.md).
 
 ---
 
-## Agent build: two prompts only
+## Agent prompts (three phases)
 
 | Order | Prompt | Goal | Stop when |
 |---|---|---|---|
-| **1** | [`prompts/PROMPT-01-PLAYABLE.md`](./prompts/PROMPT-01-PLAYABLE.md) | Build the full playable game | Game plays as expected; `PROMPT-01-COMPLETE.md` |
-| **2** | [`prompts/PROMPT-02-VISUAL.md`](./prompts/PROMPT-02-VISUAL.md) | Visual / production overhaul | Impartial judge **OVERALL: PASS**; `PROMPT-02-COMPLETE.md` |
+| **1** | [`prompts/PROMPT-01-PLAYABLE.md`](./prompts/PROMPT-01-PLAYABLE.md) | Playable core | `PROMPT-01-COMPLETE.md` — **DONE** at `9f0479d` |
+| **1.5** | [`prompts/PROMPT-01.5-MODERN-2026.md`](./prompts/PROMPT-01.5-MODERN-2026.md) | 2026 modernization (trust trade, PWA, QoL, onboarding, social) | `PROMPT-01.5-COMPLETE.md` — **RUN NEXT** |
+| **2** | [`prompts/PROMPT-02-VISUAL.md`](./prompts/PROMPT-02-VISUAL.md) | Visual / production gauntlet | Impartial judge **PASS** |
 
-**Prompt 01 status: COMPLETE** — see [`PROMPT-01-COMPLETE.md`](./PROMPT-01-COMPLETE.md) and [`BUILD-CHECK.md`](./BUILD-CHECK.md).  
-**Do not start Prompt 02 until you open a new session with only Prompt 02.**
+**Do not start Prompt 02 until 01.5 is complete.**  
+**Prompt 01 is closed** — do not reopen the playable bar.
+
+### Planner / agent kickoff for 01.5
+
+```text
+Pull main (at least 9f0479d). Read docs/REV1-REVIEW.md and docs/MODERN-2026.md.
+Execute only prompts/PROMPT-01.5-MODERN-2026.md. Stop at PROMPT-01.5-COMPLETE.md.
+```
 
 ---
 
-## Design docs (canonical)
+## Design docs
 
 | File | Contents |
 |---|---|
-| [`docs/GDD.md`](./docs/GDD.md) | Full game design & numbers |
-| [`docs/BUILD-CONTEXT.md`](./docs/BUILD-CONTEXT.md) | Core verb, V1 slice, visual tier |
+| [`docs/GDD.md`](./docs/GDD.md) | Original mechanics & numbers |
+| [`docs/MODERN-2026.md`](./docs/MODERN-2026.md) | 2026 product layer (trust trade, QoL, social, F2P) |
+| [`docs/REV1-REVIEW.md`](./docs/REV1-REVIEW.md) | Review of builder rev 1 at `9f0479d` |
+| [`docs/BUILD-CONTEXT.md`](./docs/BUILD-CONTEXT.md) | Core verb, visual tier |
 | [`docs/STYLE-CONTRACT.md`](./docs/STYLE-CONTRACT.md) | Art / UI / light |
-| [`docs/ECONOMY.md`](./docs/ECONOMY.md) | Ticks, vault, escrow, barges, Seals |
-| [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | Stack, authority, hosting shape |
+| [`docs/ECONOMY.md`](./docs/ECONOMY.md) | Ticks, vault, **trust** trade, barges, Seals |
+| [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | Stack, phases, hosting |
 
 ---
 
@@ -60,9 +69,8 @@ See [`HOSTING.md`](./HOSTING.md) for env vars, backups, and FI Arcade shape.
 ```
 apps/client/     Vite + Babylon isometric client
 apps/server/     Fastify API + tick engine + ledger
-packages/shared/ GDD rates & types
+packages/shared/ GDD rates, plot grid, types
 docs/ prompts/ tools/
-docker-compose.yml
 ```
 
 ## Tests
@@ -73,4 +81,4 @@ npm run test -w @immortal/server
 
 ## Host
 
-[Future Industries](https://futureindustries.ai) — Arcade / hosted-games client + co-hosted social/economy API.
+[Future Industries](https://futureindustries.ai) — Arcade / hosted-games + co-hosted API.

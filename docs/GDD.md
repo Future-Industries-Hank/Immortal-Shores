@@ -182,7 +182,7 @@ Upgrading the Great House:
 
 - Public **barter board** with rich shorthand culture of offers and requests.
 - Part of Tablet Wall channels (see §12).
-- Settlement of trades must still go through **authoritative mail/escrow/barge** flows — free text is culture, structured offers are executable.
+- Settlement of trades must still go through **authoritative market/mail/barge** flows — free text is culture, structured offers are executable. **No escrow** (2026).
 
 ### 8.3 Private River Barges
 
@@ -193,9 +193,9 @@ Upgrading the Great House:
 - Once a settlement maintains **11+ barges**, modest risk of **partial loss** or **unexpected treasure**.
 - Harbor ship capacity scales with Harbor level: **5** at lowest tier → **several hundred** at highest.
 
-### 8.4 Gifts, mail, escrow (architecture layer)
+### 8.4 Gifts, mail, trust settlement (architecture layer)
 
-Cross-player transfers (gifts, barter accepts, Seal trades, barge deliveries) use server **vault + mail + escrow / pay-on-receive** (see ECONOMY.md). Chat and Tablet Wall **advertise**; the ledger **settles**.
+Cross-player transfers use server **vault + mail + atomic market/wall takes** (see ECONOMY.md and MODERN-2026.md). **No escrow** — trust remains. Chat and Tablet Wall advertise; the ledger settles on explicit accept.
 
 ---
 

@@ -2,10 +2,10 @@
 
 ### Future Industries · Build until the game plays as expected
 
-> **Phase:** 1 of 2  
-> **Stop condition:** Complete playable loop verified in browser (see §DONE).  
-> **Do not** run the visual AAA overhaul or impartial visual judge — that is **Prompt 02**.  
-> **Do not ask questions.** Infer, decide, log judgment calls, build.
+> **Phase:** 1 of 3  
+> **Status:** **COMPLETE** on `main` at `9f0479d` — see `PROMPT-01-COMPLETE.md`.  
+> **Do not re-run this prompt** unless the director reopens rev 1.  
+> Next: **Prompt 01.5** (`prompts/PROMPT-01.5-MODERN-2026.md`), then Prompt 02 visual.
 
 ---
 

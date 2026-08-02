@@ -59,8 +59,15 @@ Materials must remain distinguishable in grayscale (mudbrick matte vs stone slig
 - Pitch-up for gains/rewards; pitch-down for shortage/desertion.
 - Synthesize SFX first (FI audio doctrine).
 
+## Accessibility presentation (Prompt 02 polish; 01.5 may stub)
+
+- Optional **dark mode** (papyrus → deep Nile night panels; keep gold accents).  
+- **Color-blind safe** plot category icons (not color-only): Shop / Special / Training.  
+- Resource critical warnings must not be red-only (shape + text).
+
 ## Forbidden
 
 - Sci-fi HUD, pure black glassmorphism, Comic Sans / default system UI sprawl.
 - Rainbow particle spam.
 - Marketplace asset mash of mismatched cultures.
+- Pay-to-win visual “premium power” effects.
