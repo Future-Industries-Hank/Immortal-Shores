@@ -162,16 +162,19 @@ export const SETTLEMENT_PLOTS: SettlementPlotDef[] = [
     ],
   },
 
-  // —— 4 Special plots (further inland; harbor nearest river path) ——
+  // —— Harbor ON the river (left bank / pier into water) ——
+  // River mesh sits ~x=-13.2, bank ~x=-10.2; pier pad straddles waterline.
   {
     id: "special-harbor",
     category: "special",
-    label: "Harbor site",
-    worldX: -5.5,
-    worldZ: 7.2,
+    label: "Harbor pier",
+    worldX: -11.4,
+    worldZ: 6.5,
     tint: "#3A7CA5",
     allowed: ["harbor"],
   },
+
+  // —— Remaining specials further inland (north of civic) ——
   {
     id: "special-luxury",
     category: "special",
@@ -373,6 +376,8 @@ export const PATH_NODES: PathNode[] = [
   { id: "hub-train", x: 8.0, z: 0.8 },
   // North specials spine
   { id: "hub-special", x: 0.5, z: 5.2 },
+  // Harbor path hub on the bank
+  { id: "hub-pier", x: -9.5, z: 5.5 },
   // Plot entrances (slightly offset toward path network)
   { id: "p-res-emmer", x: -7.4, z: -2.0, plotId: "res-emmer" },
   { id: "p-res-reeds", x: -7.4, z: 1.2, plotId: "res-reeds" },
@@ -384,7 +389,8 @@ export const PATH_NODES: PathNode[] = [
   { id: "p-shop-3", x: 3.8, z: -0.2, plotId: "shop-3" },
   { id: "p-shop-4", x: 6.0, z: -0.2, plotId: "shop-4" },
   { id: "p-shop-5", x: 5.0, z: 1.6, plotId: "shop-5" },
-  { id: "p-special-harbor", x: -5.0, z: 6.0, plotId: "special-harbor" },
+  // Harbor pier entrance — on the waterline
+  { id: "p-special-harbor", x: -11.0, z: 6.2, plotId: "special-harbor" },
   { id: "p-special-luxury", x: -1.5, z: 6.0, plotId: "special-luxury" },
   { id: "p-special-warehouse", x: 2.5, z: 6.0, plotId: "special-warehouse" },
   { id: "p-special-shrine", x: 5.5, z: 6.0, plotId: "special-shrine" },
@@ -417,15 +423,17 @@ export const PATH_EDGES: [string, string][] = [
   ["p-shop-1", "p-shop-3"],
   ["p-shop-2", "p-shop-4"],
   ["p-shop-3", "p-shop-5"],
-  // Specials
-  ["hub-special", "p-special-harbor"],
+  // Specials inland
   ["hub-special", "p-special-luxury"],
   ["hub-special", "p-special-warehouse"],
   ["hub-special", "p-special-shrine"],
-  ["p-special-harbor", "p-special-luxury"],
   ["p-special-luxury", "p-special-warehouse"],
   ["p-special-warehouse", "p-special-shrine"],
-  ["hub-res", "p-special-harbor"],
+  // Harbor on river: path from resources/bank → pier
+  ["hub-res", "hub-pier"],
+  ["hub-pier", "p-special-harbor"],
+  ["p-res-clay", "hub-pier"],
+  ["hub-special", "hub-pier"],
   // Training
   ["hub-train", "p-train-bow"],
   ["hub-train", "p-train-spear"],
@@ -433,6 +441,20 @@ export const PATH_EDGES: [string, string][] = [
   ["p-train-bow", "p-train-spear"],
   ["p-train-spear", "p-train-chariot"],
 ];
+
+/**
+ * Apply map archetype layout transform to a base plot position.
+ */
+export function transformPlotPos(
+  worldX: number,
+  worldZ: number,
+  layout: { mirrorZ?: boolean; offsetX?: number; offsetZ?: number }
+): { x: number; z: number } {
+  let x = worldX + (layout.offsetX ?? 0);
+  let z = worldZ + (layout.offsetZ ?? 0);
+  if (layout.mirrorZ) z = -z + 1.0; // flip around ~civic Z
+  return { x, z };
+}
 
 export function getPathNode(id: string): PathNode | undefined {
   return PATH_NODES.find((n) => n.id === id);

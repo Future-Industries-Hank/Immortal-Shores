@@ -9,11 +9,11 @@ import {
   CONSTRUCTION_CANCEL_REFUND,
   FOUNDING_SEAL_COST,
   GREAT_HOUSE_CAPS,
-  LUXURY_MATERIALS,
   MAX_MONUMENTS,
   MAX_SETTLEMENTS,
   NEW_BUILD_COST,
   PROVINCES,
+  assignFoundingSlot,
   SEAL_FLOOR,
   STARTER_MUDBRICKS,
   STARTER_RATIONS,
@@ -282,16 +282,29 @@ export class Game {
     if (exists) throw new Error("Name taken");
 
     const id = nanoid(10);
-    const luxury =
-      LUXURY_MATERIALS[Math.floor(Math.random() * LUXURY_MATERIALS.length)]!;
-    const province = PROVINCES[Math.floor(Math.random() * PROVINCES.length)]!;
-    const founding = this.store.world.sites.find(
-      (s) => s.kind === "founding" && s.provinceId === province.id && !s.ownerPlayerId
+    // Balanced multiplayer founding: least-used province + luxury, map archetype ready
+    const existing = Object.values(this.store.world.settlements).map((s) => ({
+      provinceId: s.provinceId,
+      uniqueLuxury: s.uniqueLuxury,
+    }));
+    const openFounding = this.store.world.sites.find(
+      (s) => s.kind === "founding" && !s.ownerPlayerId
     );
+    const slot = assignFoundingSlot({
+      existingSettlements: existing,
+      preferredProvinceId: openFounding?.provinceId,
+    });
+    const founding =
+      this.store.world.sites.find(
+        (s) =>
+          s.kind === "founding" &&
+          s.provinceId === slot.provinceId &&
+          !s.ownerPlayerId
+      ) ?? openFounding;
 
     const settlementId = nanoid(10);
-    const mapX = founding?.mapX ?? province.riverIndex * 120 + 30;
-    const mapY = founding?.mapY ?? 50;
+    const mapX = founding?.mapX ?? slot.mapX;
+    const mapY = founding?.mapY ?? slot.mapY;
 
     const vault = emptyVault();
     credit(vault, "rations", STARTER_RATIONS);
@@ -307,7 +320,8 @@ export class Game {
       id: settlementId,
       playerId: id,
       name: `${name}'s Shore`,
-      provinceId: province.id,
+      provinceId: slot.provinceId,
+      mapArchetypeId: slot.mapArchetypeId,
       mapX,
       mapY,
       greatHouseLevel: 1,
@@ -318,7 +332,7 @@ export class Game {
       units: [],
       barges: [],
       monuments: [],
-      uniqueLuxury: luxury,
+      uniqueLuxury: slot.uniqueLuxury,
       prestige: 0,
       lastTickAt: now,
       createdAt: now,
@@ -328,7 +342,7 @@ export class Game {
     this.store.world.sites.push({
       id: `city-${settlementId}`,
       kind: "city",
-      provinceId: province.id,
+      provinceId: slot.provinceId,
       name: settlement.name,
       mapX,
       mapY,
@@ -1229,8 +1243,14 @@ export class Game {
     this.log(playerId, "seals", -sealCost, "founding");
     for (const c of cost) this.log(playerId, c.resource, -c.amount, "founding");
 
-    const luxury =
-      LUXURY_MATERIALS[Math.floor(Math.random() * LUXURY_MATERIALS.length)]!;
+    const existing = Object.values(this.store.world.settlements).map((s) => ({
+      provinceId: s.provinceId,
+      uniqueLuxury: s.uniqueLuxury,
+    }));
+    const slot = assignFoundingSlot({
+      existingSettlements: existing,
+      preferredProvinceId: site.provinceId,
+    });
     const settlementId = nanoid(10);
     const now = Date.now();
     const settlement = {
@@ -1238,6 +1258,7 @@ export class Game {
       playerId,
       name: name.slice(0, 32) || "New Shore",
       provinceId: site.provinceId,
+      mapArchetypeId: slot.mapArchetypeId,
       mapX: site.mapX,
       mapY: site.mapY,
       greatHouseLevel: 1,
@@ -1248,7 +1269,7 @@ export class Game {
       units: [],
       barges: [],
       monuments: [],
-      uniqueLuxury: luxury as LuxuryMaterial,
+      uniqueLuxury: slot.uniqueLuxury as LuxuryMaterial,
       prestige: 0,
       lastTickAt: now,
       createdAt: now,

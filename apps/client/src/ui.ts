@@ -1084,7 +1084,12 @@ function renderMilitary(s: PublicSnapshot) {
 
 function renderMap(s: PublicSnapshot) {
   const panel = document.getElementById("panel-map")!;
-  panel.innerHTML = `<h2>World Map — Eternal River</h2><p class="muted">Click any marker for a full menu before acting.</p><div class="map-grid" id="map-grid"></div>`;
+  const st = s.settlements[0];
+  const myMap = st?.mapArchetypeId?.replace(/_/g, " ") ?? "—";
+  panel.innerHTML = `<h2>World Map — Eternal River</h2>
+    <p class="muted">Your shore: <strong>${st?.uniqueLuxury?.replace(/_/g, " ") ?? "—"}</strong> on <strong>${myMap}</strong> · ${st?.provinceId ?? ""}</p>
+    <p class="muted">Six province maps are live. New players get least-used luxury + province so multiplayer trade works.</p>
+    <div class="map-grid" id="map-grid"></div>`;
   const grid = panel.querySelector("#map-grid")!;
   for (const site of s.map.sites) {
     const btn = document.createElement("button");

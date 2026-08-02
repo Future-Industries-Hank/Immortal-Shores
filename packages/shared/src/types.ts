@@ -163,6 +163,8 @@ export interface SettlementState {
   playerId: string;
   name: string;
   provinceId: string;
+  /** Multiplayer map look / layout variant (see worldMaps.ts) */
+  mapArchetypeId?: string;
   mapX: number;
   mapY: number;
   greatHouseLevel: number;

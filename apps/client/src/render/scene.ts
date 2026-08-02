@@ -21,6 +21,7 @@ import {
   ROAD_COLORS,
   SETTLEMENT_PLOTS,
   STYLE,
+  getMapArchetype,
   getPathNode,
   getPlot,
   pathBetween,
@@ -28,7 +29,9 @@ import {
   plotWorld,
   polylineFromNodeIds,
   roadTierForGhLevel,
+  transformPlotPos,
   type BuildingState,
+  type MapArchetype,
   type RoadTier,
   type SettlementState,
 } from "@immortal/shared";
@@ -77,6 +80,8 @@ export class SettlementView {
   private roadRoot: TransformNode | null = null;
   private roadMeshes: Mesh[] = [];
   private roadTier: RoadTier = "dirt";
+  private envRoot: TransformNode | null = null;
+  private mapArch: MapArchetype = getMapArchetype("delta_mouth");
   private workers: WorkerAgent[] = [];
   private quality: Quality = "med";
   private selectedId: string | null = null;
@@ -126,7 +131,7 @@ export class SettlementView {
     hemi.groundColor = hexToColor3(STYLE.sandDeep);
 
     this.root = new TransformNode("settlement", this.scene);
-    this.buildGroundAndRiver();
+    this.rebuildEnvironment(this.mapArch);
     this.buildRoads("dirt");
     this.buildFixedPads();
     this.buildSelectRing();
@@ -229,7 +234,7 @@ export class SettlementView {
       return;
     }
     if (this.selectedPlotId) {
-      const w = plotWorld(this.selectedPlotId);
+      const w = this.plotWorldArch(this.selectedPlotId);
       this.selectRing.setEnabled(true);
       this.selectRing.position.x = w.x;
       this.selectRing.position.z = w.z;
@@ -303,7 +308,17 @@ export class SettlementView {
     this.engine.setHardwareScalingLevel(q === "low" ? 1.5 : q === "med" ? 1.1 : 1);
   }
 
-  private buildGroundAndRiver() {
+  private worldPos(def: { worldX: number; worldZ: number; id?: string }) {
+    return transformPlotPos(def.worldX, def.worldZ, this.mapArch.layout);
+  }
+
+  private rebuildEnvironment(arch: MapArchetype) {
+    this.envRoot?.dispose();
+    this.envRoot = new TransformNode("env", this.scene);
+    this.envRoot.parent = this.root;
+    this.mapArch = arch;
+    const pal = arch.palette;
+
     const ground = MeshBuilder.CreateGround(
       "ground",
       { width: 36, height: 28, subdivisions: 8 },
@@ -311,13 +326,13 @@ export class SettlementView {
     );
     ground.position.set(0, 0, 1);
     const mat = new StandardMaterial("groundMat", this.scene);
-    mat.diffuseColor = hexToColor3(STYLE.sandLight);
+    mat.diffuseColor = hexToColor3(pal.sand);
     mat.specularColor = Color3.Black();
     ground.material = mat;
-    ground.parent = this.root;
+    ground.parent = this.envRoot;
     ground.isPickable = false;
 
-    // River along the LEFT side of the shore
+    // River along the LEFT — harbor sits on this waterline
     const river = MeshBuilder.CreateBox(
       "river",
       { width: 5.5, height: 0.12, depth: 26 },
@@ -325,11 +340,11 @@ export class SettlementView {
     );
     river.position.set(-13.2, 0.02, 1.5);
     const rmat = new StandardMaterial("riverMat", this.scene);
-    rmat.diffuseColor = hexToColor3(STYLE.riverDeep);
-    rmat.specularColor = hexToColor3(STYLE.riverLight);
+    rmat.diffuseColor = hexToColor3(pal.river);
+    rmat.specularColor = hexToColor3(pal.riverLight);
     rmat.alpha = 0.9;
     river.material = rmat;
-    river.parent = this.root;
+    river.parent = this.envRoot;
     river.isPickable = false;
 
     // Bank strip
@@ -340,28 +355,70 @@ export class SettlementView {
     );
     bank.position.set(-10.2, 0.03, 1.5);
     const bmat = new StandardMaterial("bankMat", this.scene);
-    bmat.diffuseColor = hexToColor3("#C4A574");
+    bmat.diffuseColor = hexToColor3(pal.bank);
     bmat.specularColor = Color3.Black();
     bank.material = bmat;
-    bank.parent = this.root;
+    bank.parent = this.envRoot;
     bank.isPickable = false;
+
+    // Pier from bank into river toward harbor pad (~-11.4, 6.5)
+    const pierLen = arch.layout.pierLength ?? 3.0;
+    const pier = MeshBuilder.CreateBox(
+      "pier",
+      { width: pierLen, height: 0.14, depth: 1.4 },
+      this.scene
+    );
+    pier.position.set(-11.0, 0.08, 6.5);
+    const pmat = new StandardMaterial("pierMat", this.scene);
+    pmat.diffuseColor = hexToColor3("#8B7355");
+    pmat.specularColor = Color3.Black();
+    pier.material = pmat;
+    pier.parent = this.envRoot;
+    pier.isPickable = false;
+
+    // Pilings under pier
+    for (const z of [6.0, 7.0]) {
+      for (const x of [-12.2, -11.0, -9.9]) {
+        const pile = MeshBuilder.CreateCylinder(
+          `pile-${x}-${z}`,
+          { height: 0.35, diameter: 0.18, tessellation: 6 },
+          this.scene
+        );
+        pile.position.set(x, 0.05, z);
+        pile.material = pmat;
+        pile.parent = this.envRoot;
+        pile.isPickable = false;
+      }
+    }
   }
 
   /** Sparse typed pads only — not a free city grid. */
   private buildFixedPads() {
+    // Clear prior pads if rebuilding for map archetype
+    for (const m of this.padMeshes.values()) m.dispose();
+    this.padMeshes.clear();
+    this.padMats.clear();
+
     for (const def of SETTLEMENT_PLOTS) {
+      const pos = this.worldPos(def);
       const mat = new StandardMaterial(`padMat-${def.id}`, this.scene);
       mat.diffuseColor = hexToColor3(def.tint);
       mat.specularColor = Color3.Black();
       mat.emissiveColor = hexToColor3(def.tint).scale(0.12);
       this.padMats.set(def.id, mat);
 
+      const isHarbor = def.id === "special-harbor";
       const pad = MeshBuilder.CreateBox(
         `pad-${def.id}`,
-        { width: 2.6, height: 0.2, depth: 2.6 },
+        {
+          width: isHarbor ? 2.8 : 2.6,
+          height: isHarbor ? 0.16 : 0.2,
+          depth: isHarbor ? 2.4 : 2.6,
+        },
         this.scene
       );
-      pad.position.set(def.worldX, 0.1, def.worldZ);
+      // Harbor pad sits on pier (slightly lower = into water)
+      pad.position.set(pos.x, isHarbor ? 0.14 : 0.1, pos.z);
       pad.material = mat;
       pad.parent = this.root;
       pad.isPickable = !def.starterKind;
@@ -371,13 +428,16 @@ export class SettlementView {
         label: def.label,
       };
 
-      // Category border ring (slightly larger, darker)
       const border = MeshBuilder.CreateBox(
         `border-${def.id}`,
-        { width: 2.85, height: 0.06, depth: 2.85 },
+        {
+          width: isHarbor ? 3.0 : 2.85,
+          height: 0.06,
+          depth: isHarbor ? 2.6 : 2.85,
+        },
         this.scene
       );
-      border.position.set(def.worldX, 0.03, def.worldZ);
+      border.position.set(pos.x, isHarbor ? 0.06 : 0.03, pos.z);
       const bm = new StandardMaterial(`borderMat-${def.id}`, this.scene);
       bm.diffuseColor = hexToColor3(def.tint).scale(0.55);
       bm.specularColor = Color3.Black();
@@ -402,6 +462,12 @@ export class SettlementView {
 
       this.padMeshes.set(def.id, pad);
     }
+  }
+
+  private plotWorldArch(plotId: string): { x: number; z: number } {
+    const def = getPlot(plotId);
+    if (!def) return plotWorld(plotId);
+    return this.worldPos(def);
   }
 
   private syncPads(settlement: SettlementState) {
@@ -441,7 +507,7 @@ export class SettlementView {
   private makeScaffold(plotId: string): TransformNode {
     const root = new TransformNode(`scaffold-${plotId}`, this.scene);
     root.parent = this.root;
-    const w = plotWorld(plotId);
+    const w = this.plotWorldArch(plotId);
     root.position.set(w.x, 0, w.z);
     const frame = MeshBuilder.CreateBox(
       "scaffold",
@@ -461,6 +527,12 @@ export class SettlementView {
   }
 
   sync(settlement: SettlementState) {
+    const archId = settlement.mapArchetypeId ?? "delta_mouth";
+    if (archId !== this.mapArch.id) {
+      this.rebuildEnvironment(getMapArchetype(archId));
+      this.buildFixedPads();
+      this.buildRoads(this.roadTier);
+    }
     this.syncPads(settlement);
     this.syncRoads(settlement.greatHouseLevel);
     const seen = new Set<string>();
@@ -562,8 +634,10 @@ export class SettlementView {
   }
 
   private placeBuilding(node: TransformNode, b: BuildingState) {
-    const w = b.plotId ? plotWorld(b.plotId) : { x: 0, z: 0 };
-    node.position.set(w.x, 0, w.z);
+    const w = b.plotId ? this.plotWorldArch(b.plotId) : { x: 0, z: 0 };
+    // Harbor building sits on pier deck
+    const y = b.plotId === "special-harbor" ? 0.08 : 0;
+    node.position.set(w.x, y, w.z);
   }
 
   /** Dirt → packed → stone as Great House levels. */
@@ -587,10 +661,13 @@ export class SettlementView {
     const width = tier === "stone" ? 1.15 : tier === "packed" ? 1.0 : 0.88;
     const height = tier === "stone" ? 0.07 : 0.055;
 
+    const layout = this.mapArch.layout;
     for (const [aId, bId] of PATH_EDGES) {
-      const a = getPathNode(aId);
-      const b = getPathNode(bId);
-      if (!a || !b) continue;
+      const a0 = getPathNode(aId);
+      const b0 = getPathNode(bId);
+      if (!a0 || !b0) continue;
+      const a = transformPlotPos(a0.x, a0.z, layout);
+      const b = transformPlotPos(b0.x, b0.z, layout);
       const dx = b.x - a.x;
       const dz = b.z - a.z;
       const len = Math.hypot(dx, dz);
@@ -626,9 +703,10 @@ export class SettlementView {
     }
 
     // Hub discs at intersections
-    for (const n of PATH_NODES.filter((p) => p.id.startsWith("hub-"))) {
+    for (const n0 of PATH_NODES.filter((p) => p.id.startsWith("hub-"))) {
+      const n = transformPlotPos(n0.x, n0.z, layout);
       const disc = MeshBuilder.CreateCylinder(
-        `hub-${n.id}`,
+        `hub-${n0.id}`,
         { diameter: width * 1.35, height: height + 0.01, tessellation: 12 },
         this.scene
       );
@@ -715,14 +793,19 @@ export class SettlementView {
     return n?.id ?? null;
   }
 
+  private mapPoly(ids: string[]): { x: number; z: number }[] {
+    return polylineFromNodeIds(ids).map((p) =>
+      transformPlotPos(p.x, p.z, this.mapArch.layout)
+    );
+  }
+
   private assignRoute(w: WorkerAgent) {
     const entrances = this.activePlotIds
       .map((pid) => this.entranceNodeForPlot(pid))
       .filter((id): id is string => !!id);
     if (entrances.length < 1) {
-      // Fallback: walk spine
       const route = pathBetween("hub-res", "hub-train");
-      w.poly = polylineFromNodeIds(route);
+      w.poly = this.mapPoly(route);
       w.seg = 0;
       w.t = 0;
       if (w.poly[0]) w.root.position.set(w.poly[0].x, 0.22, w.poly[0].z);
@@ -737,11 +820,10 @@ export class SettlementView {
         to = entrances[Math.floor(Math.random() * entrances.length)]!;
       }
     } else {
-      // Single plot: loop plot ↔ nearest hub
       to = "hub-civic";
     }
     const ids = pathBetween(from, to);
-    w.poly = polylineFromNodeIds(ids);
+    w.poly = this.mapPoly(ids);
     w.seg = 0;
     w.t = Math.random() * 0.2;
     if (w.poly[0]) {

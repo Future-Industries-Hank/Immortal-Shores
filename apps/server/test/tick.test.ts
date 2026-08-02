@@ -135,6 +135,26 @@ describe("offline catch-up", () => {
     }
   });
 
+  it("founding balances luxuries across multiplayer", () => {
+    const { game, cleanup } = freshGame();
+    try {
+      const lux = new Set<string>();
+      const provs = new Set<string>();
+      for (let i = 0; i < 8; i++) {
+        const { playerId } = game.register(`MP${i}`, "pass");
+        const snap = game.snapshot(playerId);
+        lux.add(snap.settlements[0]!.uniqueLuxury);
+        provs.add(snap.settlements[0]!.provinceId);
+        assert.ok(snap.settlements[0]!.mapArchetypeId, "map archetype assigned");
+      }
+      // 8 players → should not all share one luxury
+      assert.ok(lux.size >= 4, `expected diverse luxuries, got ${[...lux]}`);
+      assert.ok(provs.size >= 3, `expected multi-province, got ${[...provs]}`);
+    } finally {
+      cleanup();
+    }
+  });
+
   it("seal floor blocks trade below 10", () => {
     const { game, cleanup } = freshGame();
     try {

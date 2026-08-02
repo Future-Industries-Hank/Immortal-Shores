@@ -78,12 +78,14 @@ async function enterGame() {
   const s = await api.me();
   applySnapshot(s);
 
-  // Show province + unique luxury on first load
-  const lux = s.settlements[0]?.uniqueLuxury;
-  const prov = s.map.provinces.find((p) => p.id === s.settlements[0]?.provinceId);
+  // Show province + map + unique luxury on first load
+  const st0 = s.settlements[0];
+  const lux = st0?.uniqueLuxury;
+  const prov = s.map.provinces.find((p) => p.id === st0?.provinceId);
   if (lux && prov) {
+    const mapName = (st0?.mapArchetypeId ?? prov.id).replace(/_/g, " ");
     toast(
-      `${prov.name}: your unique luxury is ${lux.replace(/_/g, " ")} — trade for the rest`
+      `${prov.name} · ${mapName}: unique ${lux.replace(/_/g, " ")} — trade for the rest`
     );
   }
 
