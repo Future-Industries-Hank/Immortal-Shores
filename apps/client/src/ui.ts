@@ -1256,8 +1256,35 @@ function renderMap(s: PublicSnapshot) {
   const panel = document.getElementById("panel-map")!;
   const st = s.settlements[0];
   const myMap = st?.mapArchetypeId?.replace(/_/g, " ") ?? "—";
+  const provinces = s.map.provinces ?? [];
+  const riverSvg = `
+    <svg class="world-river-map" viewBox="0 0 320 120" role="img" aria-label="Eternal river provinces">
+      <defs>
+        <linearGradient id="riverGrad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#1e4d6b"/>
+          <stop offset="50%" stop-color="#3a7ca5"/>
+          <stop offset="100%" stop-color="#1e4d6b"/>
+        </linearGradient>
+      </defs>
+      <rect width="320" height="120" fill="#e8d4b0" rx="8"/>
+      <path d="M10,90 C50,40 90,100 140,55 S230,20 310,70" fill="none" stroke="url(#riverGrad)" stroke-width="14" stroke-linecap="round"/>
+      <path d="M10,90 C50,40 90,100 140,55 S230,20 310,70" fill="none" stroke="#7fa85a" stroke-width="3" stroke-dasharray="2 6" opacity="0.5"/>
+      ${provinces
+        .map((p, i) => {
+          const x = 30 + i * 48;
+          const y = 35 + (i % 2) * 28;
+          const mine = p.id === st?.provinceId;
+          return `<g>
+            <circle cx="${x}" cy="${y}" r="${mine ? 9 : 6}" fill="${mine ? "#d4a84b" : "#c9956c"}" stroke="#2a2118" stroke-width="1"/>
+            <text x="${x}" y="${y + 18}" text-anchor="middle" font-size="7" fill="#2a2118">${p.name.split(" ")[0]}</text>
+          </g>`;
+        })
+        .join("")}
+    </svg>`;
   panel.innerHTML = `<h2>World Map — Eternal River</h2>
     <p class="muted">Your shore: <strong>${st?.uniqueLuxury?.replace(/_/g, " ") ?? "—"}</strong> on <strong>${myMap}</strong> · ${st?.provinceId ?? ""}</p>
+    ${riverSvg}
+    <p class="muted pad-legend">Pads: <span class="leg-shop">⬡ Shop</span> · <span class="leg-special">◇ Special</span> · <span class="leg-train">△ Training</span></p>
     <p class="muted">Six province maps are live. New players get least-used luxury + province so multiplayer trade works.</p>
     <div class="map-grid" id="map-grid"></div>`;
   const grid = panel.querySelector("#map-grid")!;
@@ -1265,7 +1292,9 @@ function renderMap(s: PublicSnapshot) {
     const btn = document.createElement("button");
     btn.className = `map-site ${site.kind}`;
     btn.type = "button";
-    btn.innerHTML = `<strong>${site.name}</strong><div class="muted">${site.kind} · ${site.provinceId} · (${site.mapX},${site.mapY})</div>`;
+    const icon =
+      site.kind === "city" ? "🏛" : site.kind === "monument" ? "▲" : site.kind === "founding" ? "○" : "·";
+    btn.innerHTML = `<strong>${icon} ${site.name}</strong><div class="muted">${site.kind} · ${site.provinceId} · (${site.mapX},${site.mapY})</div>`;
     btn.onclick = () => {
       const el = document.getElementById("building-inspect")!;
       const st = settlement();

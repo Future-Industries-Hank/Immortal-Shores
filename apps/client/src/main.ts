@@ -47,6 +47,12 @@ async function enterGame() {
   const q = document.getElementById("quality") as HTMLSelectElement;
   view.setQuality(q.value as Quality);
   q.addEventListener("change", () => view?.setQuality(q.value as Quality));
+  const tod = document.getElementById("tod") as HTMLSelectElement | null;
+  tod?.addEventListener("change", () => {
+    const v = tod.value;
+    if (v === "auto") view?.setDayPhase(null);
+    else view?.setDayPhase(v as "day" | "dusk" | "night");
+  });
 
   // Keep canvas sized when top/bottom bars reflow
   const viewport = document.getElementById("viewport");

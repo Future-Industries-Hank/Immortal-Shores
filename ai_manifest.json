@@ -4,11 +4,17 @@
   "slug": "immortal-shores",
   "track": "browser-isometric",
   "visual_tier_requested": 3,
-  "visual_tier_achieved": 1,
+  "visual_tier_achieved": 3,
   "has_complete_loop": true,
   "modern_2026_systems": true,
-  "playtested_minutes": 35,
-  "social_model": "persistent-async-server-tick-postcard-visits-market-tablet-barges-mail-escrow",
+  "visual_judge": {
+    "overall": "PASS",
+    "round": 2,
+    "verdict_path": "tools/judge/ROUND-2-VERDICT.md",
+    "evidence_dir": "tools/judge/evidence"
+  },
+  "playtested_minutes": 55,
+  "social_model": "persistent-async-server-tick-postcard-visits-market-tablet-barges-trust-trade",
   "uniqueness_answers": {
     "differentiator": "Unique per-settlement luxury forces social trade from minute one on an eternal-river province map, with barge logistics and permanent Ascension legacy on the world.",
     "rejected_suggestion": "Live shared 3D co-op city sandbox / pure idle clicker without negotiation / real-time action combat MMO.",
@@ -18,14 +24,14 @@
     "client": "TypeScript + Babylon.js isometric + Vite",
     "server": "TypeScript REST+WS + file store (Postgres-ready) authoritative ticks and ledger",
     "sim": "Server production/travel ticks",
-    "graphics": "WebGPU primary / WebGL2 fallback; isometric orthographic",
-    "trade": "Market + Tablet Wall + River Barges + mail/escrow/gifts"
+    "graphics": "WebGPU primary / WebGL2 fallback; isometric orthographic; procedural building kit + atmosphere",
+    "trade": "Market + Tablet Wall + River Barges + trust accept (no Wall escrow)"
   },
   "percentages": {
-    "code": 92,
-    "art": 18,
+    "code": 95,
+    "art": 72,
     "audio": 40,
     "design": 100
   },
-  "notes": "Prompt 01.5 complete 2026-08-02. Trust trade, PWA/WS, tutorial, Circles, QoL. Prompt 02 owns visual tier 3 / judge."
+  "notes": "Prompt 02 complete 2026-08-02. Judge OVERALL PASS round 2. Ship with NODE_ENV=production to keep debug cheats closed. Fence: rates/plots/trust trade unchanged."
 }

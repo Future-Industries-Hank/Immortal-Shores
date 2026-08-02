@@ -168,6 +168,13 @@ button.small {
   background: #1a1410;
 }
 
+/* display:grid would otherwise win over the [hidden] UA rule */
+#game[hidden],
+#auth[hidden],
+.auth-panel[hidden] {
+  display: none !important;
+}
+
 #hud-top {
   position: relative;
   z-index: 6;
@@ -233,7 +240,8 @@ button.small {
   color: #f5f0e6;
 }
 
-#quality {
+#quality,
+#tod {
   width: auto;
   margin-top: 0;
   padding: 0 0.4rem;
@@ -724,20 +732,60 @@ button.build-choice strong {
   gap: 0.35rem;
 }
 
+.world-river-map {
+  width: 100%;
+  height: auto;
+  display: block;
+  margin: 0.35rem 0 0.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--sand-deep);
+  background: var(--sand-light);
+}
+
+.pad-legend {
+  font-size: 0.78rem;
+}
+
+.leg-shop {
+  color: #8a6a3a;
+  font-weight: 600;
+}
+.leg-special {
+  color: var(--seal-accent);
+  font-weight: 600;
+}
+.leg-train {
+  color: #4a5a6a;
+  font-weight: 600;
+}
+
 .map-site {
   text-align: left;
   width: 100%;
   background: #fffdf6;
   color: var(--ink-ui);
   border: 1px solid var(--sand-deep);
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.map-site:hover {
+  border-color: var(--river-deep);
+  box-shadow: 0 2px 8px rgba(30, 77, 107, 0.12);
 }
 
 .map-site.city {
   border-color: var(--gold-soft);
+  background: linear-gradient(135deg, #fffdf6 0%, #f8efd4 100%);
 }
 
 .map-site.monument {
   border-color: var(--seal-accent);
+}
+
+.map-site.founding {
+  border-style: dashed;
 }
 
 @media (max-width: 720px) {
