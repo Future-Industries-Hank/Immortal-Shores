@@ -1,160 +1,139 @@
-# PROMPT 02 — Immortal Shores: Visual & Production Overhaul
+# PROMPT 02 — Immortal Shores: Visual & Production Gauntlet
 
-### Future Industries · Final visual goal · Run only after Prompt 01 is complete
+### Future Industries · Final visual goal  
+### Run only after Prompt 01 **and** Prompt 01.5 are complete
 
-> **Phase:** 2 of 2  
-> **Prerequisite:** `PROMPT-01-COMPLETE.md` exists and the game **plays** end-to-end (`has_complete_loop=true`).  
-> **Fence:** Rewrite **rendering, assets, lighting, animation, atmosphere, UI chrome** — **do not** change GDD mechanics, rates, economy math, or authority rules.  
+> **Phase:** 2 of 3 (final)  
+> **Prerequisites:**  
+> - `PROMPT-01-COMPLETE.md` (playable core — baseline `9f0479d`+)  
+> - `PROMPT-01.5-COMPLETE.md` (2026 systems: trust trade, PWA, onboarding, QoL)  
+> **Fence:** Rewrite **rendering, assets, lighting, animation, atmosphere, UI chrome, map presentation** — **do not** change GDD rates, plot counts, economy math, or reintroduce escrow/P2W.  
 > **Do not ask questions.** Push until the impartial judge PASSes.
 
 ---
 
 ## Mission
 
-**Immortal Shores** already plays. Your job is to make it **mind-blowing** visually and in production values — isometric riverside empire quality that holds up next to high-end commercial strategy presentation — while staying inside the locked technical architecture and preserving **60 fps** and practical load times.
+Immortal Shores **plays** and has **2026 product systems**. Your job is to make it **mind-blowing** visually — high-end isometric river-empire presentation that holds up next to commercial strategy titles — while preserving **60 fps**, practical loads, and the soul of limited-plot mudbrick shores.
 
-Read:
+Read first:
 
 | Doc | Role |
 |---|---|
-| `PROMPT-01-COMPLETE.md` | What ships, how to run, known visual debt |
-| `docs/GDD.md` | Do not change mechanics |
-| `docs/STYLE-CONTRACT.md` | Thesis, palette, camera, UI language |
+| `PROMPT-01-COMPLETE.md` / `PROMPT-01.5-COMPLETE.md` | Run instructions, visual debt |
+| `docs/MODERN-2026.md` §1 Visual + §2 spatial composition | Presentation requirements |
+| `docs/STYLE-CONTRACT.md` | Thesis, palette, UI language |
 | `docs/BUILD-CONTEXT.md` | visualReference, antiReference, worstCase, transitions |
-| `docs/ARCHITECTURE.md` | Stack constraints |
-| `BUILD-CHECK.md` | Baseline must stay green |
+| `docs/GDD.md` | Mechanics frozen |
+| `docs/REV1-REVIEW.md` | Rev 1 visual debt list |
 
 ---
 
 ## Architecture constraints (do not break)
 
-- TypeScript + Vite + Babylon.js isometric orthographic  
+- TypeScript + Vite + Babylon.js **isometric orthographic**  
 - WebGPU primary / WebGL2 fallback; quality tiers  
-- Server remains economy authority; no Colyseus pivot  
-- Original first-party assets only (code, shaders, Blender/Scenario generation committed to repo)  
+- Server remains economy authority; trust trade model from 01.5  
+- Original first-party assets only (code, shaders, Blender/Scenario → committed)  
 - No marketplace dumps; no tracing commercial art into ship  
+- **No** extra plots, speed-ups, or pay-to-win cosmetics that grant power  
 
 ### Tools / MCPs
 
-Use aggressively when available:
-
 | Tool | Use |
 |---|---|
-| **playwright** | Frame sheets, multi-angle captures, UI sequences |
-| **blender** | Building/props/barge meshes, LODs, glTF export (**single agent owns Blender**) |
-| **scenario** | Style-locked singular assets / concept → rebuild systematically |
-| **context7** | Babylon material/post/perf docs |
-| **image_gen / image_edit** | Concept and UI icon sets → implement in-engine |
+| **playwright** | Frame sheets, multi-angle, UI, mobile layouts |
+| **blender** | Buildings, props, barges, LODs, glTF (**single agent owns Blender**) |
+| **scenario** | Style-locked singular concepts → implement systematically |
+| **context7** | Babylon materials / post / perf |
+| **image_gen / image_edit** | Icons, banners, UI set → in-engine |
 | Skills | `fi-visual-overhaul`, `fi-graphics`, `fi-judge`, `fi-audio`, Grok game-asset skills |
-
-Delegate parallel tracks (materials, UI, particles, world map art) except Blender single-owner.
 
 ---
 
-## Visual goals
+## Visual goals (Immortal Shores thesis)
 
-Maximize, within Immortal Shores thesis (eternal river, mudbrick, pale stone, reeds, deep blue water, soft gold prestige):
+Eternal river civilization: sun-baked mudbrick, pale stone, green reeds, deep blue water, soft gold prestige.
 
-- Settlement density and readable isometric silhouettes  
-- Lighting quality (one coherent sun; warm day; dusk; night emissives)  
-- Material fidelity (mudbrick vs stone vs water vs crops)  
-- Atmospheric effects (heat haze, dust, soft fog on river — subtle)  
-- Particle systems (workshop, water spray, barge wake) lit by the scene  
-- Animations of city life (Workers phase-staggered; workshops; barges)  
-- Day/night continuous  
-- UI/HUD production values (papyrus/ink system, icon set, trade cards, Tablet Wall)  
-- World map: beautiful river curve, province bands, monument/ancestral markers  
+Maximize:
 
-Prefer intentional, high-quality assets and generation over crude procedural leftovers. Procedural is fine when it **reads as designed**.
+1. **Spatial readability** — river left; fields by water; GH+Market center; 5 shops; 4 special with Harbor pier; 3 training outer; generous spacing (MODERN-2026 §2).  
+2. **Empty plot clarity** — color + icon by Shop / Special / Training; instant limited-slot literacy.  
+3. **High-contrast isometric kit** — silhouettes readable at a glance; contact shadows.  
+4. **Materials** — mudbrick vs stone vs crops vs water distinguishable in grayscale.  
+5. **Lighting** — one coherent sun; warm day; dusk; night emissives on GH/workshops.  
+6. **Life** — phase-staggered Workers; workshop loops; barge motion and river foam.  
+7. **Atmosphere** — subtle heat haze / dust / soft river fog (not muddy).  
+8. **Day/night** continuous.  
+9. **UI chrome** — papyrus/ink production values; trade cards; Tablet Wall; Harbor load UI; production overlay legibility.  
+10. **World map** — beautiful river curve, province bands, monument/ancestral markers.  
+11. **Accessibility presentation** — dark mode + color-blind-safe resource/plot cues (from 01.5 hooks, polish visuals here).  
+12. **Monument / Legacy feedback** — active bonus readouts feel premium.
 
-Preserve:
-
-- Smooth **60 fps** in `worstCase` (BUILD-CONTEXT)  
-- Practical load times; progressive streaming  
-- Dual input; mobile thermal respect via quality tiers  
+Preserve: **60 fps** in worstCase; progressive load; dual input; quality tiers under thermal pressure.
 
 ---
 
 ## Capture & artifact hunt
 
-Systematically capture **sheets of frames** across:
+Frame sheets across:
 
-- Settlement gameplay (low / eye / high isometric)  
-- Camera pan/zoom  
+- Settlement low / mid / high iso  
+- Pan/zoom  
 - Day → dusk → night  
-- Building placement / upgrade complete  
+- Empty pad hover + place building  
 - Worker assign feedback  
-- Mail / gift / escrow / Market / Tablet Wall  
-- Barge depart/arrive  
-- World map and province view  
-- Mobile layout  
+- Production overlay on/off  
+- Market / Tablet Wall / barge ETA UI  
+- Tutorial key beats (if still visible)  
+- World map + province  
+- Mobile portrait panels  
+- Dark mode + color-blind palette check  
 
-**Eliminate by name:**
-
-| Artifact | Fix class |
-|---|---|
-| Seams | padding, snap, welding |
-| Z-fighting / sort flicker | depth bias, stable sort keys |
-| Banding | dither, noise in gradients |
-| Popping | LOD hysteresis, cross-fades |
-| Aliasing | TAA/FXAA tiers, geo LODs, shadows |
-| Lighting errors | one sun agreement, color spaces, IBL |
-| Texture issues | mips, anisotropy, sRGB vs linear |
-| Shimmer | no unseeded per-frame draw RNG |
-| Effect FPS drops | pools, caps, quality culls |
+**Eliminate by name:** seams, z-fighting, banding, popping, aliasing, lighting errors, texture issues, shimmer, effect FPS drops (see classic FI artifact table).
 
 ---
 
 ## Goal verification — impartial judge (non-negotiable)
 
-Create an **independent judge subagent**. The builder must not grade their own work.
+Create an **independent judge subagent**. Builder does not grade own work.
 
 ### Mandate
 
-1. Use FI **`JUDGE-RUBRIC.md` categories** (Ground · Structures · Lighting · Depth · Materials · Particles/atmosphere · Animation · Transitions · UI/HUD · Cohesion · Performance) adapted to **isometric city-empire** presentation — binary **PASS/FAIL**.  
-2. Compare **screenshots and frame captures** of Immortal Shores against high-end commercial references appropriate to this genre (**Anno 1800 / 2205**, high-end isometric historical city/empire builders, polished browser strategy presentation — not free-roam Skylines as the primary fantasy).  
-3. Detailed, **located** criticism (which shot, where in frame, fix class).  
-4. Verdict table:
-
-```
-CATEGORY            VERDICT   CRITICISM
-1 Ground and tiles  FAIL      ...
-...
-OVERALL: BLOCKED — N categories failing.
-```
-
-or `OVERALL: PASS` only when **every** category passes.
+1. FI **`JUDGE-RUBRIC.md` categories** adapted to **isometric city-empire** — binary PASS/FAIL.  
+2. Side-by-side against **Anno 1800/2205**, high-end isometric historical city/empire, polished browser strategy — **not** free-roam Skylines as primary fantasy.  
+3. Located criticism (shot, frame region, fix class).  
+4. Verdict table form; `OVERALL: PASS` only if every category passes.
 
 ### Integrity
 
-- You may **not** complete this prompt until the judge states comparable visual/production quality (`OVERALL: PASS`).  
-- **Forbidden** to soften, renegotiate, or edit judge criteria.  
-- Factual rebuttal with new evidence only.  
-- **5 blocking rounds** (Production tier). Exhausted rounds → honest FAIL + structural cause in `ai_manifest.json` — never manufacture PASS.
+- Complete only on judge **OVERALL: PASS**.  
+- Forbidden to soften criteria.  
+- **5 blocking rounds** (Production tier). Exhausted → honest FAIL in `ai_manifest.json`.  
 
-### Evidence pack
+### Evidence
 
-`tools/judge/evidence/`: multi-angle settlements, day/dusk/night, placement transitions, trade/mail UI, chat cards, world map, mobile, worstCase density, performance note (fps / frame time).
+`tools/judge/evidence/` — multi-angle, TOD cycle, placement, trade/mail UI, map, mobile, worstCase, fps note.
 
 ---
 
 ## Protocol
 
-1. Confirm Prompt 01 complete; re-run smoke (game still plays).  
-2. Inventory draw paths and assets; plan overhaul without touching sim math.  
-3. Parallel visual tracks; continuous Playwright capture.  
-4. After each major pass: re-check 60 fps + complete loop still works.  
-5. Run impartial judge; fix FAILs; repeat within round budget.  
-6. On PASS: set `ai_manifest.json` → `visual_tier_achieved: 3`, write `PROMPT-02-COMPLETE.md`, update `REVIEW-DASHBOARD.html`.
+1. Confirm 01 + 01.5 complete; smoke loop still plays; trust trade still works.  
+2. Inventory draw paths; overhaul plan without touching sim math.  
+3. Parallel tracks (mesh, materials, UI, map, VFX); Blender single-owner.  
+4. After each major pass: 60 fps + complete loop + plot limits intact.  
+5. Judge → fix → re-judge within round budget.  
+6. On PASS: `visual_tier_achieved: 3`, `PROMPT-02-COMPLETE.md`, dashboard update.
 
 ---
 
 ## Done criteria
 
 - Judge **OVERALL: PASS**  
-- Mechanics unchanged vs GDD (spot-check rates, trade, ticks)  
-- 60 fps worstCase measured and recorded  
+- GDD rates + 5/4/3 plots + trust trade unchanged  
+- 60 fps worstCase measured  
 - Evidence pack on disk  
-- `PROMPT-02-COMPLETE.md` with run instructions and before/after notes  
+- `PROMPT-02-COMPLETE.md` with run notes and before/after  
 
-You are capable of reaching this bar. Push hard. Do not stop until the judge approves.
+Push hard. Do not stop until the judge approves.
