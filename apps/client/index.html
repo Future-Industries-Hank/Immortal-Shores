@@ -25,37 +25,52 @@
       </div>
 
       <div id="game" hidden>
-        <!-- TOP BAR: resources + tools -->
+        <!-- Thin top chrome -->
         <header id="hud-top">
           <div id="resources"></div>
           <div id="seals"></div>
           <div class="row gap hud-actions">
-            <select id="quality">
+            <select id="quality" title="Quality">
               <option value="high">High</option>
               <option value="med" selected>Med</option>
               <option value="low">Low</option>
             </select>
             <button id="btn-map" type="button" title="World Map">Map</button>
             <button id="btn-postcard" type="button" title="Postcard">✉</button>
-            <button id="btn-tray-toggle" type="button" class="secondary" title="Expand or collapse tray">
-              Tray
-            </button>
           </div>
         </header>
 
-        <!-- WORLD fills middle -->
+        <!-- Full-bleed world -->
         <div id="viewport">
           <canvas id="view"></canvas>
           <div id="prod-overlay" class="prod-overlay" hidden></div>
           <div id="ration-warn" class="ration-warn" hidden></div>
-          <p id="hint" class="hint">Colored pads = build sites · click buildings · trade for other luxuries</p>
+          <p id="hint" class="hint">Click pads to build · buildings for workers · menus open popups</p>
           <div id="toast" hidden></div>
+
+          <!-- Floating menu popup (Shore / Harbor / …) -->
+          <div id="menu-popup" class="menu-popup" hidden>
+            <div class="menu-popup-head">
+              <strong id="menu-popup-title">Shore</strong>
+              <button type="button" class="menu-popup-close" id="menu-popup-close" aria-label="Close">×</button>
+            </div>
+            <div id="side" class="menu-popup-body">
+              <div id="panel-settlement" class="side-panel"></div>
+              <div id="panel-harbor" class="side-panel" hidden></div>
+              <div id="panel-tablets" class="side-panel" hidden></div>
+              <div id="panel-allies" class="side-panel" hidden></div>
+              <div id="panel-wall" class="side-panel" hidden></div>
+              <div id="panel-build" class="side-panel" hidden></div>
+              <div id="panel-military" class="side-panel" hidden></div>
+              <div id="panel-map" class="side-panel" hidden></div>
+            </div>
+          </div>
         </div>
 
-        <!-- BOTTOM BAR: tabs + tray content -->
+        <!-- Thin bottom chrome — tabs only -->
         <footer id="hub">
-          <nav id="nav" aria-label="Settlement hub">
-            <button data-panel="settlement" class="active" type="button">Shore</button>
+          <nav id="nav" aria-label="Menus">
+            <button data-panel="settlement" type="button">Shore</button>
             <button data-panel="harbor" type="button">Harbor</button>
             <button data-panel="tablets" type="button">Tablets</button>
             <button data-panel="allies" type="button">Allies</button>
@@ -63,16 +78,6 @@
             <button data-panel="build" type="button">Build</button>
             <button data-panel="military" type="button">Military</button>
           </nav>
-          <div id="side">
-            <div id="panel-settlement" class="side-panel"></div>
-            <div id="panel-harbor" class="side-panel" hidden></div>
-            <div id="panel-tablets" class="side-panel" hidden></div>
-            <div id="panel-allies" class="side-panel" hidden></div>
-            <div id="panel-wall" class="side-panel" hidden></div>
-            <div id="panel-build" class="side-panel" hidden></div>
-            <div id="panel-military" class="side-panel" hidden></div>
-            <div id="panel-map" class="side-panel" hidden></div>
-          </div>
         </footer>
 
         <div id="building-inspect" class="inspect-panel" hidden></div>

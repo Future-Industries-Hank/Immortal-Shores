@@ -4,6 +4,7 @@ import {
   initUi,
   renderSnapshot,
   selectBuilding,
+  selectConstruction,
   selectPad,
 } from "./ui.js";
 import { applyAppearance, initModern, renderModernHud } from "./modern.js";
@@ -34,7 +35,7 @@ function applySnapshot(s: PublicSnapshot) {
 }
 
 function layoutCanvas() {
-  // Babylon needs a resize when the docked hub opens/closes or the stage reflows
+  // Babylon needs a resize when the viewport reflows (bars, orientation)
   window.dispatchEvent(new Event("resize"));
 }
 
@@ -46,22 +47,6 @@ async function enterGame() {
   const q = document.getElementById("quality") as HTMLSelectElement;
   view.setQuality(q.value as Quality);
   q.addEventListener("change", () => view?.setQuality(q.value as Quality));
-
-  // Bottom tray: collapse content, keep tab bar (full-width world, no side chrome)
-  const trayBtn = document.getElementById("btn-tray-toggle");
-  const collapsed = localStorage.getItem("tray_collapsed") === "1";
-  if (collapsed) gameEl.classList.add("tray-collapsed");
-  trayBtn?.addEventListener("click", () => {
-    gameEl.classList.toggle("tray-collapsed");
-    localStorage.setItem(
-      "tray_collapsed",
-      gameEl.classList.contains("tray-collapsed") ? "1" : "0"
-    );
-    requestAnimationFrame(() => {
-      layoutCanvas();
-      setTimeout(layoutCanvas, 220);
-    });
-  });
 
   // Keep canvas sized when top/bottom bars reflow
   const viewport = document.getElementById("viewport");
@@ -75,11 +60,15 @@ async function enterGame() {
     if (ev.type === "building") {
       selectBuilding(ev.buildingId, { fromScene: true });
       sfx.ok();
+    } else if (ev.type === "construction") {
+      selectConstruction(ev.plotId, { fromScene: true });
+      sfx.ok();
     } else if (ev.type === "pad") {
       selectPad(ev.plotId, { fromScene: true });
       sfx.ok();
     } else {
       selectBuilding(null, { fromScene: true });
+      selectConstruction(null, { fromScene: true });
     }
   });
 
@@ -99,6 +88,7 @@ async function enterGame() {
     },
     onHighlightBuilding: (id) => view?.highlightBuilding(id),
     onHighlightPad: (plotId) => view?.highlightPad(plotId),
+    onHighlightConstruction: (plotId) => view?.highlightConstruction(plotId),
   });
 
   initModern({ onSnapshot: applySnapshot, onToast: toast });

@@ -41,6 +41,8 @@ export type Quality = "low" | "med" | "high";
 export type SelectEvent =
   | { type: "building"; buildingId: string }
   | { type: "pad"; plotId: string }
+  /** Scaffold / pad under active construction job */
+  | { type: "construction"; plotId: string }
   | { type: "none" };
 
 const KIND_COLOR: Record<string, string> = {
@@ -86,6 +88,8 @@ export class SettlementView {
   private quality: Quality = "med";
   private selectedId: string | null = null;
   private selectedPlotId: string | null = null;
+  /** Plot currently under construction (scaffold + pad pick targets). */
+  private constructionPlotId: string | null = null;
   private selectRing: Mesh | null = null;
   private onSelect: ((ev: SelectEvent) => void) | null = null;
   private pointerDown: { x: number; y: number; t: number } | null = null;
@@ -175,6 +179,15 @@ export class SettlementView {
     }
   }
 
+  selectConstruction(plotId: string) {
+    this.selectedId = null;
+    this.selectedPlotId = plotId;
+    this.updateSelectRing();
+    if (!this.suppressNotify) {
+      this.onSelect?.({ type: "construction", plotId });
+    }
+  }
+
   /** Sync ring without clearing UI selection state. */
   highlightBuilding(buildingId: string | null) {
     this.suppressNotify = true;
@@ -185,6 +198,17 @@ export class SettlementView {
   highlightPad(plotId: string | null) {
     this.suppressNotify = true;
     if (plotId) this.selectPad(plotId);
+    else {
+      this.selectedPlotId = null;
+      this.selectedId = null;
+      this.updateSelectRing();
+    }
+    this.suppressNotify = false;
+  }
+
+  highlightConstruction(plotId: string | null) {
+    this.suppressNotify = true;
+    if (plotId) this.selectConstruction(plotId);
     else {
       this.selectedPlotId = null;
       this.selectedId = null;
@@ -263,15 +287,27 @@ export class SettlementView {
           this.scene.pointerY,
           (mesh) => {
             if (!mesh.isEnabled() || !mesh.isPickable) return false;
-            return !!(mesh.metadata?.buildingId || mesh.metadata?.plotId);
+            return !!(
+              mesh.metadata?.buildingId ||
+              mesh.metadata?.plotId ||
+              mesh.metadata?.construction
+            );
           }
         );
-        if (pick?.hit && pick.pickedMesh?.metadata?.buildingId) {
+        if (pick?.hit && pick.pickedMesh?.metadata?.construction) {
+          const plotId = pick.pickedMesh.metadata.plotId as string;
+          this.selectConstruction(plotId);
+        } else if (pick?.hit && pick.pickedMesh?.metadata?.buildingId) {
           this.selectBuilding(pick.pickedMesh.metadata.buildingId as string);
         } else if (pick?.hit && pick.pickedMesh?.metadata?.plotId) {
           const plotId = pick.pickedMesh.metadata.plotId as string;
-          if (this.occupied.has(plotId)) return;
-          this.selectPad(plotId);
+          if (this.constructionPlotId === plotId) {
+            this.selectConstruction(plotId);
+          } else if (this.occupied.has(plotId)) {
+            return;
+          } else {
+            this.selectPad(plotId);
+          }
         } else {
           this.clearSelection();
         }
@@ -284,8 +320,12 @@ export class SettlementView {
         this.scene.pointerY,
         (mesh) => {
           if (mesh.metadata?.buildingId) return true;
-          if (mesh.metadata?.plotId && !this.occupied.has(mesh.metadata.plotId))
-            return true;
+          if (mesh.metadata?.construction) return true;
+          if (mesh.metadata?.plotId) {
+            const pid = mesh.metadata.plotId as string;
+            if (!this.occupied.has(pid) || this.constructionPlotId === pid)
+              return true;
+          }
           return false;
         }
       );
@@ -470,21 +510,48 @@ export class SettlementView {
     return this.worldPos(def);
   }
 
+  private resolveConstructionPlot(settlement: SettlementState): string | null {
+    const job = settlement.construction;
+    if (!job) return null;
+    if (job.plotId) return job.plotId;
+    if (job.buildingId) {
+      return (
+        settlement.buildings.find((x) => x.id === job.buildingId)?.plotId ?? null
+      );
+    }
+    return null;
+  }
+
   private syncPads(settlement: SettlementState) {
     this.occupied = new Set(
-      settlement.buildings.map((b) => b.plotId).filter(Boolean)
+      settlement.buildings.map((b) => b.plotId).filter(Boolean) as string[]
     );
-    if (settlement.construction?.plotId) {
-      this.occupied.add(settlement.construction.plotId);
+    this.constructionPlotId = this.resolveConstructionPlot(settlement);
+    if (this.constructionPlotId) {
+      this.occupied.add(this.constructionPlotId);
     }
     for (const [id, pad] of this.padMeshes) {
       const taken = this.occupied.has(id);
+      const underConstruction = this.constructionPlotId === id;
       const def = getPlot(id)!;
-      pad.isPickable = !taken;
-      pad.visibility = taken ? 0.22 : 1;
+      // Construction sites stay pickable so players can inspect the job
+      pad.isPickable = !taken || underConstruction;
+      pad.visibility = taken && !underConstruction ? 0.22 : underConstruction ? 0.55 : 1;
+      pad.metadata = {
+        plotId: def.id,
+        category: def.category,
+        label: def.label,
+        ...(underConstruction ? { construction: true } : {}),
+      };
       const mat = this.padMats.get(id);
-      if (mat && !taken) {
-        mat.emissiveColor = hexToColor3(def.tint).scale(0.12);
+      if (mat) {
+        if (underConstruction) {
+          mat.emissiveColor = hexToColor3(STYLE.goldSoft).scale(0.2);
+        } else if (!taken) {
+          mat.emissiveColor = hexToColor3(def.tint).scale(0.12);
+        } else {
+          mat.emissiveColor = Color3.Black();
+        }
       }
     }
     this.syncScaffold(settlement);
@@ -493,15 +560,9 @@ export class SettlementView {
   private syncScaffold(settlement: SettlementState) {
     this.scaffoldNode?.dispose();
     this.scaffoldNode = null;
-    const job = settlement.construction;
-    if (!job?.plotId) {
-      if (job?.buildingId) {
-        const b = settlement.buildings.find((x) => x.id === job.buildingId);
-        if (b?.plotId) this.scaffoldNode = this.makeScaffold(b.plotId);
-      }
-      return;
-    }
-    this.scaffoldNode = this.makeScaffold(job.plotId);
+    const plotId = this.constructionPlotId ?? this.resolveConstructionPlot(settlement);
+    if (!plotId) return;
+    this.scaffoldNode = this.makeScaffold(plotId);
   }
 
   private makeScaffold(plotId: string): TransformNode {
@@ -509,6 +570,8 @@ export class SettlementView {
     root.parent = this.root;
     const w = this.plotWorldArch(plotId);
     root.position.set(w.x, 0, w.z);
+
+    // Visible wireframe frame
     const frame = MeshBuilder.CreateBox(
       "scaffold",
       { width: 1.5, height: 1.2, depth: 1.5 },
@@ -522,7 +585,21 @@ export class SettlementView {
     mat.specularColor = Color3.Black();
     frame.material = mat;
     frame.parent = root;
-    frame.isPickable = false;
+    frame.isPickable = true;
+    frame.metadata = { construction: true, plotId };
+
+    // Larger invisible hit volume so the site is easy to click
+    const hit = MeshBuilder.CreateBox(
+      "scaffoldHit",
+      { width: 2.4, height: 2.0, depth: 2.4 },
+      this.scene
+    );
+    hit.position.y = 1.0;
+    hit.visibility = 0;
+    hit.isPickable = true;
+    hit.metadata = { construction: true, plotId };
+    hit.parent = root;
+
     return root;
   }
 

@@ -44,33 +44,79 @@ export type UiHandlers = {
   onPostcard: () => void;
   onHighlightBuilding?: (buildingId: string | null) => void;
   onHighlightPad?: (plotId: string | null) => void;
+  onHighlightConstruction?: (plotId: string | null) => void;
 };
 
 let state: PublicSnapshot | null = null;
 let handlers: UiHandlers;
 let selectedBuildingId: string | null = null;
 let selectedPlotId: string | null = null;
+/** True when inspecting an in-progress construction job (scaffold). */
+let selectedConstruction = false;
+/** Currently open menu popup panel id, or null when closed. */
+let activePanel: string | null = null;
+
+const PANEL_TITLES: Record<string, string> = {
+  settlement: "Shore",
+  harbor: "Harbor",
+  tablets: "Tablets",
+  allies: "Allies",
+  wall: "Wall",
+  build: "Build",
+  military: "Military",
+  map: "Map",
+};
 
 export function initUi(h: UiHandlers) {
   handlers = h;
   document.querySelectorAll<HTMLButtonElement>("#nav button").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const panel = btn.dataset.panel!;
-      document.querySelectorAll("#nav button").forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      showPanel(panel === "settlement" ? "settlement" : panel);
-      if (panel === "map" || btn.id === "btn-map") showPanel("map");
+      const panel = btn.dataset.panel;
+      if (panel) showPanel(panel);
     });
   });
   document.getElementById("btn-map")?.addEventListener("click", () => {
     showPanel("map");
+  });
+  document.getElementById("menu-popup-close")?.addEventListener("click", () => {
+    closeMenuPopup();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    const popup = document.getElementById("menu-popup");
+    if (popup && !popup.hidden) {
+      closeMenuPopup();
+      e.preventDefault();
+    }
   });
   document.getElementById("btn-postcard")?.addEventListener("click", () => {
     handlers.onPostcard();
   });
 }
 
+/** Close floating menu popup and clear tab active state. */
+export function closeMenuPopup() {
+  activePanel = null;
+  const popup = document.getElementById("menu-popup");
+  if (popup) popup.hidden = true;
+  document.querySelectorAll("#nav button").forEach((b) => b.classList.remove("active"));
+  document.getElementById("btn-map")?.classList.remove("active");
+}
+
+/**
+ * Open a menu as a floating popup over the world.
+ * Re-clicking the same tab (or Map) while open toggles it closed.
+ */
 export function showPanel(name: string) {
+  const popup = document.getElementById("menu-popup");
+  if (!popup) return;
+
+  if (activePanel === name && !popup.hidden) {
+    closeMenuPopup();
+    return;
+  }
+
+  activePanel = name;
   document.querySelectorAll(".side-panel").forEach((el) => {
     (el as HTMLElement).hidden = el.id !== `panel-${name}`;
   });
@@ -78,10 +124,20 @@ export function showPanel(name: string) {
     const btn = b as HTMLButtonElement;
     btn.classList.toggle("active", btn.dataset.panel === name);
   });
+  document.getElementById("btn-map")?.classList.toggle("active", name === "map");
+
+  const title = document.getElementById("menu-popup-title");
+  if (title) title.textContent = PANEL_TITLES[name] ?? name;
+
+  popup.hidden = false;
 }
 
 export function renderSnapshot(s: PublicSnapshot) {
   state = s;
+  // Construction finished while popup open — drop selection
+  if (selectedConstruction && !s.settlements[0]?.construction) {
+    selectedConstruction = false;
+  }
   renderHud(s);
   renderSettlement(s);
   renderHarbor(s);
@@ -91,7 +147,10 @@ export function renderSnapshot(s: PublicSnapshot) {
   renderBuild(s);
   renderMilitary(s);
   renderMap(s);
-  renderInspect();
+  // Refresh open inspect (construction progress, building state)
+  if (selectedConstruction || selectedBuildingId || selectedPlotId) {
+    renderInspect();
+  }
 }
 
 export type SelectOpts = { fromScene?: boolean };
@@ -100,8 +159,12 @@ export type SelectOpts = { fromScene?: boolean };
 export function selectBuilding(buildingId: string | null, opts: SelectOpts = {}) {
   selectedBuildingId = buildingId;
   selectedPlotId = null;
-  if (!opts.fromScene) handlers.onHighlightBuilding?.(buildingId);
-  if (!opts.fromScene) handlers.onHighlightPad?.(null);
+  selectedConstruction = false;
+  if (!opts.fromScene) {
+    handlers.onHighlightBuilding?.(buildingId);
+    handlers.onHighlightPad?.(null);
+    handlers.onHighlightConstruction?.(null);
+  }
   renderInspect();
   const hint = document.getElementById("hint");
   if (hint) hint.classList.toggle("hidden", !!buildingId || !!selectedPlotId);
@@ -111,11 +174,30 @@ export function selectBuilding(buildingId: string | null, opts: SelectOpts = {})
 export function selectPad(plotId: string, opts: SelectOpts = {}) {
   selectedBuildingId = null;
   selectedPlotId = plotId;
-  if (!opts.fromScene) handlers.onHighlightPad?.(plotId);
-  if (!opts.fromScene) handlers.onHighlightBuilding?.(null);
+  selectedConstruction = false;
+  if (!opts.fromScene) {
+    handlers.onHighlightPad?.(plotId);
+    handlers.onHighlightBuilding?.(null);
+    handlers.onHighlightConstruction?.(null);
+  }
   renderPadBuildMenu();
   const hint = document.getElementById("hint");
   if (hint) hint.classList.add("hidden");
+}
+
+/** Scaffold / construction site — show what's being built. */
+export function selectConstruction(plotId: string | null, opts: SelectOpts = {}) {
+  selectedBuildingId = null;
+  selectedPlotId = null;
+  selectedConstruction = !!plotId;
+  if (!opts.fromScene) {
+    handlers.onHighlightConstruction?.(plotId);
+    handlers.onHighlightBuilding?.(null);
+    handlers.onHighlightPad?.(null);
+  }
+  renderInspect();
+  const hint = document.getElementById("hint");
+  if (hint) hint.classList.toggle("hidden", selectedConstruction);
 }
 
 export function getSelectedBuildingId() {
@@ -133,6 +215,10 @@ function prettyKind(kind: BuildingKind | string) {
 function renderInspect() {
   const el = document.getElementById("building-inspect");
   if (!el || !state) return;
+  if (selectedConstruction) {
+    renderConstructionInspect();
+    return;
+  }
   if (selectedPlotId) {
     renderPadBuildMenu();
     return;
@@ -152,6 +238,90 @@ function renderInspect() {
     onToast: handlers.onToast,
     onClose: () => selectBuilding(null),
     onOpenPanel: (panel) => showPanel(panel),
+  });
+}
+
+function renderConstructionInspect() {
+  const el = document.getElementById("building-inspect");
+  if (!el || !state) return;
+  const st = state.settlements[0];
+  const job = st?.construction;
+  if (!st || !job) {
+    selectedConstruction = false;
+    hidePopup(el);
+    return;
+  }
+
+  const title =
+    job.luxury && job.kind === "luxury_material"
+      ? `${prettyKind(job.kind)} (${RESOURCE_LABELS[job.luxury]})`
+      : prettyKind(job.kind);
+  const blurb =
+    job.kind in BUILDING_BLURB
+      ? BUILDING_BLURB[job.kind as BuildingKind]
+      : "Structure under construction.";
+  const isUpgrade = !!job.buildingId && job.targetLevel > 1;
+  const pct = Math.min(
+    100,
+    Math.floor((job.workerHoursDone / Math.max(0.01, job.workerHoursRequired)) * 100)
+  );
+  const plot = job.plotId ? getPlot(job.plotId) : null;
+  const previews = levelPreviews(
+    job.kind,
+    Math.max(1, job.targetLevel - (isUpgrade ? 1 : 0)),
+    job.luxury ?? st.uniqueLuxury,
+    4
+  );
+  const levelTableHtml = `
+    <table class="lvl-table">
+      <thead><tr><th>Lvl</th><th>Workers</th><th>Time</th><th>Outputs</th></tr></thead>
+      <tbody>
+        ${previews
+          .map(
+            (row) =>
+              `<tr class="${row.level === job.targetLevel ? "is-next" : ""}">
+                <td>L${row.level}</td>
+                <td>${row.workerCap || "—"}</td>
+                <td>${formatHours(row.buildHours)}</td>
+                <td>${row.outputs
+                  .slice(0, 2)
+                  .map((o) => o.text)
+                  .join(" · ") || "—"}</td>
+              </tr>`
+          )
+          .join("")}
+      </tbody>
+    </table>`;
+
+  renderGenericPopup(el, {
+    title: isUpgrade ? `Upgrading: ${title}` : `Building: ${title}`,
+    subtitle: `Under construction · L${job.targetLevel} · ${pct}%`,
+    what: blurb,
+    details: [
+      isUpgrade
+        ? `Upgrade to level ${job.targetLevel}`
+        : `New construction to level ${job.targetLevel}`,
+      `Progress: ${job.workerHoursDone.toFixed(1)} / ${job.workerHoursRequired.toFixed(1)} worker-hours (${pct}%)`,
+      plot ? `Site: ${plot.label}` : job.buildingId ? "Upgrading existing building" : "Site: pad",
+      job.trainingUnit
+        ? `Training unit: ${job.trainingUnit.replace(/_/g, " ")}`
+        : "",
+      `Cost paid: ${formatStacks(job.cost)}`,
+      "Cancel refunds about 25% of materials.",
+    ].filter(Boolean),
+    levelTableHtml,
+    primaryLabel: "Cancel construction (~25% refund)",
+    onPrimary: async () => {
+      try {
+        handlers.onSnapshot(await api.cancelConstruct(st.id));
+        sfx.ok();
+        selectConstruction(null);
+      } catch (e) {
+        sfx.warn();
+        handlers.onToast((e as Error).message);
+      }
+    },
+    onClose: () => selectConstruction(null),
   });
 }
 
