@@ -159,7 +159,7 @@ export function createBuildingKit(scene: Scene, b: BuildingState): BuildingMeshe
       const h = 2.2 + level * 0.12;
       const { mass } = baseMass(scene, root, b, h, 2.1, STYLE.stonePale);
       // Stepped upper tier
-      const upper = box(
+      box(
         scene,
         `gh-u-${b.id}`,
         1.55,
@@ -169,17 +169,38 @@ export function createBuildingKit(scene: Scene, b: BuildingState): BuildingMeshe
         mat(scene, `gh-um-${b.id}`, STYLE.stonePale, { specular: 0.2 }),
         h + 0.06
       );
-      const roof = box(
+      // Dark mudbrick roof — never gold flood
+      box(
         scene,
         `roof-${b.id}`,
         2.35,
         0.32,
         2.0,
         root,
-        mat(scene, `roofm-${b.id}`, STYLE.goldSoft, { emissive: 0.12, specular: 0.25 }),
+        mat(scene, `roofm-${b.id}`, "#5A4838", { specular: 0.08 }),
         h + 0.7
       );
-      emissives.push(roof);
+      // Cornice + buttresses + wall band (structure densify)
+      box(
+        scene,
+        `gh-cornice-${b.id}`,
+        2.45,
+        0.12,
+        2.1,
+        root,
+        mat(scene, `gh-cornm-${b.id}`, STYLE.stonePale, { specular: 0.22 }),
+        h + 0.45
+      );
+      box(
+        scene,
+        `gh-band-${b.id}`,
+        2.15,
+        0.18,
+        0.12,
+        root,
+        mat(scene, `gh-bandm-${b.id}`, STYLE.mudbrick),
+        h * 0.55
+      ).position.z = -0.95;
       // Columns
       const colMat = mat(scene, `col-${b.id}`, STYLE.stonePale, { specular: 0.22 });
       for (const [x, z] of [
@@ -187,29 +208,38 @@ export function createBuildingKit(scene: Scene, b: BuildingState): BuildingMeshe
         [0.85, -0.7],
         [-0.85, 0.7],
         [0.85, 0.7],
+        [-0.95, -1.0],
+        [0.95, -1.0],
       ] as const) {
-        const c = cyl(scene, `col-${b.id}-${x}`, 0.16, h * 0.55, root, colMat, 0.08, 8);
+        const c = cyl(scene, `col-${b.id}-${x}${z}`, 0.16, h * 0.55, root, colMat, 0.08, 8);
         c.position.x = x;
         c.position.z = z;
+      }
+      // Gold facade windows (day-readable material, night via scene windows)
+      const winMat = mat(scene, `gh-winm-${b.id}`, STYLE.goldSoft, { emissive: 0.15, specular: 0.2 });
+      for (let i = 0; i < 4; i++) {
+        const w = box(scene, `gh-win-${b.id}-${i}`, 0.28, 0.38, 0.08, root, winMat, 1.15);
+        w.position.set(-0.7 + i * 0.45, 0, -1.02);
+        emissives.push(w);
       }
       // Entry plinth
       box(
         scene,
         `plinth-${b.id}`,
-        1.0,
-        0.18,
-        0.55,
+        1.2,
+        0.22,
+        0.65,
         root,
         mat(scene, `pl-${b.id}`, STYLE.sandDeep),
-        0.06
-      ).position.z = -1.05;
+        0.08
+      ).position.z = -1.1;
       const hit = makeHit(scene, b.id, root, b, h + 1.2, 3.0);
       mass.metadata = hit.metadata;
       return { root, hit, emissives, anim };
     }
 
     case "market": {
-      // Open canopy on posts
+      // Open canopy on posts — cloth canopy not gold emissive flood
       const post = mat(scene, `mp-${b.id}`, STYLE.sandDeep);
       for (const [x, z] of [
         [-0.7, -0.55],
@@ -221,21 +251,25 @@ export function createBuildingKit(scene: Scene, b: BuildingState): BuildingMeshe
         p.position.x = x;
         p.position.z = z;
       }
-      const canopy = box(
+      box(
         scene,
         `canopy-${b.id}`,
-        2.0,
+        2.1,
         0.12,
-        1.6,
+        1.7,
         root,
-        mat(scene, `can-${b.id}`, STYLE.goldSoft, { emissive: 0.08 }),
+        mat(scene, `can-${b.id}`, "#C09050", { specular: 0.05 }),
         1.2
       );
-      emissives.push(canopy);
-      // Stalls
+      // Dense stall mass + rear wall
       const stall = mat(scene, `st-${b.id}`, STYLE.mudbrick);
-      box(scene, `stall1-${b.id}`, 0.7, 0.55, 0.45, root, stall, 0.05).position.x = -0.45;
-      box(scene, `stall2-${b.id}`, 0.7, 0.55, 0.45, root, stall, 0.05).position.x = 0.45;
+      box(scene, `stall1-${b.id}`, 0.85, 0.7, 0.55, root, stall, 0.05).position.set(-0.5, 0, 0.1);
+      box(scene, `stall2-${b.id}`, 0.85, 0.7, 0.55, root, stall, 0.05).position.set(0.5, 0, 0.1);
+      box(scene, `mkt-back-${b.id}`, 1.9, 0.9, 0.2, root, stall, 0.1).position.z = 0.7;
+      // Goods crates
+      const crate = mat(scene, `crate-${b.id}`, "#6B4A32");
+      box(scene, `crate1-${b.id}`, 0.35, 0.28, 0.3, root, crate, 0.08).position.set(-0.2, 0, -0.5);
+      box(scene, `crate2-${b.id}`, 0.3, 0.22, 0.28, root, crate, 0.08).position.set(0.35, 0, -0.45);
       const hit = makeHit(scene, b.id, root, b, 1.6, 2.5);
       return { root, hit, emissives, anim };
     }
@@ -629,6 +663,11 @@ export function animateBuildingKit(
   for (const kit of kits.values()) {
     for (const e of kit.emissives) {
       if (!e || e.isDisposed()) continue;
+      // Never flood roof planes — window/glow/kiln only (name gate)
+      const en = e.name.toLowerCase();
+      if (en.includes("roof") && !en.includes("gold") && !en.includes("glow")) {
+        continue;
+      }
       const m = e.material as StandardMaterial & {
         albedoColor?: Color3;
         emissiveColor?: Color3;
@@ -637,9 +676,9 @@ export function animateBuildingKit(
       // StandardMaterial uses diffuseColor; PBR/glTF often uses albedoColor
       const d = m.diffuseColor ?? m.albedoColor;
       if (!d || typeof d.scale !== "function") continue;
-      const boost = 0.2 + nightFactor * 0.85;
+      const boost = 0.15 + nightFactor * 0.75;
       try {
-        m.emissiveColor = d.scale(Math.min(1.0, boost));
+        m.emissiveColor = d.scale(Math.min(0.95, boost));
       } catch {
         /* material variant without emissive */
       }

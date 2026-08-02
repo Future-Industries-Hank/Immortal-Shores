@@ -28,15 +28,31 @@
 |---:|---:|---|
 | **4.8** | **2** | **FAIL** (6/6 rounds) — keep looping under 02.6 |
 
-## 02.6 Stack-1 loop (money-shot day mid-iso)
+## 02.6 Stack-1 loop (money-shot day mid-iso) — active
 
 | Round | Overall | Min | Notes |
 |---:|---:|---:|---|
 | R1 | 4.9 | 2 | Atmosphere hard fail |
 | R2 | 5.0 | 3 | Workers misread as silos |
-| R3 | (pending) | | Humanoid workers + foam + mist |
+| R3 | 5.3 | 3 | Life → 7 (humanoids) |
+| R4 | 5.4 | 3 | Cohesion → 6 |
+| R5 | 5.6 | 3 | Ground → 6; Lighting → 5 |
+| R6 | 5.8 | 4 | Atmosphere → 4; UI → 6 |
+| R7 | 5.9 | 5 | Atmosphere → 5 |
+| R8 | 6.0 | 5 | Structures → 7 (ghosts) |
+| R9 | 6.0 | 5 | Stagnation (GH densify not read) |
+| R10 | 6.1 | 5 | Night GH windows TRUE; far sand FALSE |
+| R11 | 6.4 | 5 | Dark river+silt, continuous mist, solid ghosts, Materials/Atm 6; Depth still 5 |
+| R12 | 6.7 | **6** | **Min floor cleared** (far stepped falloff); mean still short of 8 |
+| R13 | **7.0** | 6 | Structures 8 densify; Materials/UI 7; mean climb continues |
+| R14 | **7.4** | **7** | Reed mass, dual barge, mid haze, Life/Ground 8 |
+| R15 | **7.7** | **7** | Rake bars + wet specular + secondary densify |
+| R16 | **7.9** | **7** | Atm+UI 8; Depth only under 8 |
+| R17 | **8.0** | **8** | Mid-board cool sand + far carpet; **provisional PASS** — **REVIEW PAUSE** |
 
-Strategy shifts: tighter money-shot camera; humanoid agents; thick foam; bank mist; hide capture chrome.
+Strategy: Stack-1 climb R10→R17 (6.1→8.0).  
+**Paused for director review** — no new pixel edits until feedback.  
+`PROMPT-02.6-COMPLETE.md` deferred until you confirm.
 
 ## Tracks
 

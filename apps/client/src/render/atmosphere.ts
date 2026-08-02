@@ -79,64 +79,66 @@ export class Atmosphere {
 
   update(now = performance.now() * 0.001, river?: Mesh | null) {
     const n = this.phase01(now);
-    const dayColor = hexToColor3("#FFD9A0");
-    const duskColor = hexToColor3("#E08050");
-    const nightColor = hexToColor3("#2A3858");
+    const dayColor = hexToColor3("#FFE0A8");
+    const duskColor = hexToColor3("#E07040");
+    const nightColor = hexToColor3("#1A2840");
     const sunCol =
       n < 0.5
         ? Color3.Lerp(dayColor, duskColor, n * 2)
         : Color3.Lerp(duskColor, nightColor, (n - 0.5) * 2);
     this.sun.diffuse = sunCol;
-    // Strong key + raking angle for long contact shadows (day & dusk)
-    this.sun.intensity = 1.55 - n * 1.25;
-    // More horizontal sun = longer shadows on ground
-    const elev = n < 0.35 ? -0.55 : n < 0.7 ? -0.4 : -0.35;
-    this.sun.direction = new Vector3(-0.95, elev, 0.55);
+    // Hard key + very low rake = long black bars on open sand (day money-shot)
+    this.sun.intensity = 2.05 - n * 1.55;
+    const elev = n < 0.35 ? -0.28 : n < 0.7 ? -0.24 : -0.22;
+    this.sun.direction = new Vector3(-1.35, elev, 0.85);
+    this.sun.position = new Vector3(28, 14, -18);
 
-    this.hemi.intensity = 0.55 - n * 0.42;
+    // Low fill so rakes survive stills
+    this.hemi.intensity = 0.28 - n * 0.2;
     this.hemi.diffuse = Color3.Lerp(
-      hexToColor3("#E8F0F8"),
-      hexToColor3("#1A2840"),
+      hexToColor3("#D8E4EC"),
+      hexToColor3("#121C28"),
       n
     );
-    this.hemi.groundColor = hexToColor3(STYLE.sandDeep).scale(0.35 * (1 - n * 0.7));
+    this.hemi.groundColor = hexToColor3(STYLE.sandDeep).scale(0.28 * (1 - n * 0.75));
 
-    // Day sky leans warm-sand so ground edge never reads as pure black void
-    const clearDay = Color4.FromColor3(hexToColor3("#A8B8B0"), 1);
-    const clearDusk = Color4.FromColor3(hexToColor3("#C07050"), 1);
-    const clearNight = Color4.FromColor3(hexToColor3("#0A1018"), 1);
+    // Day sky cooler-haze so far sand falloff is readable against clear color
+    const clearDay = Color4.FromColor3(hexToColor3("#9AA8A0"), 1);
+    const clearDusk = Color4.FromColor3(hexToColor3("#B86848"), 1);
+    const clearNight = Color4.FromColor3(hexToColor3("#070C12"), 1);
     this.scene.clearColor =
       n < 0.5
         ? Color4.Lerp(clearDay, clearDusk, n * 2)
         : Color4.Lerp(clearDusk, clearNight, (n - 0.5) * 2);
 
-    // Distance falloff so far sand softens (depth + atmosphere in stills)
+    // Aggressive EXP2 fog — far sand MUST desaturate vs near at mid-iso
     this.scene.fogMode = Scene.FOGMODE_EXP2;
     if (n < 0.35) {
-      this.scene.fogDensity = 0.019;
-      this.scene.fogColor = hexToColor3("#C4B490");
+      this.scene.fogDensity = 0.056;
+      this.scene.fogColor = hexToColor3("#A09880");
     } else if (n < 0.7) {
-      this.scene.fogDensity = 0.024;
-      this.scene.fogColor = hexToColor3("#B88860");
+      this.scene.fogDensity = 0.06;
+      this.scene.fogColor = hexToColor3("#906848");
     } else {
-      this.scene.fogDensity = 0.028;
-      this.scene.fogColor = hexToColor3("#101820");
+      this.scene.fogDensity = 0.062;
+      this.scene.fogColor = hexToColor3("#0A1016");
     }
 
-    // Night local lamps (not just roof flood)
-    this.ghLight.intensity = n > 0.55 ? 1.8 * (n - 0.4) : 0;
-    this.marketLight.intensity = n > 0.55 ? 1.2 * (n - 0.4) : 0;
+    // Night local lamps (window/hearth falloff — not roof flood)
+    this.ghLight.intensity = n > 0.55 ? 2.2 * (n - 0.4) : 0;
+    this.marketLight.intensity = n > 0.55 ? 1.6 * (n - 0.4) : 0;
 
+    // PRESERVE dark depth water — never lerp toward candy riverLight
     if (river) {
       const rm = river.material as StandardMaterial | null;
       if (rm) {
-        const deep = hexToColor3("#0A2030");
-        const light = hexToColor3(STYLE.riverLight);
-        rm.diffuseColor = Color3.Lerp(light, deep, 0.55 + n * 0.25);
-        rm.specularColor = light.scale(0.55 + (1 - n) * 0.25);
-        rm.specularPower = 48;
-        rm.alpha = 0.92;
-        rm.emissiveColor = deep.scale(0.08 + Math.sin(now * 1.4) * 0.03);
+        const deep = hexToColor3("#061820");
+        const mid = hexToColor3("#0C2838");
+        rm.diffuseColor = Color3.Lerp(mid, deep, 0.55 + n * 0.35);
+        rm.specularColor = hexToColor3("#6AA8C0").scale(0.35 + (1 - n) * 0.2);
+        rm.specularPower = 72;
+        rm.alpha = 0.97;
+        rm.emissiveColor = deep.scale(0.12 + Math.sin(now * 1.1) * 0.02);
       }
     }
   }

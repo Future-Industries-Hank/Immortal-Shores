@@ -195,32 +195,42 @@ button.small {
   min-height: var(--bar-h);
   max-height: var(--bar-h);
   padding: 0 0.75rem;
-  background: linear-gradient(
-    180deg,
-    rgba(28, 22, 16, 0.82) 0%,
-    rgba(42, 34, 26, 0.78) 100%
-  );
-  border-bottom: 1px solid rgba(212, 168, 75, 0.45);
+  /* IXION-adjacent: dark bronze panel + papyrus ink edge */
+  background:
+    linear-gradient(180deg, rgba(48, 38, 26, 0.94) 0%, rgba(28, 22, 16, 0.92) 55%, rgba(22, 18, 14, 0.95) 100%),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 3px,
+      rgba(212, 168, 75, 0.03) 3px,
+      rgba(212, 168, 75, 0.03) 4px
+    );
+  border-bottom: 2px solid rgba(212, 168, 75, 0.55);
   box-shadow:
-    0 1px 0 rgba(212, 168, 75, 0.2),
-    0 8px 22px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0 rgba(255, 245, 220, 0.08);
+    0 1px 0 rgba(243, 230, 200, 0.12),
+    0 10px 28px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 245, 220, 0.12),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35);
   overflow: hidden;
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(14px);
   color: var(--papyrus);
+  letter-spacing: 0.02em;
 }
 
 #hud-top #resources,
 #hud-top #seals {
   color: #f3e6c8;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  font-variant-numeric: tabular-nums;
 }
 
 #hud-top .hud-actions button,
 #hud-top .hud-actions select {
-  background: rgba(243, 230, 200, 0.12);
+  background: linear-gradient(180deg, rgba(60, 48, 34, 0.95), rgba(36, 28, 20, 0.98));
   color: #f3e6c8;
-  border: 1px solid rgba(212, 168, 75, 0.4);
+  border: 1px solid rgba(212, 168, 75, 0.55);
+  box-shadow: inset 0 1px 0 rgba(255, 245, 220, 0.1), 0 1px 2px rgba(0, 0, 0, 0.35);
+  border-radius: 4px;
 }
 
 #resources {
@@ -241,6 +251,24 @@ button.small {
 
 #resources span {
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.18rem 0.45rem;
+  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(60, 48, 34, 0.75), rgba(28, 22, 16, 0.9));
+  border: 1px solid rgba(212, 168, 75, 0.4);
+  box-shadow: inset 0 1px 0 rgba(255, 245, 220, 0.08), 0 1px 2px rgba(0, 0, 0, 0.35);
+  font-size: 0.74rem;
+  letter-spacing: 0.01em;
+}
+
+#seals {
+  padding: 0.18rem 0.5rem;
+  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(70, 50, 24, 0.85), rgba(36, 26, 14, 0.95));
+  border: 1px solid rgba(212, 168, 75, 0.55);
+  box-shadow: inset 0 1px 0 rgba(255, 230, 160, 0.12);
 }
 
 #seals {
@@ -300,13 +328,19 @@ button.small {
   height: var(--bar-h);
   min-height: var(--bar-h);
   max-height: var(--bar-h);
-  background: linear-gradient(
-    0deg,
-    rgba(36, 28, 22, 0.92) 0%,
-    rgba(52, 42, 32, 0.88) 100%
-  );
-  border-top: 1px solid var(--rim-gold);
-  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.28);
+  background:
+    linear-gradient(0deg, rgba(22, 18, 14, 0.96) 0%, rgba(42, 34, 26, 0.94) 55%, rgba(48, 38, 28, 0.92) 100%),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 3px,
+      rgba(212, 168, 75, 0.03) 3px,
+      rgba(212, 168, 75, 0.03) 4px
+    );
+  border-top: 2px solid rgba(212, 168, 75, 0.55);
+  box-shadow:
+    0 -10px 28px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 245, 220, 0.1);
   z-index: 6;
   overflow: hidden;
 }

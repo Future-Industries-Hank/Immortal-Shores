@@ -146,13 +146,13 @@ export class SettlementView {
     hemi.groundColor = hexToColor3(STYLE.sandDeep);
     this.atmosphere = new Atmosphere(this.scene, this.sun, hemi);
 
-    // Soft contact shadows (Surviving Mars / Aven readability)
+    // Soft contact shadows — darker so raking sun sells long ground bars
     this.shadowGen = new ShadowGenerator(2048, this.sun);
     this.shadowGen.useBlurExponentialShadowMap = true;
-    this.shadowGen.blurKernel = 32;
-    this.shadowGen.darkness = 0.55;
-    this.shadowGen.bias = 0.0004;
-    this.shadowGen.normalBias = 0.015;
+    this.shadowGen.blurKernel = 28;
+    this.shadowGen.darkness = 0.82;
+    this.shadowGen.bias = 0.00035;
+    this.shadowGen.normalBias = 0.012;
     this.shadowGen.contactHardeningLightSizeUVRatio = 0.05;
 
     this.root = new TransformNode("settlement", this.scene);
@@ -451,21 +451,22 @@ export class SettlementView {
       const bb = parseInt(base.slice(4, 6), 16);
       const img = ctx.createImageData(size, size);
       for (let i = 0; i < size * size; i++) {
-        const n = (Math.random() - 0.5) * 36;
-        const n2 = ((i * 17) % 23) - 11;
+        const n = (Math.random() - 0.5) * 52;
+        const n2 = ((i * 17) % 29) - 14;
+        const n3 = ((i * 31) % 11) - 5;
         img.data[i * 4] = Math.max(0, Math.min(255, br + n + n2));
-        img.data[i * 4 + 1] = Math.max(0, Math.min(255, bg + n * 0.9 + n2 * 0.5));
-        img.data[i * 4 + 2] = Math.max(0, Math.min(255, bb + n * 0.7));
+        img.data[i * 4 + 1] = Math.max(0, Math.min(255, bg + n * 0.85 + n2 * 0.5 + n3));
+        img.data[i * 4 + 2] = Math.max(0, Math.min(255, bb + n * 0.55 + n3 * 0.4));
         img.data[i * 4 + 3] = 255;
       }
       ctx.putImageData(img, 0, 0);
-      // Soft mottles
-      for (let k = 0; k < 40; k++) {
+      // Soft mottles + dark silt flecks (materials craft)
+      for (let k = 0; k < 55; k++) {
         const x = Math.random() * size;
         const y = Math.random() * size;
-        const r = 8 + Math.random() * 22;
+        const r = 6 + Math.random() * 26;
         const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-        g.addColorStop(0, "rgba(160,120,70,0.18)");
+        g.addColorStop(0, k % 3 === 0 ? "rgba(90,70,40,0.22)" : "rgba(170,130,75,0.2)");
         g.addColorStop(1, "rgba(160,120,70,0)");
         ctx.fillStyle = g;
         ctx.beginPath();
@@ -473,8 +474,8 @@ export class SettlementView {
         ctx.fill();
       }
       tex.update(false);
-      tex.uScale = 6;
-      tex.vScale = 5;
+      tex.uScale = 8;
+      tex.vScale = 7;
       return tex;
     } catch {
       return null;
@@ -486,6 +487,7 @@ export class SettlementView {
     this.foamMeshes = [];
     this.dustRoot = null;
     this.bargeNode = null;
+    this.bargeNode2 = null;
     this.riverMesh = null;
     this.envRoot = new TransformNode("env", this.scene);
     this.envRoot.parent = this.root;
@@ -513,36 +515,139 @@ export class SettlementView {
     ground.isPickable = false;
     ground.receiveShadows = true;
 
-    // Far sand ring — darker/cooler for distance falloff (depth category)
-    const far = MeshBuilder.CreateGround(
-      "farSand",
-      { width: 70, height: 60, subdivisions: 8 },
+    // Mid-distance cooler strip (step falloff across settlement board)
+    const midSand = MeshBuilder.CreateGround(
+      "midSand",
+      { width: 55, height: 48, subdivisions: 4 },
       this.scene
     );
-    far.position.set(4, -0.02, 4);
+    midSand.position.set(6, -0.012, 4);
+    const midSandMat = new StandardMaterial("midSandMat", this.scene);
+    midSandMat.diffuseColor = hexToColor3("#908060");
+    midSandMat.emissiveColor = hexToColor3("#5A5040").scale(0.06);
+    midSandMat.specularColor = Color3.Black();
+    midSand.material = midSandMat;
+    midSand.parent = this.envRoot;
+    midSand.isPickable = false;
+    midSand.receiveShadows = true;
+
+    // Soft haze carpet over FAR THIRD of board (Depth — mid-iso soft far ground)
+    const farCarpetMat = new StandardMaterial("farCarpetMat", this.scene);
+    farCarpetMat.diffuseColor = hexToColor3("#8A8470");
+    farCarpetMat.emissiveColor = hexToColor3("#6A6858").scale(0.2);
+    farCarpetMat.alpha = 0.28;
+    farCarpetMat.disableLighting = true;
+    farCarpetMat.backFaceCulling = false;
+    const farCarpet = MeshBuilder.CreateGround(
+      "farCarpet",
+      { width: 36, height: 40 },
+      this.scene
+    );
+    farCarpet.position.set(10, 0.12, 6);
+    farCarpet.material = farCarpetMat;
+    farCarpet.parent = this.envRoot;
+    farCarpet.isPickable = false;
+
+    // Far sand — cooler/darker than near (first-glance distance)
+    const far = MeshBuilder.CreateGround(
+      "farSand",
+      { width: 100, height: 85, subdivisions: 4 },
+      this.scene
+    );
+    far.position.set(16, -0.05, 8);
     const farMat = new StandardMaterial("farSandMat", this.scene);
-    farMat.diffuseColor = hexToColor3("#B8A078");
-    farMat.emissiveColor = hexToColor3("#8A7858").scale(0.08);
+    farMat.diffuseColor = hexToColor3("#585448");
+    farMat.emissiveColor = hexToColor3("#2E2C28").scale(0.12);
     farMat.specularColor = Color3.Black();
     far.material = farMat;
     far.parent = this.envRoot;
     far.isPickable = false;
     far.receiveShadows = true;
 
-    const wet = MeshBuilder.CreateGround(
-      "wetBank",
-      { width: 3.2, height: 28, subdivisions: 4 },
+    // Soft far haze sheets — stacked so far board washes out in stills
+    const farWashMat = new StandardMaterial("farWashMat", this.scene);
+    farWashMat.diffuseColor = hexToColor3("#989078");
+    farWashMat.emissiveColor = hexToColor3("#787060").scale(0.22);
+    farWashMat.alpha = 0.4;
+    farWashMat.disableLighting = true;
+    farWashMat.backFaceCulling = false;
+    for (const [name, x, y, w, h] of [
+      ["farWash0", 12, 0.4, 50, 48],
+      ["farWash1", 18, 0.9, 42, 44],
+      ["farWash2", 22, 1.6, 36, 40],
+    ] as const) {
+      const farWash = MeshBuilder.CreateGround(name, { width: w, height: h }, this.scene);
+      farWash.position.set(x, y, 6);
+      farWash.material = farWashMat;
+      farWash.parent = this.envRoot;
+      farWash.isPickable = false;
+    }
+    // Vertical soft wall on far-right edge (kills hard horizon diorama)
+    const farWallMat = new StandardMaterial("farWallMat", this.scene);
+    farWallMat.diffuseColor = hexToColor3("#8A8470");
+    farWallMat.emissiveColor = hexToColor3("#6A6858").scale(0.2);
+    farWallMat.alpha = 0.28;
+    farWallMat.disableLighting = true;
+    farWallMat.backFaceCulling = false;
+    const farWall = MeshBuilder.CreateBox(
+      "farWall",
+      { width: 1.2, height: 6, depth: 55 },
       this.scene
     );
-    wet.position.set(-10.4, 0.015, 1.5);
+    farWall.position.set(24, 2.2, 4);
+    farWall.material = farWallMat;
+    farWall.parent = this.envRoot;
+    farWall.isPickable = false;
+
+    // Wet silt bank — brown-green wet mud, not dry sand
+    const wet = MeshBuilder.CreateGround(
+      "wetBank",
+      { width: 3.8, height: 30, subdivisions: 6 },
+      this.scene
+    );
+    wet.position.set(-10.2, 0.018, 1.5);
     const wetMat = new StandardMaterial("wetMat", this.scene);
-    wetMat.diffuseColor = hexToColor3("#A89068");
-    wetMat.specularColor = hexToColor3(STYLE.riverLight).scale(0.2);
-    wetMat.emissiveColor = hexToColor3("#6A5840").scale(0.05);
+    wetMat.diffuseColor = hexToColor3("#6A5840");
+    wetMat.specularColor = hexToColor3("#4A7080").scale(0.35);
+    wetMat.specularPower = 32;
+    wetMat.emissiveColor = hexToColor3("#3A3020").scale(0.08);
     wet.material = wetMat;
     wet.parent = this.envRoot;
     wet.isPickable = false;
     wet.receiveShadows = true;
+
+    // Dark silt break at waterline (Materials: wet clay grammar)
+    const silt = MeshBuilder.CreateBox(
+      "siltBreak",
+      { width: 1.1, height: 0.06, depth: 32 },
+      this.scene
+    );
+    silt.position.set(-10.85, 0.03, 1.5);
+    const siltMat = new StandardMaterial("siltMat", this.scene);
+    siltMat.diffuseColor = hexToColor3("#4A3A28");
+    siltMat.specularColor = hexToColor3("#3A5A68").scale(0.25);
+    siltMat.emissiveColor = hexToColor3("#2A2018").scale(0.06);
+    silt.material = siltMat;
+    silt.parent = this.envRoot;
+    silt.isPickable = false;
+    silt.receiveShadows = true;
+
+    // Wet specular shoreline strip (Materials craft — shiny wet line)
+    const wetLine = MeshBuilder.CreateBox(
+      "wetSpecular",
+      { width: 0.45, height: 0.04, depth: 34 },
+      this.scene
+    );
+    wetLine.position.set(-10.55, 0.05, 1.5);
+    const wetLineMat = new StandardMaterial("wetSpecularMat", this.scene);
+    wetLineMat.diffuseColor = hexToColor3("#5A7068");
+    wetLineMat.specularColor = hexToColor3("#C0E0F0").scale(0.85);
+    wetLineMat.specularPower = 96;
+    wetLineMat.emissiveColor = hexToColor3("#3A5048").scale(0.12);
+    wetLineMat.alpha = 0.9;
+    wetLine.material = wetLineMat;
+    wetLine.parent = this.envRoot;
+    wetLine.isPickable = false;
 
     if (this.quality !== "low") {
       const duneMat = new StandardMaterial("duneMat", this.scene);
@@ -567,19 +672,19 @@ export class SettlementView {
       }
     }
 
-    // Deep Nile: dark channel + specular mid + bright wet lip + foam edge
+    // Deep Nile: near-black channel (Materials/Ground — not matte candy teal)
     const river = MeshBuilder.CreateBox(
       "river",
-      { width: 9.5, height: 0.28, depth: 70 },
+      { width: 10.5, height: 0.32, depth: 75 },
       this.scene
     );
-    river.position.set(-15.0, -0.1, 2);
+    river.position.set(-15.4, -0.12, 2);
     const rmat = new StandardMaterial("riverMat", this.scene);
-    rmat.diffuseColor = hexToColor3("#0F2A3C");
-    rmat.specularColor = hexToColor3("#8EC4E0").scale(0.7);
-    rmat.specularPower = 64;
-    rmat.alpha = 0.96;
-    rmat.emissiveColor = hexToColor3("#0A1828").scale(0.2);
+    rmat.diffuseColor = hexToColor3("#061820");
+    rmat.specularColor = hexToColor3("#5A98B0").scale(0.55);
+    rmat.specularPower = 80;
+    rmat.alpha = 0.98;
+    rmat.emissiveColor = hexToColor3("#041018").scale(0.25);
     river.material = rmat;
     river.parent = this.envRoot;
     river.isPickable = false;
@@ -587,67 +692,70 @@ export class SettlementView {
 
     const mid = MeshBuilder.CreateBox(
       "riverMid",
-      { width: 2.6, height: 0.12, depth: 65 },
+      { width: 2.8, height: 0.14, depth: 68 },
       this.scene
     );
-    mid.position.set(-11.8, 0.01, 2);
+    mid.position.set(-11.6, 0.0, 2);
     const midMat = new StandardMaterial("riverMidMat", this.scene);
-    midMat.diffuseColor = hexToColor3("#1A4560");
-    midMat.specularColor = hexToColor3("#A0D0E8").scale(0.55);
-    midMat.specularPower = 48;
-    midMat.alpha = 0.92;
+    midMat.diffuseColor = hexToColor3("#0E3048");
+    midMat.specularColor = hexToColor3("#78B0C8").scale(0.45);
+    midMat.specularPower = 56;
+    midMat.alpha = 0.94;
+    midMat.emissiveColor = hexToColor3("#0A2030").scale(0.1);
     mid.material = midMat;
     mid.parent = this.envRoot;
     mid.isPickable = false;
 
+    // Shallow = murky silt water, not bright teal lip
     const shallow = MeshBuilder.CreateBox(
       "riverShallow",
-      { width: 1.6, height: 0.08, depth: 60 },
+      { width: 1.8, height: 0.09, depth: 62 },
       this.scene
     );
-    shallow.position.set(-10.4, 0.04, 2);
+    shallow.position.set(-10.35, 0.03, 2);
     const shMat = new StandardMaterial("shallowMat", this.scene);
-    shMat.diffuseColor = hexToColor3("#3A6A7A");
-    shMat.specularColor = hexToColor3("#C0E0F0").scale(0.4);
-    shMat.alpha = 0.82;
+    shMat.diffuseColor = hexToColor3("#2A4A52");
+    shMat.specularColor = hexToColor3("#88B0B8").scale(0.3);
+    shMat.specularPower = 28;
+    shMat.alpha = 0.88;
+    shMat.emissiveColor = hexToColor3("#1A3038").scale(0.08);
     shallow.material = shMat;
     shallow.parent = this.envRoot;
     shallow.isPickable = false;
 
-    // Broken organic foam — irregular clusters, not a solid white curb
+    // Wet churn foam — silt-grey/cream, lit (not pure-albedo candy chunks)
     const flMat = new StandardMaterial("foamLineMat", this.scene);
-    flMat.diffuseColor = hexToColor3("#E8F0F4");
-    flMat.emissiveColor = hexToColor3("#D8E8F0").scale(0.5);
-    flMat.alpha = 0.9;
-    flMat.disableLighting = true;
-    flMat.zOffset = -2;
-    for (let i = 0; i < 28; i++) {
+    flMat.diffuseColor = hexToColor3("#B8C4C0");
+    flMat.emissiveColor = hexToColor3("#8A9890").scale(0.12);
+    flMat.specularColor = hexToColor3("#C0D0D0").scale(0.2);
+    flMat.alpha = 0.72;
+    flMat.zOffset = -1;
+    for (let i = 0; i < 36; i++) {
       const blob = MeshBuilder.CreateSphere(
         `foamBlob-${i}`,
-        { diameter: 0.28 + (i % 4) * 0.1, segments: 6 },
+        { diameter: 0.22 + (i % 5) * 0.08, segments: 6 },
         this.scene
       );
-      const along = -14 + i * 1.05 + (i % 3) * 0.15;
-      blob.position.set(-9.75 - (i % 2) * 0.35, 0.14, along);
-      blob.scaling.set(1.2 + (i % 3) * 0.3, 0.3, 0.8 + (i % 2) * 0.3);
+      const along = -15 + i * 0.95 + (i % 3) * 0.12;
+      blob.position.set(-10.05 - (i % 3) * 0.28, 0.1 + (i % 4) * 0.03, along);
+      blob.scaling.set(1.4 + (i % 4) * 0.35, 0.22 + (i % 3) * 0.08, 0.7 + (i % 2) * 0.35);
       blob.material = flMat;
       blob.parent = this.envRoot;
       blob.isPickable = false;
-      blob.renderingGroupId = 1;
     }
 
     const foamMat = new StandardMaterial("foamMat", this.scene);
-    foamMat.diffuseColor = hexToColor3("#D8E8F0");
-    foamMat.emissiveColor = hexToColor3("#D8E8F0").scale(0.08);
-    foamMat.alpha = 0.75;
-    foamMat.specularColor = Color3.Black();
-    for (let i = 0; i < (this.quality === "low" ? 4 : 8); i++) {
+    foamMat.diffuseColor = hexToColor3("#A8B8B4");
+    foamMat.emissiveColor = hexToColor3("#708080").scale(0.06);
+    foamMat.alpha = 0.65;
+    foamMat.specularColor = hexToColor3("#B0C0C0").scale(0.15);
+    for (let i = 0; i < (this.quality === "low" ? 5 : 10); i++) {
       const foam = MeshBuilder.CreateBox(
         `foam-${i}`,
-        { width: 0.5 + (i % 3) * 0.15, height: 0.04, depth: 0.28 },
+        { width: 0.55 + (i % 3) * 0.18, height: 0.05, depth: 0.32 },
         this.scene
       );
-      foam.position.set(-13.8 - (i % 2) * 0.3, 0.1, -8 + i * 2.8);
+      foam.position.set(-13.5 - (i % 2) * 0.35, 0.08, -9 + i * 2.5);
       foam.material = foamMat;
       foam.parent = this.envRoot;
       foam.isPickable = false;
@@ -657,43 +765,69 @@ export class SettlementView {
     // Bank strip + reed fringe
     const bank = MeshBuilder.CreateBox(
       "bank",
-      { width: 1.35, height: 0.1, depth: 26 },
+      { width: 1.5, height: 0.12, depth: 28 },
       this.scene
     );
-    bank.position.set(-10.15, 0.04, 1.5);
+    bank.position.set(-10.05, 0.05, 1.5);
     const bmat = new StandardMaterial("bankMat", this.scene);
-    bmat.diffuseColor = hexToColor3(pal.bank);
+    bmat.diffuseColor = hexToColor3("#7A6848");
     bmat.specularColor = Color3.Black();
     bank.material = bmat;
     bank.parent = this.envRoot;
     bank.isPickable = false;
 
-    // Dense reed fringe along full bank (Aven/SM environmental coherence)
+    // Dense reed BEDS — mass silhouettes + stalks (Ground craft, not sparse sticks)
     const reedMat = new StandardMaterial("envReed", this.scene);
     reedMat.diffuseColor = hexToColor3(STYLE.reedGreen);
     reedMat.specularColor = Color3.Black();
-    reedMat.emissiveColor = hexToColor3(STYLE.reedGreen).scale(0.05);
-    const reedCount = this.quality === "low" ? 28 : 70;
-    for (let i = 0; i < reedCount; i++) {
-      const r = MeshBuilder.CreateCylinder(
-        `envReed-${i}`,
-        {
-          height: 0.5 + (i % 4) * 0.14,
-          diameter: 0.06 + (i % 3) * 0.015,
-          tessellation: 5,
-        },
-        this.scene
-      );
-      r.position.set(
-        -10.15 + (i % 3) * 0.18 + (i % 5) * 0.02,
-        0.3,
-        -10 + i * (22 / reedCount)
-      );
-      r.material = reedMat;
-      r.parent = this.envRoot;
-      r.isPickable = false;
-      if (this.shadowGen && this.quality === "high") {
-        this.shadowGen.addShadowCaster(r, false);
+    reedMat.emissiveColor = hexToColor3(STYLE.reedGreen).scale(0.04);
+    const reedMatDry = new StandardMaterial("envReedDry", this.scene);
+    reedMatDry.diffuseColor = hexToColor3("#6A7040");
+    reedMatDry.specularColor = Color3.Black();
+    const reedMassMat = new StandardMaterial("reedMassMat", this.scene);
+    reedMassMat.diffuseColor = hexToColor3("#3A5A38");
+    reedMassMat.emissiveColor = hexToColor3("#2A4028").scale(0.08);
+    reedMassMat.specularColor = Color3.Black();
+    reedMassMat.alpha = 0.85;
+    const bedCount = this.quality === "low" ? 14 : 28;
+    let reedI = 0;
+    for (let bed = 0; bed < bedCount; bed++) {
+      const bz = -12 + bed * (26 / bedCount);
+      const bx = -10.25 + (bed % 3) * 0.14;
+      // Mass clump silhouette (reads at mid-iso without counting stalks)
+      if (bed % 2 === 0) {
+        const mass = MeshBuilder.CreateBox(
+          `reedMass-${bed}`,
+          { width: 0.55 + (bed % 3) * 0.12, height: 0.55 + (bed % 2) * 0.15, depth: 0.4 },
+          this.scene
+        );
+        mass.position.set(bx, 0.32, bz);
+        mass.material = reedMassMat;
+        mass.parent = this.envRoot;
+        mass.isPickable = false;
+      }
+      const stalks = this.quality === "low" ? 4 : 7;
+      for (let s = 0; s < stalks; s++) {
+        const r = MeshBuilder.CreateCylinder(
+          `envReed-${reedI++}`,
+          {
+            height: 0.6 + (s % 4) * 0.2,
+            diameter: 0.08 + (s % 3) * 0.02,
+            tessellation: 5,
+          },
+          this.scene
+        );
+        r.position.set(
+          bx + (s % 3) * 0.15 - 0.14,
+          0.35 + (s % 2) * 0.05,
+          bz + (s % 4) * 0.12 - 0.16
+        );
+        r.material = s % 3 === 0 ? reedMatDry : reedMat;
+        r.parent = this.envRoot;
+        r.isPickable = false;
+        if (this.shadowGen && this.quality === "high" && s === 0) {
+          this.shadowGen.addShadowCaster(r, false);
+        }
       }
     }
     // Scattered shore stones
@@ -764,54 +898,63 @@ export class SettlementView {
       }
     }
 
-    // Ambient barge on river (visual life; not sim-bound)
+    // Ambient barges on river (visual life; not sim-bound)
     this.buildBarge();
   }
 
+  private bargeNode2: TransformNode | null = null;
+
   private buildBarge() {
     this.bargeNode?.dispose();
-    const root = new TransformNode("barge", this.scene);
+    this.bargeNode2?.dispose();
+    // Two first-glance barges on money-shot river (Life craft)
+    this.bargeNode = this.makeOneBarge("barge", -13.0, -3.5, 1.15);
+    this.bargeNode2 = this.makeOneBarge("barge2", -14.4, 6.2, 1.05);
+  }
+
+  private makeOneBarge(name: string, x: number, z: number, scale: number): TransformNode {
+    const root = new TransformNode(name, this.scene);
     root.parent = this.envRoot;
-    root.position.set(-13.0, 0.12, -2);
+    root.position.set(x, 0.12, z);
+    root.scaling.setAll(scale);
     const hull = MeshBuilder.CreateBox(
-      "bargeHull",
+      `${name}Hull`,
       { width: 0.7, height: 0.22, depth: 1.6 },
       this.scene
     );
     hull.position.y = 0.12;
-    const hm = new StandardMaterial("bargeHullMat", this.scene);
-    hm.diffuseColor = hexToColor3("#6B4A32");
+    const hm = new StandardMaterial(`${name}HullMat`, this.scene);
+    hm.diffuseColor = hexToColor3(name.endsWith("2") ? "#5A3A28" : "#6B4A32");
     hm.specularColor = Color3.Black();
     hull.material = hm;
     hull.parent = root;
     hull.isPickable = false;
     const cabin = MeshBuilder.CreateBox(
-      "bargeCabin",
+      `${name}Cabin`,
       { width: 0.45, height: 0.28, depth: 0.5 },
       this.scene
     );
     cabin.position.set(0, 0.35, -0.2);
-    const cm = new StandardMaterial("bargeCabinMat", this.scene);
+    const cm = new StandardMaterial(`${name}CabinMat`, this.scene);
     cm.diffuseColor = hexToColor3(STYLE.sandDeep);
     cm.specularColor = Color3.Black();
     cabin.material = cm;
     cabin.parent = root;
     cabin.isPickable = false;
-    // Sail cloth
     const sail = MeshBuilder.CreateBox(
-      "bargeSail",
+      `${name}Sail`,
       { width: 0.06, height: 0.7, depth: 0.55 },
       this.scene
     );
     sail.position.set(0, 0.7, 0.15);
-    const sm = new StandardMaterial("sailMat", this.scene);
+    const sm = new StandardMaterial(`${name}SailMat`, this.scene);
     sm.diffuseColor = hexToColor3(STYLE.papyrus);
     sm.emissiveColor = hexToColor3(STYLE.papyrus).scale(0.05);
     sm.specularColor = Color3.Black();
     sail.material = sm;
     sail.parent = root;
     sail.isPickable = false;
-    this.bargeNode = root;
+    return root;
   }
 
   private animateRiverLife(now: number) {
@@ -825,6 +968,12 @@ export class SettlementView {
       this.bargeNode.position.z = z;
       this.bargeNode.position.y = 0.12 + Math.sin(now * 1.6) * 0.03;
       this.bargeNode.rotation.y = Math.sin(now * 0.2) * 0.08;
+    }
+    if (this.bargeNode2) {
+      const z2 = 4 + Math.sin(now * 0.09 + 1.2) * 6;
+      this.bargeNode2.position.z = z2;
+      this.bargeNode2.position.y = 0.12 + Math.sin(now * 1.4 + 0.5) * 0.025;
+      this.bargeNode2.rotation.y = Math.PI + Math.sin(now * 0.15) * 0.06;
     }
     // Dust motes (heat atmosphere readable in stills as soft particles)
     if (this.dustRoot) {
@@ -866,43 +1015,107 @@ export class SettlementView {
     }
   }
 
-  /** Soft volume — heat haze + bank mist puffs (reads as air, not hard plane). */
+  /**
+   * Soft continuous bank-mist ribbon + distance air.
+   * Overlapping volumes must read as ONE haze band at mid-iso — not puff chain.
+   */
   private buildHazePlanes() {
-    // Soft distance wash: large low-alpha plane far side only
+    // Soft distance wash: large low-alpha volume far side (depth falloff)
     const hazeMat = new StandardMaterial("hazeMat", this.scene);
-    hazeMat.diffuseColor = hexToColor3("#D4C4A0");
-    hazeMat.emissiveColor = hexToColor3("#C8B890").scale(0.2);
-    hazeMat.alpha = 0.14;
+    hazeMat.diffuseColor = hexToColor3("#B8B0A0");
+    hazeMat.emissiveColor = hexToColor3("#A09888").scale(0.22);
+    hazeMat.alpha = 0.18;
     hazeMat.disableLighting = true;
     hazeMat.backFaceCulling = false;
     const farHaze = MeshBuilder.CreateGround(
       "farHaze",
-      { width: 30, height: 40 },
+      { width: 42, height: 50 },
       this.scene
     );
-    farHaze.position.set(8, 1.4, 2);
+    farHaze.position.set(12, 1.1, 4);
     farHaze.material = hazeMat;
     farHaze.parent = this.envRoot;
     farHaze.isPickable = false;
 
-    // Bank mist: soft elongated clouds (not perfect spheres / not hard box)
+    // Continuous bank-mist ribbon: long soft boxes overlapping into one air mass
     const mm = new StandardMaterial("bankMistMat", this.scene);
-    mm.diffuseColor = hexToColor3("#D8E4E8");
-    mm.emissiveColor = hexToColor3("#C0D4DC").scale(0.25);
-    mm.alpha = 0.22;
+    mm.diffuseColor = hexToColor3("#C8D4D8");
+    mm.emissiveColor = hexToColor3("#A8BCC4").scale(0.2);
+    mm.alpha = 0.26;
     mm.disableLighting = true;
     mm.backFaceCulling = false;
-    for (let i = 0; i < 12; i++) {
-      const mist = MeshBuilder.CreateSphere(
-        `bankMist-${i}`,
-        { diameter: 2.2 + (i % 4) * 0.4, segments: 10 },
+    // Backbone ribbon along full waterline
+    for (let i = 0; i < 8; i++) {
+      const ribbon = MeshBuilder.CreateBox(
+        `bankRibbon-${i}`,
+        { width: 3.8, height: 0.55 + (i % 2) * 0.15, depth: 4.2 },
         this.scene
       );
-      mist.position.set(-11.8 + (i % 2) * 0.55, 0.7 + (i % 3) * 0.15, -11 + i * 2.1);
-      mist.scaling.set(1.6, 0.35, 1.1);
+      ribbon.position.set(
+        -11.5 + (i % 2) * 0.4,
+        0.55 + (i % 3) * 0.12,
+        -12 + i * 3.4
+      );
+      ribbon.material = mm;
+      ribbon.parent = this.envRoot;
+      ribbon.isPickable = false;
+    }
+    // Soft fill spheres heavily overlapping the ribbon (kill discrete puff gaps)
+    for (let i = 0; i < 18; i++) {
+      const mist = MeshBuilder.CreateSphere(
+        `bankMist-${i}`,
+        { diameter: 2.8 + (i % 4) * 0.5, segments: 8 },
+        this.scene
+      );
+      mist.position.set(
+        -11.6 + (i % 3) * 0.45,
+        0.65 + (i % 4) * 0.1,
+        -13 + i * 1.55
+      );
+      mist.scaling.set(1.9, 0.32, 1.35);
       mist.material = mm;
       mist.parent = this.envRoot;
       mist.isPickable = false;
+    }
+    // Upper thin haze veil over bank (reads as soft air volume at mid-iso)
+    const veilMat = new StandardMaterial("bankVeilMat", this.scene);
+    veilMat.diffuseColor = hexToColor3("#D0D8D8");
+    veilMat.emissiveColor = hexToColor3("#B8C8C8").scale(0.15);
+    veilMat.alpha = 0.14;
+    veilMat.disableLighting = true;
+    veilMat.backFaceCulling = false;
+    const veil = MeshBuilder.CreateBox(
+      "bankVeil",
+      { width: 5.5, height: 1.2, depth: 30 },
+      this.scene
+    );
+    veil.position.set(-11.2, 1.1, 1.5);
+    veil.material = veilMat;
+    veil.parent = this.envRoot;
+    veil.isPickable = false;
+
+    // Mid-field heat haze volumes (Atmosphere craft — air over plaza, not only bank)
+    const heatMat = new StandardMaterial("heatHazeMat", this.scene);
+    heatMat.diffuseColor = hexToColor3("#D8C8A8");
+    heatMat.emissiveColor = hexToColor3("#C8B898").scale(0.18);
+    heatMat.alpha = 0.14;
+    heatMat.disableLighting = true;
+    heatMat.backFaceCulling = false;
+    for (const [x, z, sx, sz] of [
+      [0, 2, 8, 6],
+      [4, -2, 7, 5],
+      [8, 4, 9, 7],
+      [-2, 6, 5, 4],
+    ] as const) {
+      const heat = MeshBuilder.CreateBox(
+        `heatHaze-${x}-${z}`,
+        { width: sx, height: 1.4, depth: sz },
+        this.scene
+      );
+      heat.position.set(x, 1.3, z);
+      heat.material = heatMat;
+      heat.parent = this.envRoot;
+      heat.isPickable = false;
     }
   }
 
@@ -986,20 +1199,37 @@ export class SettlementView {
         );
         if (icon) this.padIcons.set(def.id, icon);
 
+        // Solid densified mudbrick half-build (not line wireframe only)
         const ghost = MeshBuilder.CreateBox(
           `ghost-${def.id}`,
-          { width: 1.6, height: 0.35, depth: 1.4 },
+          { width: 1.55, height: 0.55, depth: 1.35 },
           this.scene
         );
-        ghost.position.set(pos.x, 0.22, pos.z);
+        ghost.position.set(pos.x, 0.3, pos.z);
         const gm = new StandardMaterial(`ghostMat-${def.id}`, this.scene);
         gm.diffuseColor = hexToColor3(STYLE.mudbrick);
-        gm.emissiveColor = hexToColor3(STYLE.mudbrick).scale(0.08);
-        gm.alpha = 0.35;
-        gm.wireframe = true;
+        gm.emissiveColor = hexToColor3(STYLE.mudbrick).scale(0.05);
+        gm.specularColor = hexToColor3("#3A2A18").scale(0.08);
+        gm.alpha = 0.55;
         ghost.material = gm;
         ghost.parent = this.root;
         ghost.isPickable = false;
+        ghost.receiveShadows = true;
+        // Wireframe outline on top of solid mass for kit readability
+        const ghostWire = MeshBuilder.CreateBox(
+          `ghostWire-${def.id}`,
+          { width: 1.62, height: 0.62, depth: 1.42 },
+          this.scene
+        );
+        ghostWire.position.set(pos.x, 0.32, pos.z);
+        const gwm = new StandardMaterial(`ghostWireMat-${def.id}`, this.scene);
+        gwm.diffuseColor = hexToColor3("#5A4030");
+        gwm.emissiveColor = hexToColor3("#4A3020").scale(0.15);
+        gwm.alpha = 0.45;
+        gwm.wireframe = true;
+        ghostWire.material = gwm;
+        ghostWire.parent = this.root;
+        ghostWire.isPickable = false;
         this.padGhosts.set(def.id, ghost);
       }
 
@@ -1354,8 +1584,8 @@ export class SettlementView {
     }
 
     // Force a readable crowd in stills (02.6 life category)
-    const cap = this.quality === "low" ? 12 : this.quality === "med" ? 18 : 22;
-    const show = settlement.workers > 0 ? cap : Math.max(12, cap);
+    const cap = this.quality === "low" ? 14 : this.quality === "med" ? 20 : 26;
+    const show = settlement.workers > 0 ? cap : Math.max(14, cap);
 
     while (this.workers.length < show) {
       this.workers.push(this.spawnWorker(this.workers.length));
@@ -1388,6 +1618,8 @@ export class SettlementView {
   private spawnWorker(i: number): WorkerAgent {
     const root = new TransformNode(`worker-${i}`, this.scene);
     root.parent = this.root;
+    // Slightly larger mid-iso LOD so labor reads without zoom
+    root.scaling.setAll(1.18);
     // Thin human silhouette: torso + head + arms + legs (not barrel/silo)
     const linen = hexToColor3("#FFF8EC");
     const skin = hexToColor3("#C9956C");
