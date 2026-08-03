@@ -145,6 +145,9 @@ export function showPanel(name: string) {
   const title = document.getElementById("menu-popup-title");
   if (title) title.textContent = PANEL_TITLES[name] ?? name;
 
+  // World map gets the wide "set piece" shell; every other panel is a card.
+  popup.classList.toggle("map-wide", name === "map");
+
   popup.hidden = false;
 }
 
@@ -707,11 +710,27 @@ function renderHarbor(s: PublicSnapshot) {
   const st = s.settlements[0];
   if (!st) return;
   const hasHarbor = st.buildings.some((b) => b.kind === "harbor");
+  const bargeEmptyState = `<div class="harbor-empty">
+      <svg viewBox="0 0 104 52" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 28c3 7 10 11 18 11h42c8 0 15-4 18-11"/>
+        <path d="M12 28h78"/>
+        <path d="M12 28c-3-3-4.5-6.5-4.5-10M90 28c4-3 6.5-7.5 6.5-12"/>
+        <path d="M40 28v-8h22v8"/>
+        <path d="M44 20v-4h14v4" opacity="0.7"/>
+        <path d="M70 28l7-10" opacity="0.8"/>
+        <path d="M8 46q7-4 14 0t14 0 14 0 14 0 14 0 14 0" opacity="0.5"/>
+      </svg>
+      <p>No barges on the water. Build one to trade up and down the river.</p>
+    </div>`;
   panel.innerHTML = `
     <h2>Harbor</h2>
     ${
       hasHarbor
-        ? `<p class="muted">Fleet of the shore · ${st.barges.length} barge${st.barges.length === 1 ? "" : "s"}</p>
+        ? `${
+            st.barges.length === 0
+              ? bargeEmptyState
+              : `<p class="muted">Fleet of the shore · ${st.barges.length} barge${st.barges.length === 1 ? "" : "s"}</p>`
+          }
            <div id="barge-list"></div>
            <div class="panel-footer">
              <button id="build-barge" class="primary">Lay a new barge <span class="muted">· 25 Cedar + 25 Rations · 20 worker-hours</span></button>
@@ -1013,7 +1032,7 @@ function renderWall(s: PublicSnapshot) {
       </label>
     </div>
     <div class="chat-box" id="chat-box"></div>
-    <div class="row">
+    <div class="row chat-compose">
       <input id="chat-input" placeholder="Write to your province…" />
       <button class="small" id="chat-send">Send</button>
     </div>
@@ -1500,18 +1519,18 @@ function renderMilitary(s: PublicSnapshot) {
 
 /* ── World map v2: authored papyrus cartography board ────────────── */
 
-/** Hand-authored river centerline: delta mouth (top) → upper cataract (bottom). Board is 640×620. */
+/** Hand-authored river centerline: delta mouth (top) → upper cataract (bottom). Board is 640×700. */
 const RIVER_PTS: [number, number][] = [
-  [330, 58],
-  [306, 104],
-  [244, 156],
-  [218, 222],
-  [272, 282],
-  [356, 330],
-  [408, 392],
-  [378, 458],
-  [300, 500],
-  [232, 556],
+  [330, 65],
+  [306, 117],
+  [244, 176],
+  [218, 251],
+  [272, 318],
+  [356, 373],
+  [408, 443],
+  [378, 517],
+  [300, 565],
+  [232, 628],
 ];
 
 /** Dense, arc-length-normalized samples of the Catmull-Rom-smoothed centerline. */
@@ -1584,15 +1603,20 @@ function buildRiverBoard(
   const ordered = provinces.slice().sort((a, b) => a.riverIndex - b.riverIndex);
   const segCount = Math.max(1, ordered.length);
 
+  // Province medallion anchor points (also fixed obstacles for site relaxation)
+  const provPts = ordered.map((_, i) => {
+    const mid = riverPoint((i + 0.5) / segCount);
+    const side = i % 2 === 0 ? 1 : -1;
+    return { x: mid.x + mid.nx * 46 * side, y: mid.y + mid.ny * 46 * side };
+  });
+
   // Province markers: city glyph roundel on the bank + small-caps plaque label
   const provMarks = ordered
     .map((p, i) => {
-      const mid = riverPoint((i + 0.5) / segCount);
-      const side = i % 2 === 0 ? 1 : -1;
-      const x = mid.x + mid.nx * 46 * side;
-      const y = mid.y + mid.ny * 46 * side;
+      const x = provPts[i]!.x;
+      const y = provPts[i]!.y;
       const mine = p.id === myProvinceId;
-      const labelW = Math.max(66, p.name.length * 7.6 + 18);
+      const labelW = Math.max(74, p.name.length * 8.5 + 20);
       return `<g class="wm-prov${mine ? " wm-mine" : ""}" data-prov="${p.id}" tabindex="0" role="button"
         aria-label="${p.name}${mine ? " (your province)" : ""}">
         <circle class="halo" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="20" fill="#e8c26a"/>
@@ -1601,18 +1625,19 @@ function buildRiverBoard(
         <circle class="roundel" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="12.5" fill="${mine ? "#e2b558" : "#f2e6c6"}" stroke="#6b512c" stroke-width="1.4"/>
         ${glyphAt("ziggurat", x - 8, y - 8, 16, mine ? "#3d2c0e" : "#8a6b34")}
         ${mine ? `<circle cx="${(x + 10.5).toFixed(1)}" cy="${(y - 9.5).toFixed(1)}" r="4" fill="#96323f" stroke="#4a1219" stroke-width="1"/>` : ""}
-        <rect class="wm-plaque" x="${(x - labelW / 2).toFixed(1)}" y="${(y + 17).toFixed(1)}" width="${labelW.toFixed(0)}" height="17" rx="8.5" fill="#fdf6e4" fill-opacity="0.9" stroke="#c2a26c" stroke-width="0.7"/>
-        <text class="wm-label" x="${x.toFixed(1)}" y="${(y + 29.5).toFixed(1)}" text-anchor="middle"${mine ? ' font-weight="700"' : ""}>${p.name}</text>
+        <rect class="wm-plaque" x="${(x - labelW / 2).toFixed(1)}" y="${(y + 17).toFixed(1)}" width="${labelW.toFixed(0)}" height="19" rx="9.5" fill="#fdf6e4" fill-opacity="0.9" stroke="#c2a26c" stroke-width="0.7"/>
+        <text class="wm-label" x="${x.toFixed(1)}" y="${(y + 31).toFixed(1)}" text-anchor="middle"${mine ? ' font-weight="700"' : ""}>${p.name}</text>
       </g>`;
     })
     .join("");
 
-  // Dashed cartouche borders between province reaches, drawn across the river
+  // Dashed cartouche borders between province reaches: short ticks crossing
+  // the river only — no strokes wandering across the open desert.
   const borders = ordered
     .slice(0, -1)
     .map((_, k) => {
       const b = riverPoint((k + 1) / segCount);
-      const L = 150;
+      const L = 34;
       return `<line class="wm-border" x1="${(b.x - b.nx * L).toFixed(1)}" y1="${(b.y - b.ny * L).toFixed(1)}" x2="${(b.x + b.nx * L).toFixed(1)}" y2="${(b.y + b.ny * L).toFixed(1)}"/>`;
     })
     .join("");
@@ -1634,8 +1659,11 @@ function buildRiverBoard(
     const lat = ((site.mapY - 57.5) / 75) * 20 * inland;
     return { site, x: pos.x + pos.nx * lat, y: pos.y + pos.ny * lat };
   });
-  // Collision relaxation: markers are ~22px round — push overlapping pairs apart
-  for (let iter = 0; iter < 24; iter++) {
+  // Collision relaxation: medallions are ~22px round — keep ≥34px separation
+  // so no pair (site↔site or site↔province roundel) ever overlaps. Province
+  // medallions are authored anchors, so they act as fixed obstacles.
+  const minD = 34;
+  for (let iter = 0; iter < 32; iter++) {
     let moved = false;
     for (let i = 0; i < sitePts.length; i++) {
       for (let j = i + 1; j < sitePts.length; j++) {
@@ -1644,7 +1672,6 @@ function buildRiverBoard(
         const dx = b.x - a.x;
         const dy = b.y - a.y;
         const d = Math.hypot(dx, dy);
-        const minD = 27;
         if (d < minD) {
           const ux = d > 0.01 ? dx / d : 1;
           const uy = d > 0.01 ? dy / d : 0;
@@ -1656,12 +1683,27 @@ function buildRiverBoard(
           moved = true;
         }
       }
+      // fixed province medallions (Midstream / Delta Mouth pile-ups)
+      const a = sitePts[i]!;
+      for (const pp of provPts) {
+        const dx = a.x - pp.x;
+        const dy = a.y - pp.y;
+        const d = Math.hypot(dx, dy);
+        if (d < minD) {
+          const ux = d > 0.01 ? dx / d : 1;
+          const uy = d > 0.01 ? dy / d : 0;
+          const push = minD - d + 0.4;
+          a.x += ux * push;
+          a.y += uy * push;
+          moved = true;
+        }
+      }
     }
     if (!moved) break;
   }
   for (const p of sitePts) {
     p.x = Math.min(614, Math.max(26, p.x));
-    p.y = Math.min(594, Math.max(26, p.y));
+    p.y = Math.min(674, Math.max(26, p.y));
   }
   const siteMarks = sitePts
     .map(({ site, x, y }) => {
@@ -1689,7 +1731,7 @@ function buildRiverBoard(
   const d = riverPathD();
 
   return `
-  <svg class="world-river-map" viewBox="0 0 640 620" role="img" aria-label="The Eternal River and its provinces">
+  <svg class="world-river-map" viewBox="0 0 640 700" role="img" aria-label="The Eternal River and its provinces">
     <defs>
       <pattern id="wmFiber" width="26" height="26" patternUnits="userSpaceOnUse">
         <path d="M0 7h26M0 19h26" stroke="#917748" stroke-opacity="0.075"/>
@@ -1699,7 +1741,7 @@ function buildRiverBoard(
         <stop offset="0" stop-color="#2e6787"/>
         <stop offset="1" stop-color="#24597a"/>
       </linearGradient>
-      <clipPath id="wmClip"><rect width="640" height="620" rx="10"/></clipPath>
+      <clipPath id="wmClip"><rect width="640" height="700" rx="10"/></clipPath>
       <g id="wmPalm" stroke="#7a6134" stroke-linecap="round" fill="none">
         <path d="M0 10V2" stroke-width="1.8"/>
         <path d="M0 2C-3.5 -1 -7 -2 -10 -1.2M0 2c-2-3.5-4.5-6-8-7M0 2c.8-4 .2-7.5-1.6-10M0 2c3.5-3 7-4 10-3.2M0 2c2.4-3.2 5.2-5.2 8.6-6" stroke-width="1.2"/>
@@ -1708,25 +1750,35 @@ function buildRiverBoard(
 
     <g clip-path="url(#wmClip)">
       <!-- papyrus field -->
-      <rect width="640" height="620" fill="#ead7b2"/>
-      <rect width="640" height="620" fill="url(#wmFiber)"/>
+      <rect width="640" height="700" fill="#ead7b2"/>
+      <rect width="640" height="700" fill="url(#wmFiber)"/>
       <!-- layered desert tones -->
-      <path d="M0 90 C 120 70 220 118 340 96 C 460 76 560 108 640 88 L640 0 0 0 Z" fill="#dec394" opacity="0.5"/>
-      <path d="M640 210 C 560 250 500 232 470 280 C 450 320 500 380 545 420 C 590 458 620 470 640 468 Z" fill="#d8bc8c" opacity="0.55"/>
-      <path d="M0 330 C 60 310 110 340 150 390 C 185 434 160 480 110 520 C 70 552 30 560 0 556 Z" fill="#d8bc8c" opacity="0.5"/>
-      <path d="M0 620 h640 v-70 C 520 574 380 540 250 566 C 150 586 60 566 0 578 Z" fill="#cdb083" opacity="0.5"/>
-      <!-- the far sea beyond the delta -->
-      <path d="M0 0 h640 v40 C 540 56 420 32 320 46 C 210 60 90 38 0 52 Z" fill="url(#wmSea)" opacity="0.6"/>
-      <path d="M0 52 C 90 38 210 60 320 46 C 420 32 540 56 640 40" stroke="#f8eed3" stroke-width="1.3" fill="none" opacity="0.55"/>
+      <path d="M0 102 C 120 79 220 133 340 108 C 460 87 560 122 640 99 L640 0 0 0 Z" fill="#dec394" opacity="0.5"/>
+      <path d="M640 237 C 560 282 500 262 470 316 C 450 361 500 429 545 474 C 590 517 620 531 640 528 Z" fill="#d8bc8c" opacity="0.55"/>
+      <path d="M0 373 C 60 350 110 384 150 440 C 185 490 160 542 110 587 C 70 623 30 632 0 628 Z" fill="#d8bc8c" opacity="0.5"/>
+      <path d="M0 700 h640 v-75 C 520 651 380 612 250 640 C 150 662 60 640 0 653 Z" fill="#cdb083" opacity="0.5"/>
+      <!-- the far sea beyond the delta: full-bleed band, foam shoreline, wave lines -->
+      <path d="M0 0 h640 v48 C 540 65 420 39 320 54 C 210 70 90 46 0 61 Z" fill="url(#wmSea)" opacity="0.85"/>
+      <path d="M0 61 C 90 46 210 70 320 54 C 420 39 540 65 640 48" stroke="#f8eed3" stroke-width="1.4" fill="none" opacity="0.6"/>
+      <g stroke="#9cc3d8" stroke-width="1.1" fill="none" opacity="0.5" stroke-linecap="round">
+        <path d="M28 18q8 -4 16 0t16 0 16 0"/>
+        <path d="M148 30q8 -4 16 0t16 0"/>
+        <path d="M252 14q8 -4 16 0t16 0 16 0"/>
+        <path d="M418 26q8 -4 16 0t16 0"/>
+        <path d="M528 12q8 -4 16 0t16 0 16 0"/>
+        <path d="M96 40q8 -4 16 0t16 0"/>
+        <path d="M352 38q8 -4 16 0t16 0"/>
+        <path d="M586 34q8 -4 16 0t16 0"/>
+      </g>
 
       <!-- dune ridge strokes -->
       <g stroke="#c2a26c" stroke-width="1.5" fill="none" opacity="0.6">
-        <path d="M84 158q15 -10 30 0"/><path d="M128 176q12 -8 24 0"/>
-        <path d="M478 132q14 -9 28 0"/><path d="M524 152q11 -7 22 0"/>
-        <path d="M540 320q15 -10 30 0"/><path d="M584 344q12 -8 24 0"/>
-        <path d="M90 430q15 -10 30 0"/><path d="M60 462q12 -8 24 0"/>
-        <path d="M480 520q14 -9 28 0"/><path d="M532 546q12 -8 24 0"/>
-        <path d="M320 586q14 -9 28 0"/>
+        <path d="M84 178q15 -10 30 0"/><path d="M128 199q12 -8 24 0"/>
+        <path d="M478 149q14 -9 28 0"/><path d="M524 172q11 -7 22 0"/>
+        <path d="M540 361q15 -10 30 0"/><path d="M584 388q12 -8 24 0"/>
+        <path d="M90 485q15 -10 30 0"/><path d="M60 522q12 -8 24 0"/>
+        <path d="M480 587q14 -9 28 0"/><path d="M532 617q12 -8 24 0"/>
+        <path d="M320 662q14 -9 28 0"/>
       </g>
 
       <!-- floodplain along both banks -->
@@ -1741,35 +1793,35 @@ function buildRiverBoard(
 
       <!-- delta fan at the mouth -->
       <g stroke="#24597a" fill="none" stroke-linecap="round">
-        <path d="M330 58 C 322 40 306 28 288 18" stroke-width="10"/>
-        <path d="M330 58 C 332 40 344 26 362 16" stroke-width="9"/>
-        <path d="M330 58 C 316 46 298 40 280 38" stroke-width="6" opacity="0.85"/>
-        <path d="M330 58 C 340 44 354 39 372 40" stroke-width="5" opacity="0.75"/>
+        <path d="M330 65 C 322 45 306 32 288 20" stroke-width="10"/>
+        <path d="M330 65 C 332 45 344 29 362 18" stroke-width="9"/>
+        <path d="M330 65 C 316 52 298 45 280 43" stroke-width="6" opacity="0.85"/>
+        <path d="M330 65 C 340 50 354 44 372 45" stroke-width="5" opacity="0.75"/>
       </g>
 
       <!-- cataract rapids at the head of the river -->
       <g stroke="#f8eed3" stroke-width="1.7" opacity="0.8" stroke-linecap="round">
-        <path d="M220 542l10 -5M231 550l11 -5M224 559l10 -5M236 566l10 -5"/>
+        <path d="M220 614l10 -5M231 622l11 -5M224 631l10 -5M236 638l10 -5"/>
       </g>
 
       ${myWash}
       ${borders}
 
       <!-- palm clusters + reeds -->
-      <use href="#wmPalm" transform="translate(150 130) scale(1.15)"/>
-      <use href="#wmPalm" transform="translate(170 140) scale(0.85)"/>
-      <use href="#wmPalm" transform="translate(388 220) scale(1.05)"/>
-      <use href="#wmPalm" transform="translate(404 230) scale(0.8)"/>
-      <use href="#wmPalm" transform="translate(150 300) scale(1.0)"/>
-      <use href="#wmPalm" transform="translate(166 310) scale(0.75)"/>
-      <use href="#wmPalm" transform="translate(496 430) scale(1.1)"/>
-      <use href="#wmPalm" transform="translate(514 442) scale(0.8)"/>
-      <use href="#wmPalm" transform="translate(230 470) scale(0.95)"/>
-      <use href="#wmPalm" transform="translate(360 540) scale(0.9)"/>
+      <use href="#wmPalm" transform="translate(150 147) scale(1.15)"/>
+      <use href="#wmPalm" transform="translate(170 158) scale(0.85)"/>
+      <use href="#wmPalm" transform="translate(388 248) scale(1.05)"/>
+      <use href="#wmPalm" transform="translate(404 260) scale(0.8)"/>
+      <use href="#wmPalm" transform="translate(150 339) scale(1.0)"/>
+      <use href="#wmPalm" transform="translate(166 350) scale(0.75)"/>
+      <use href="#wmPalm" transform="translate(496 485) scale(1.1)"/>
+      <use href="#wmPalm" transform="translate(514 499) scale(0.8)"/>
+      <use href="#wmPalm" transform="translate(230 531) scale(0.95)"/>
+      <use href="#wmPalm" transform="translate(360 610) scale(0.9)"/>
       <g stroke="#6d7c46" stroke-width="1.3" stroke-linecap="round" opacity="0.7">
-        <path d="M268 172v-10M274 173v-12M280 172v-9"/>
-        <path d="M330 348v-10M336 349v-12M342 348v-9"/>
-        <path d="M330 480v-9M336 481v-11M342 480v-8"/>
+        <path d="M268 194v-10M274 195v-12M280 194v-9"/>
+        <path d="M330 393v-10M336 394v-12M342 393v-9"/>
+        <path d="M330 542v-9M336 543v-11M342 542v-8"/>
       </g>
 
       ${siteMarks}

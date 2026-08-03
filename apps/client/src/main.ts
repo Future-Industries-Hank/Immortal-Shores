@@ -142,9 +142,9 @@ async function enterGame() {
   const lux = st0?.uniqueLuxury;
   const prov = s.map.provinces.find((p) => p.id === st0?.provinceId);
   if (lux && prov) {
-    const mapName = (st0?.mapArchetypeId ?? prov.id).replace(/_/g, " ");
+    const luxName = lux.replace(/_/g, " ");
     toast(
-      `${prov.name} · ${mapName}: unique ${lux.replace(/_/g, " ")} — trade for the rest`
+      `${prov.name}: your unique luxury is ${luxName} — trade for the rest`
     );
   }
 

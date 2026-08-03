@@ -71,11 +71,11 @@ def palette():
         "mud_tan": M("mud_tan", "#C29A6B"),
         "stone": M("stone_pale", "#D9CDB0", rough=0.8),
         "stone_w": M("stone_white", "#E4DCC6", rough=0.78),
-        # ground
-        "dirt": M("dirt_apron", "#8A6A48"),
+        # ground — aprons stay sandy so kits sit IN the desert, not on plinths
+        "dirt": M("dirt_apron", "#B49873"),
         "soil": M("soil_dark", "#6B4B30"),
         "sand": M("sand_spit", "#CBB184"),
-        "earth": M("earth_pack", "#B08D5F"),
+        "earth": M("earth_pack", "#BFA67E"),
         # wood
         "wood": M("wood_mid", "#7A5632"),
         "wood_dk": M("wood_dark", "#4E3418"),
@@ -90,12 +90,12 @@ def palette():
         "cl_red": M("cloth_red", "#A6402E"),
         "rug": M("rug_red", "#8E3B2C"),
         "linen": M("linen_pale", "#D8C9A8"),
-        # crops
-        # "amber" not "gold" — gold-named meshes get night emissive in kitLoader
-        "crop_g": M("crop_amber", "#B99A3F"),
-        "crop_gr": M("crop_green", "#7D8A38"),
-        "crop_dk": M("crop_deep", "#5E7030"),
-        "crop_lt": M("crop_light", "#93A24A"),
+        # crops — desaturated olive/sage family (no lime/neon reads), heads
+        # wheat-tan. "amber" not "gold" — gold names get night emissive.
+        "crop_g": M("crop_amber", "#C4A55C"),
+        "crop_gr": M("crop_green", "#82894A"),
+        "crop_dk": M("crop_deep", "#6E7A3A"),
+        "crop_lt": M("crop_light", "#969256"),
         # brick
         "brick": M("brick_red", "#9A5B3C"),
         "brick_g": M("brick_grey", "#8A7259"),
@@ -252,10 +252,11 @@ def grab_all():
 def build_great_house(P):
     """Board 01: two-tier mudbrick estate — stone band, loggia pergola,
     external stair, striped door awning, gold disc, pots."""
-    # ground apron (trimmed so the corner never kisses the market base)
-    box("gh_dirt_apron", 3.05, 3.05, 0.07, (0, 0, 0), P["dirt"])
+    # ground apron (trimmed so the corner never kisses the market base;
+    # low + sandy so the kit sits IN the desert, not on a plinth)
+    box("gh_dirt_apron", 3.05, 3.05, 0.05, (0, 0, 0), P["dirt"])
     # lower story: battered terracotta mass
-    lower = frustum("gh_mud_lower", 2.75, 2.45, 2.6, 2.3, 1.12, (0, 0, 0.07),
+    lower = frustum("gh_mud_lower", 2.75, 2.45, 2.6, 2.3, 1.12, (0, 0, 0.05),
                     P["mud"])
     bevel(lower, 0.025)
     # pale stone mid band (upper half of story 1, slightly proud)
@@ -329,14 +330,18 @@ def build_great_house(P):
         P["cl_org"])
 
     # external stair: proud of the front face, climbing left→right to terrace
-    sy = -1.42  # fully outside the battered wall (base face ≈ -1.22)
-    stairs("gh_stone_stair", 9, 0.44, 0.165, 0.185, (-1.6, sy, 0.07),
+    sy = -1.5  # clear of the battered wall taper (base face ≈ -1.22)
+    # dirt pad extends the apron under the flight so nothing hovers off-apron
+    box("gh_dirt_stairpad", 1.95, 0.55, 0.05, (-0.85, -1.62, 0), P["dirt"])
+    stairs("gh_stone_stair", 9, 0.44, 0.165, 0.185, (-1.6, sy, 0.05),
            P["stone"], along="x", sign=1)
     # solid mud stringer wall carrying the flight (outer side)
     frustum("gh_mud_stringer", 1.5, 0.13, 1.45, 0.11, 0.9,
-            (-0.85, sy - 0.24, 0.07), P["mud"])
+            (-0.85, sy - 0.24, 0.05), P["mud"])
+    # return wall ties the stringer's top end flush into the wall face
+    box("gh_mud_stringer_ret", 0.12, 0.6, 0.9, (-0.14, -1.5, 0.05), P["mud"])
     # low landing wall at top of flight
-    box("gh_stone_landing", 0.3, 0.44, 0.06, (-0.02, sy, 1.73), P["stone"])
+    box("gh_stone_landing", 0.3, 0.44, 0.06, (-0.02, sy, 1.715), P["stone"])
 
     # door: center-right of front face
     dx = 0.32
@@ -354,7 +359,7 @@ def build_great_house(P):
     box("gh_cloth_awn_str1", 0.9, 0.14, 0.05, (dx, fy - 0.44, 1.005), P["linen"],
         rx=math.radians(-18))
     for sxp in (dx - 0.4, dx + 0.4):
-        cyl("gh_wood_awnpole", 0.025, 0.92, (sxp, fy - 0.5, 0.07), P["wood_dk"], seg=7)
+        cyl("gh_wood_awnpole", 0.025, 0.92, (sxp, fy - 0.5, 0.05), P["wood_dk"], seg=7)
 
     # two yellow window awnings + dark windows on the stone band (front face)
     for wx in (-0.85, 1.0):
@@ -366,9 +371,9 @@ def build_great_house(P):
     box("gh_win_dark_side", 0.07, 0.3, 0.3, (-1.33, -0.35, 1.32), P["dark"])
 
     # pots at the door
-    amphora("gh", dx - 0.62, fy - 0.28, 0.07, P, s=1.15)
-    amphora("gh2", dx - 0.78, fy - 0.12, 0.07, P, s=0.8)
-    basket("gh", dx + 0.7, fy - 0.3, 0.07, P, r=0.1, fill="crop_g")
+    amphora("gh", dx - 0.62, fy - 0.28, 0.05, P, s=1.15)
+    amphora("gh2", dx - 0.78, fy - 0.12, 0.05, P, s=0.8)
+    basket("gh", dx + 0.7, fy - 0.3, 0.05, P, r=0.1, fill="crop_g")
 
 
 # ---------------------------------------------------------------- MARKET
@@ -474,19 +479,25 @@ def build_emmer_field(P):
                 cx0, cy0 = -1.15, -1.15
             else:
                 bed_w = bed_d = 1.28
-            box("ef_crop_bed", bed_w + 0.06, bed_d + 0.06, 0.1,
-                (cx0, cy0, 0.1), P["crop_dk"])
-            # crop rows: many fine low rows in 3 green tones + amber heads
+            # bed base is mud-brown soil — green rows read as planted lines
+            # with visible soil gaps, never a solid green cube
+            box("ef_soil_bed", bed_w + 0.06, bed_d + 0.06, 0.1,
+                (cx0, cy0, 0.1), P["soil"])
+            # crop rows: thin planted lines in 3 olive tones + wheat heads
             # (workers are ~0.6 shoulder height — stalks stay well below)
             rows = 9
             greens = ("crop_gr", "crop_dk", "crop_lt")
             for r in range(rows):
                 ry = cy0 - bed_d / 2 + (r + 0.5) * bed_d / rows
                 hh = 0.13 + 0.035 * (r % 3) + rnd.random() * 0.03
-                box("ef_crop_rowbase", bed_w, bed_d / rows * 0.55, hh,
+                box("ef_crop_rowbase", bed_w, bed_d / rows * 0.5, hh,
                     (cx0, ry, 0.2), P[greens[r % 3]])
-                box("ef_crop_rowhead", bed_w * 0.97, bed_d / rows * 0.4, 0.06,
-                    (cx0, ry, 0.2 + hh), P["crop_g"])
+                # heads in broken segments so rows read as planted grain
+                # lines, not continuous tan planks
+                for si in range(3):
+                    box("ef_crop_rowhead", bed_w * 0.27, bed_d / rows * 0.36,
+                        0.06, (cx0 + (si - 1) * bed_w * 0.33, ry, 0.2 + hh),
+                        P["crop_g"])
             for _ in range(14):
                 tx = cx0 + (rnd.random() - 0.5) * bed_w * 0.9
                 ty = cy0 + (rnd.random() - 0.5) * bed_d * 0.9
@@ -690,8 +701,8 @@ def build_harbor(P):
     amphora("hb_p2", 1.45, -1.05, deck_z + 0.025, P, s=0.8)
     amphora("hb_p3", 1.5, -1.22, deck_z + 0.025, P, s=0.7)
 
-    # moored barge alongside arm (west of arm, floating at z≈0.06)
-    bx0, by0, bz0 = 0.55, -1.15, 0.06
+    # moored barge alongside arm (hull settled low in the water, z≈0.04)
+    bx0, by0, bz0 = 0.55, -1.15, 0.04
     hull = box("hb_wood_hull", 1.5, 0.44, 0.2, (bx0, by0, bz0), P["wood_dk"])
     bevel(hull, 0.04)
     # curved prow / stern (angled risers)
@@ -979,12 +990,12 @@ def build_shrine(P):
 def build_ration_house(P):
     """Board 09: mudbrick bakehouse hall + granary annex with beehive silos,
     arched oven mouth, serving counter with awning, bread, sacks, baskets."""
-    base = box("rh_dirt_apron", 2.8, 2.7, 0.07, (0, 0, 0), P["dirt"])
+    base = box("rh_dirt_apron", 2.8, 2.7, 0.05, (0, 0, 0), P["dirt"])
     bevel(base, 0.02)
 
     # main hall (battered, board-09 sloped mass)
     hall = frustum("rh_mud_hall", 1.75, 1.55, 1.55, 1.35, 1.05,
-                   (-0.42, 0.18, 0.07), P["mud_tan"])
+                   (-0.42, 0.18, 0.05), P["mud_tan"])
     bevel(hall, 0.025)
     box("rh_stone_string", 1.72, 1.52, 0.06, (-0.42, 0.18, 0.78), P["stone"])
     box("rh_mud_parapet", 1.6, 1.4, 0.08, (-0.42, 0.18, 1.12), P["mud_dk"])
@@ -996,48 +1007,48 @@ def build_ration_house(P):
     box("rh_matting_roof", 0.6, 0.5, 0.03, (-0.42, 0.1, 1.18), P["thatch"])
     for i in range(2):
         box("rh_crop_dryrow", 0.5, 0.1, 0.045, (-0.42, -0.02 + i * 0.2, 1.2),
-            P["crop_g"], rz=0.07 * (i * 2 - 1))
+            P["crop_g"], rz=0.05 * (i * 2 - 1))
 
     # arched oven mouth on the front face (pot arch ring + dark throat +
     # warm cloth-orange inset suggesting the fire, no emissive)
     fy = -0.62
     cyl("rh_pot_ovenarch", 0.34, 0.1, (-0.42, fy - 0.03, 0.36 - 0.05), P["pot"],
         seg=16, rx=math.radians(90))
-    cyl("rh_dark_oventhroat", 0.24, 0.08, (-0.42, fy - 0.07, 0.36 - 0.04),
+    cyl("rh_dark_oventhroat", 0.24, 0.08, (-0.42, fy - 0.05, 0.36 - 0.04),
         P["dark"], seg=14, rx=math.radians(90))
     cyl("rh_cl_ovenwarm", 0.13, 0.03, (-0.42, fy - 0.115, 0.3 - 0.015),
         P["cl_org"], seg=10, rx=math.radians(90))
-    box("rh_stone_ovenshelf", 0.66, 0.26, 0.1, (-0.42, fy - 0.14, 0.07),
+    box("rh_stone_ovenshelf", 0.66, 0.26, 0.1, (-0.42, fy - 0.14, 0.05),
         P["stone"])
     sphere("rh_linen_bread", 0.06, (-0.56, fy - 0.16, 0.17), P["linen"], seg=7)
     sphere("rh_linen_bread2", 0.05, (-0.28, fy - 0.18, 0.17), P["linen"], seg=7)
 
     # door right of the oven (dark recess + wood lintel); the apron strip in
     # front stays clear so the entrance reads (ladder cut — crowded the face)
-    box("rh_dark_door", 0.38, 0.22, 0.64, (0.18, fy - 0.01, 0.07), P["dark"])
+    box("rh_dark_door", 0.38, 0.22, 0.64, (0.18, fy - 0.01, 0.05), P["dark"])
     box("rh_wood_doorlintel", 0.5, 0.2, 0.09, (0.18, fy + 0.01, 0.71),
         P["wood_dk"])
 
     # granary annex + beehive silos (cyl taper + sphere cap)
-    annex = frustum("rh_mud_annex", 1.0, 1.2, 0.9, 1.1, 0.58, (0.85, 0.6, 0.07),
+    annex = frustum("rh_mud_annex", 1.0, 1.2, 0.9, 1.1, 0.58, (0.85, 0.6, 0.05),
                     P["mud"])
     bevel(annex, 0.02)
     box("rh_mud_annexroof", 0.92, 1.12, 0.06, (0.85, 0.6, 0.65), P["mud_dk"])
     # silos enlarged so the beehive silhouette leads the read
     silos = ((1.02, 0.15, 1.18), (0.68, -0.44, 1.02), (1.12, -0.86, 0.86))
     for i, (sx, sy, s) in enumerate(silos):
-        cyl(f"rh_mud_silo{i}", 0.27 * s, 0.52 * s, (sx, sy, 0.07), P["mud_tan"],
+        cyl(f"rh_mud_silo{i}", 0.27 * s, 0.52 * s, (sx, sy, 0.05), P["mud_tan"],
             seg=12, rtop=0.2 * s)
-        sphere(f"rh_mud_silocap{i}", 0.2 * s, (sx, sy, 0.07 + 0.52 * s - 0.16 * s),
+        sphere(f"rh_mud_silocap{i}", 0.2 * s, (sx, sy, 0.05 + 0.52 * s - 0.16 * s),
                P["mud_tan"], seg=10)
         box(f"rh_dark_silohatch{i}", 0.075 * s, 0.05, 0.085 * s,
             (sx, sy - 0.245 * s, 0.3 * s), P["dark"])
-        cyl(f"rh_mud_silobase{i}", 0.3 * s, 0.07, (sx, sy, 0.07), P["mud_dk"],
+        cyl(f"rh_mud_silobase{i}", 0.3 * s, 0.05, (sx, sy, 0.05), P["mud_dk"],
             seg=12)
 
     # serving counter with awning (front-left, fully on the apron)
     cx, cy = -0.95, -0.88
-    box("rh_mud_counter", 0.8, 0.4, 0.46, (cx, cy, 0.07), P["mud_dk"])
+    box("rh_mud_counter", 0.8, 0.4, 0.46, (cx, cy, 0.05), P["mud_dk"])
     box("rh_linen_countertop", 0.86, 0.46, 0.04, (cx, cy, 0.53), P["linen"])
     box("rh_wood_breadboard", 0.34, 0.22, 0.03, (cx - 0.18, cy - 0.02, 0.57),
         P["wood"])
@@ -1047,16 +1058,16 @@ def build_ration_house(P):
     box("rh_cloth_awn", 0.95, 0.52, 0.04, (cx, cy - 0.22, 0.96), P["cl_org"],
         rx=math.radians(-24))
     for sxp in (cx - 0.42, cx + 0.42):
-        cyl("rh_wood_awnpole", 0.025, 0.9, (sxp, cy - 0.42, 0.07),
+        cyl("rh_wood_awnpole", 0.025, 0.9, (sxp, cy - 0.42, 0.05),
             P["wood_dk"], seg=7)
 
     # two readable clusters, open apron kept in front of the door:
     # counter cluster gets one sack + one basket; a jar tucks by the silos
-    s = box("rh_linen_sack0", 0.24, 0.2, 0.2, (-1.05, -1.24, 0.07), P["linen"],
+    s = box("rh_linen_sack0", 0.24, 0.2, 0.2, (-1.05, -1.24, 0.05), P["linen"],
             rz=0.35)
     bevel(s, 0.04)
-    basket("rh_g1", -0.65, -1.16, 0.07, P, r=0.12, fill="crop_g")
-    amphora("rh_j1", 1.3, -0.34, 0.07, P, s=1.1)
+    basket("rh_g1", -0.65, -1.16, 0.05, P, r=0.12, fill="crop_g")
+    amphora("rh_j1", 1.3, -0.34, 0.05, P, s=1.1)
 
 
 # ---------------------------------------------------------------- LUXURY MATERIAL
@@ -1069,30 +1080,34 @@ def build_luxury_material(P):
     box("lm_stone_pad", 1.5, 1.2, 0.05, (-0.45, -0.35, 0.08), P["stone"])
 
     # heavy material rack along the back wall: chunky double-row post frame,
-    # thick planked shelves with support rails — every item visibly seated
+    # thick planked shelves with support rails — every item visibly seated.
+    # Top shelf surface stays <= 0.8 and the side posts rise ABOVE the goods
+    # so nothing reads detached at the in-game high-iso camera (az≈142).
     ry0 = 1.05
     for px in (-1.12, 0.0, 1.12):
         for py in (ry0 - 0.22, ry0 + 0.22):
-            box("lm_wood_rackpost", 0.1, 0.1, 1.14, (px, py, 0.08),
+            box("lm_wood_rackpost", 0.1, 0.1, 1.02, (px, py, 0.08),
                 P["wood_dk"])
-    for zz in (0.38, 0.76):
+    for zz in (0.36, 0.70):
         # support rails under the shelf, spanning the posts front and back
-        box("lm_wood_shelfrail", 2.34, 0.07, 0.07, (0, ry0 - 0.22, zz - 0.07),
+        box("lm_wood_shelfrail", 2.34, 0.07, 0.07, (0, ry0 - 0.22, zz - 0.09),
             P["wood_dk"])
-        box("lm_wood_shelfrail2", 2.34, 0.07, 0.07, (0, ry0 + 0.22, zz - 0.07),
+        box("lm_wood_shelfrail2", 2.34, 0.07, 0.07, (0, ry0 + 0.22, zz - 0.09),
             P["wood_dk"])
-        box("lm_wood_shelf", 2.4, 0.58, 0.07, (0, ry0, zz), P["wood"])
-    box("lm_wood_racktop", 2.5, 0.64, 0.06, (0, ry0, 1.22), P["wood_dk"])
-    # shelf goods seated flat on the shelf tops (lower top 0.45, upper 0.83)
+        box("lm_wood_shelf", 2.4, 0.58, 0.1, (0, ry0, zz), P["wood"])
+    # side frames capping each post pair above the goods (visible from -Z iso)
+    for px in (-1.12, 0.0, 1.12):
+        box("lm_wood_sidecap", 0.12, 0.56, 0.08, (px, ry0, 1.06), P["wood_dk"])
+    # shelf goods seated flat on the shelf tops (lower top 0.46, upper 0.80)
     for i in range(3):
-        box("lm_stone_shelfblock", 0.32, 0.24, 0.2, (-0.85 + i * 0.36, ry0, 0.45),
+        box("lm_stone_shelfblock", 0.32, 0.24, 0.2, (-0.85 + i * 0.36, ry0, 0.46),
             P["stone_w"], rz=0.06 * (i - 1))
     for i in range(4):
         box("lm_copper_shelfingot", 0.2, 0.1, 0.07, (0.45 + (i % 2) * 0.26, ry0
-            - 0.06 + (i // 2) * 0.14, 0.45), P["copper"], rz=0.1 * (i % 2))
-    cyl("lm_thatch_shelfbundle", 0.08, 0.6, (-0.6, ry0, 0.83 + 0.08 - 0.3),
+            - 0.06 + (i // 2) * 0.14, 0.46), P["copper"], rz=0.1 * (i % 2))
+    cyl("lm_thatch_shelfbundle", 0.08, 0.6, (-0.6, ry0, 0.8 + 0.08 - 0.3),
         P["thatch"], seg=7, ry=math.radians(90))
-    box("lm_grey_shelfslab", 0.5, 0.3, 0.1, (0.55, ry0, 0.83), P["grey"])
+    box("lm_grey_shelfslab", 0.5, 0.3, 0.1, (0.55, ry0, 0.8), P["grey"])
     # ground pallet with spare copper stock in front of the rack — ties the
     # metal read to the ground plane
     box("lm_wood_pallet", 0.62, 0.4, 0.06, (1.0, 0.55, 0.08), P["wood"])
@@ -1613,11 +1628,59 @@ def paint_variation(objs, seed=5):
                 attr.data[li].color = (v, v, v, 1.0)
 
 
+AO_SAMPLES = 48
+
+
+def bake_ao(objs):
+    """MATERIALS ceiling-breaker: bake real Cycles ambient occlusion into the
+    COLOR_0 vertex colors, multiplied with the existing jitter/grade. Corners,
+    under-eaves and prop bases visibly darken so kits stop looking pasted.
+    Headless-safe: Cycles vertex-color bake target, no lights needed."""
+    sc = bpy.context.scene
+    sc.render.engine = "CYCLES"
+    sc.cycles.samples = AO_SAMPLES
+    sc.cycles.use_denoising = False
+    sc.render.bake.target = "VERTEX_COLORS"
+    if sc.world is None:
+        sc.world = bpy.data.worlds.new("bake_world")
+    # short ray distance = local contact shadow, not global gloom
+    sc.world.light_settings.distance = 1.6
+    for o in objs:
+        me = o.data
+        name = o.name.lower()
+        if not me.polygons:
+            continue
+        if "ember" in name or "glow" in name:
+            continue  # emissives must not carry baked shadow
+        # accents keep a gentler AO so cloth/gold/water/pottery stay clean
+        soft = any(k in name for k in ("cloth", "gold", "linen", "water",
+                                       "pottery"))
+        ao = me.color_attributes.new(name="AO", type="FLOAT_COLOR",
+                                     domain="CORNER")
+        me.color_attributes.active_color = ao
+        for other in bpy.context.scene.objects:
+            other.select_set(other is o)
+        bpy.context.view_layer.objects.active = o
+        bpy.ops.object.bake(type="AO")
+        col = me.color_attributes["Col"]
+        for li in range(len(me.loops)):
+            a = ao.data[li].color[0]
+            if soft:
+                a = 0.65 + 0.35 * a
+            else:
+                a = 0.35 + 0.65 * pow(a, 1.4)
+            c = col.data[li].color
+            col.data[li].color = (c[0] * a, c[1] * a, c[2] * a, 1.0)
+        me.color_attributes.remove(me.color_attributes["AO"])
+        me.color_attributes.active_color = me.color_attributes["Col"]
+
+
 for kind in KINDS:
     reset()
     P = palette()
     BUILDERS[kind](P)
     kit_objs = merge_by_material(kind)
+    bake_ao(kit_objs)
     tris = sum(len(o.data.polygons) * 2 for o in kit_objs)  # rough (quads→2)
     print(f"BUILT {kind}: {len(kit_objs)} meshes ~{tris} tris")
     # export GLB (selection only, apply modifiers)

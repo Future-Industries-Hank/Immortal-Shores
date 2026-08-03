@@ -151,8 +151,10 @@ export class Atmosphere {
       if (rm) {
         const deep = hexToColor3("#061820");
         const mid = hexToColor3("#0C2838");
-        rm.diffuseColor = Color3.Lerp(mid, deep, 0.55 + n * 0.35);
-        rm.specularColor = hexToColor3("#6AA8C0").scale(0.35 + (1 - n) * 0.2);
+        rm.diffuseColor = Color3.Lerp(mid, deep, 0.5 + n * n * 0.4);
+        rm.specularColor = n > 0.25 && n < 0.75
+          ? hexToColor3("#E8925A").scale(0.5)
+          : hexToColor3("#6AA8C0").scale(0.35 + (1 - n) * 0.2);
         rm.specularPower = 72;
         rm.alpha = 0.97;
         rm.emissiveColor = deep.scale(0.12 + Math.sin(now * 1.1) * 0.02);

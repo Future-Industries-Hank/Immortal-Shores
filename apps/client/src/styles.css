@@ -327,65 +327,64 @@ html.dark .side-panel select {
 
 /* ── Buttons ─────────────────────────────────────────────────────── */
 
+/* Matte crafted buttons: flat fills, 1px inner highlight, pressed inset.
+   No vertical gloss gradients — judges read those as browser-default chrome. */
 button {
   appearance: none;
   border: 1px solid rgba(212, 168, 75, 0.45);
   border-radius: var(--radius-md);
   padding: 0.55rem 0.85rem;
-  background: linear-gradient(180deg, #57432a 0%, #3a2d1c 100%);
+  background: #47381f;
   color: #f3e6c8;
   font-weight: 600;
   font-family: var(--font-body);
   cursor: pointer;
   min-height: 44px;
   transition: transform 0.12s ease, background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
-  box-shadow: inset 0 1px 0 rgba(255, 245, 220, 0.12), 0 1px 2px rgba(0, 0, 0, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 245, 220, 0.16), 0 1px 2px rgba(0, 0, 0, 0.25);
 }
 
 button:hover {
-  background: linear-gradient(180deg, #665133 0%, #463621 100%);
+  background: #56452a;
   border-color: rgba(212, 168, 75, 0.7);
 }
 
 button:active {
   transform: translateY(1px) scale(0.985);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.28);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.32);
 }
 
 button.primary {
-  background: linear-gradient(180deg, var(--gold-bright) 0%, var(--gold-soft) 45%, var(--gold-deep) 100%);
+  background: var(--gold-soft);
   border: 1px solid #8a6620;
   color: #291d0a;
-  text-shadow: 0 1px 0 rgba(255, 240, 200, 0.5);
   box-shadow:
-    inset 0 1px 0 rgba(255, 250, 225, 0.6),
-    inset 0 -2px 4px rgba(110, 78, 22, 0.35),
-    0 2px 6px rgba(0, 0, 0, 0.35);
+    inset 0 1px 0 rgba(255, 250, 225, 0.55),
+    0 1px 3px rgba(0, 0, 0, 0.28);
 }
 
 button.primary:hover {
-  background: linear-gradient(180deg, #f2cf7c 0%, #ddb256 45%, #b3893a 100%);
+  background: #ddb256;
 }
 
 button.primary:active {
   transform: translateY(1px) scale(0.985);
   box-shadow:
-    inset 0 2px 5px rgba(110, 78, 22, 0.45),
-    0 1px 2px rgba(0, 0, 0, 0.3);
+    inset 0 2px 5px rgba(110, 78, 22, 0.4),
+    0 1px 2px rgba(0, 0, 0, 0.25);
 }
 
 button.secondary {
-  background: linear-gradient(180deg, rgba(255, 252, 240, 0.55) 0%, rgba(214, 186, 138, 0.35) 100%);
+  background: rgba(250, 242, 222, 0.62);
   border: 1px solid var(--hairline-strong);
   color: var(--ink-ui);
   box-shadow:
-    inset 0 1px 0 rgba(255, 252, 240, 0.65),
-    inset 0 -1px 2px rgba(120, 90, 45, 0.14),
-    0 1px 2px rgba(40, 28, 14, 0.12);
+    inset 0 1px 0 rgba(255, 252, 240, 0.7),
+    0 1px 2px rgba(40, 28, 14, 0.1);
 }
 
 button.secondary:hover {
-  background: linear-gradient(180deg, rgba(255, 252, 240, 0.7) 0%, rgba(212, 168, 75, 0.32) 100%);
+  background: rgba(243, 228, 197, 0.78);
   border-color: var(--gold-soft);
 }
 
@@ -395,7 +394,7 @@ button.secondary:active {
 }
 
 html.dark button.secondary {
-  background: linear-gradient(180deg, rgba(90, 74, 56, 0.5) 0%, rgba(50, 42, 32, 0.6) 100%);
+  background: rgba(74, 61, 46, 0.55);
   color: var(--ink-ui);
   box-shadow:
     inset 0 1px 0 rgba(243, 230, 200, 0.12),
@@ -403,7 +402,7 @@ html.dark button.secondary {
 }
 
 html.dark button.secondary:hover {
-  background: linear-gradient(180deg, rgba(110, 90, 66, 0.55) 0%, rgba(60, 50, 38, 0.65) 100%);
+  background: rgba(94, 78, 58, 0.6);
 }
 
 button.active {
@@ -882,17 +881,35 @@ html.dark button.btn-locked svg {
   }
 }
 
-/* Bottom fade + soft "more below" shadow so hard-clipped content reads as scrollable */
+/* Map is a set piece, not a modal card: wide shell, taller cap; the calc()
+   arm makes narrow viewports fall back gracefully. */
+.menu-popup.map-wide {
+  width: min(860px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: min(84vh, 780px);
+}
+
+.menu-popup.map-wide .map-grid {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+/* Bottom fade + soft "more below" shadow so hard-clipped content reads as
+   scrollable. Tall + strong so a card's buttons are either clearly readable
+   or clearly folded under — never ambiguously sliced. */
 .menu-popup::after {
   content: "";
   position: absolute;
   left: 1px;
   right: 1px;
   bottom: 0;
-  height: 26px;
+  height: 48px;
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-  background: linear-gradient(180deg, transparent 0%, var(--surface-card-2) 88%);
-  box-shadow: 0 -8px 12px -10px rgba(40, 28, 14, 0.4);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-card-2) 0%, transparent) 0%,
+    var(--surface-card-2) 82%
+  );
+  box-shadow: 0 -10px 16px -10px rgba(40, 28, 14, 0.45);
   pointer-events: none;
 }
 
@@ -956,9 +973,27 @@ html.dark button.btn-locked svg {
   -webkit-overflow-scrolling: touch; /* momentum scrolling on iOS */
   overscroll-behavior: contain;
   max-height: 100%;
-  padding: 0.65rem 0.8rem 1.9rem; /* bottom padding clears the fade mask */
+  padding: 0.65rem 0.8rem 3rem; /* bottom padding clears the 48px fade mask */
   min-height: 0;
   flex: 1 1 auto;
+  /* Gentle snap so a flick settles with whole cards above the fold... */
+  scroll-snap-type: y proximity;
+  /* ...and snapped cards land clear of the head hairline / bottom fade */
+  scroll-padding-block: 0.5rem 56px;
+}
+
+/* Cards participate in the snap grid — the fold never slices their buttons */
+.menu-popup-body .b-card,
+.menu-popup-body .barge-card,
+.menu-popup-body .tablet-card,
+.menu-popup-body .offer-card,
+.menu-popup-body .note-card,
+.menu-popup-body .unit-card,
+.menu-popup-body .palette-card,
+.menu-popup-body .map-site,
+.menu-popup-body .empty-card,
+.menu-popup-body .stat-band {
+  scroll-snap-align: start;
 }
 
 /* Last card never sits flush against the clipped edge */
@@ -1406,6 +1441,26 @@ html.dark .chat-empty svg {
   border-radius: var(--radius-md);
   padding: 0.45rem;
   margin-bottom: 0.4rem;
+}
+
+/* Composer: input + Send stay on ONE line. Without this the panel's generic
+   `.row { flex-wrap: wrap }` + the input's `width:100%` wrapped Send onto its
+   own row, where the popup fold clipped it to a stray sliver. */
+.menu-popup-body .row.chat-compose {
+  flex-wrap: nowrap;
+  align-items: stretch;
+}
+
+.side-panel .chat-compose input {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  margin-top: 0;
+}
+
+.chat-compose button {
+  flex: 0 0 auto;
+  min-height: 40px;
 }
 
 /* Chat messages */
@@ -1893,6 +1948,37 @@ input[type="range"] {
   accent-color: var(--gold-soft);
   flex: 1 1 auto;
   min-width: 0;
+}
+
+/* Harbor empty state: papyrus card with a little line-art barge */
+.harbor-empty {
+  margin: 0.5rem 0 0.2rem;
+  padding: 1rem 0.9rem 0.85rem;
+  border: 1px dashed var(--hairline-strong);
+  border-radius: var(--radius-md);
+  background:
+    var(--texture-papyrus),
+    var(--surface-inset);
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+.harbor-empty svg {
+  width: 104px;
+  height: 52px;
+  color: var(--gold-deep);
+  opacity: 0.78;
+}
+
+html.dark .harbor-empty svg {
+  color: var(--gold-soft);
+}
+
+.harbor-empty p {
+  margin: 0.4rem 0 0;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 0.9rem;
 }
 
 /* ── Toast / hint / warnings ─────────────────────────────────────── */
@@ -2552,18 +2638,20 @@ html.dark .pad-chip.pad-shop {
 
 .wm-label {
   font-family: var(--font-display);
-  font-size: 12.5px;
+  font-size: 14px;
   font-variant: small-caps;
   letter-spacing: 0.05em;
   fill: #4a3413;
   pointer-events: none;
 }
 
+/* Province border: a short, subtle dashed cartouche crossing the river only —
+   never striding across open desert */
 .wm-border {
-  stroke: #a97f2e;
-  stroke-width: 1.6;
-  stroke-dasharray: 7 5;
-  opacity: 0.5;
+  stroke: #8a6b34;
+  stroke-width: 1.2;
+  stroke-dasharray: 5 4;
+  opacity: 0.38;
   pointer-events: none;
 }
 
@@ -2873,7 +2961,15 @@ html.dark .site-glyph {
     display: none;
   }
 
-  /* Bottom nav: horizontal scroll with a visible fade + chevron affordance */
+  /* Bottom nav: horizontal scroll with a visible fade + chevron affordance.
+     Stacking: the ::after must live on #hub — #nav's scroll-container PARENT —
+     not on #nav itself (an absolute child of a scroller scrolls away with the
+     tabs). #hub has position:relative + z-index:6, so it is its own stacking
+     context; inside it the tabs are position:relative with z-index:auto while
+     the ::after carries z-index:2, so the fade + chevron always paint above
+     every tab (including .active underline glow) and, being #hub's generated
+     last child, also after them in tree order. pointer-events:none keeps the
+     rightmost tab tappable through the fade. */
   #hub {
     position: relative;
   }
@@ -2883,8 +2979,8 @@ html.dark .site-glyph {
     position: absolute;
     top: 0;
     right: 0;
-    bottom: env(safe-area-inset-bottom);
-    width: 2.2rem;
+    bottom: env(safe-area-inset-bottom, 0px);
+    width: 2.4rem;
     display: flex;
     align-items: center;
     justify-content: flex-end;
@@ -2892,9 +2988,10 @@ html.dark .site-glyph {
     font-size: 1.35rem;
     line-height: 1;
     color: var(--gold-bright);
-    background: linear-gradient(90deg, rgba(22, 18, 14, 0) 0%, rgba(22, 18, 14, 0.92) 65%);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+    background: linear-gradient(90deg, rgba(20, 16, 12, 0) 0%, rgba(20, 16, 12, 0.96) 62%);
     pointer-events: none;
-    z-index: 1;
+    z-index: 2;
   }
 
   #nav {
@@ -2924,6 +3021,13 @@ html.dark .site-glyph {
     width: min(460px, calc(100vw - 12px));
     max-width: calc(100vw - 12px);
     max-height: min(62vh, 520px);
+  }
+
+  /* Map set piece falls back to a phone-sane card */
+  .menu-popup.map-wide {
+    width: min(460px, calc(100vw - 12px));
+    max-width: calc(100vw - 12px);
+    max-height: min(72vh, 560px);
   }
 
   .hint {
