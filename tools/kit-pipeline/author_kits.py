@@ -95,6 +95,7 @@ def palette():
         "crop_g": M("crop_amber", "#B99A3F"),
         "crop_gr": M("crop_green", "#7D8A38"),
         "crop_dk": M("crop_deep", "#5E7030"),
+        "crop_lt": M("crop_light", "#93A24A"),
         # brick
         "brick": M("brick_red", "#9A5B3C"),
         "brick_g": M("brick_grey", "#8A7259"),
@@ -351,8 +352,10 @@ def build_market(P):
     """Board 02: colonnade hall — battered ends, heavy roof slab, awnings,
     counters with goods, amphorae, corner steps."""
     # stepped limestone base
-    box("mk_stone_base", 3.15, 2.25, 0.1, (0, 0, 0), P["stone"])
-    box("mk_stone_base2", 2.98, 2.08, 0.1, (0, 0, 0.1), P["stone_w"])
+    mb1 = box("mk_stone_base", 3.15, 2.25, 0.1, (0, 0, 0), P["stone"])
+    bevel(mb1, 0.02)
+    mb2 = box("mk_stone_base2", 2.98, 2.08, 0.1, (0, 0, 0.1), P["stone_w"])
+    bevel(mb2, 0.02)
     box("mk_stone_floor", 2.85, 1.92, 0.05, (0, 0, 0.2), P["stone"])
 
     # battered end walls + back wall (mud)
@@ -372,14 +375,28 @@ def build_market(P):
         cyl("mk_stone_col", 0.085, 0.88, (cx, -0.72, 0.25), P["stone_w"], seg=10)
         box("mk_stone_cap", 0.2, 0.2, 0.07, (cx, -0.72, 1.13), P["stone_w"])
 
-    # heavy roof slab + raised border
+    # heavy roof slab + cornice
     roof = box("mk_mud_roofslab", 3.12, 2.24, 0.2, (0, 0, 1.25), P["mud_tan"])
     bevel(roof, 0.03)
-    box("mk_mud_roofrim", 2.84, 1.96, 0.07, (0, 0, 1.45), P["mud_dk"])
     box("mk_stone_cornice", 3.16, 2.28, 0.05, (0, 0, 1.2), P["stone_w"])
-    # reed mats stacked on roof edge
+    # low parapet rim strips around the roof edge (roof surface stays open)
+    for s in (-1, 1):
+        box("mk_mud_rimY", 2.9, 0.1, 0.09, (0, s * 1.02, 1.45), P["mud_dk"])
+        box("mk_mud_rimX", 0.1, 1.84, 0.09, (s * 1.4, 0, 1.45), P["mud_dk"])
+    # wood joist battens: thin proud strips breaking up the slab
+    for i in range(5):
+        box("mk_wood_batten", 0.055, 1.78, 0.035, (-1.1 + i * 0.55, 0.02, 1.45),
+            P["wood_dk"])
+    # roof hatch + small vent box
+    box("mk_wood_hatchframe", 0.42, 0.42, 0.05, (0.72, 0.5, 1.45), P["wood_dk"])
+    box("mk_dark_hatch", 0.3, 0.3, 0.045, (0.72, 0.5, 1.475), P["dark"])
+    box("mk_mud_vent", 0.16, 0.16, 0.15, (-0.78, 0.55, 1.45), P["mud_tan"])
+    box("mk_dark_venttop", 0.1, 0.1, 0.04, (-0.78, 0.55, 1.6), P["dark"])
+    # reed mats + rolled mat on the roof surface
     box("mk_matting_roof", 0.8, 0.4, 0.05, (0.9, -0.85, 1.45), P["thatch"])
     box("mk_matting_roof2", 0.6, 0.35, 0.05, (-1.05, -0.8, 1.45), P["thatch_dk"])
+    cyl("mk_thatch_roofroll", 0.055, 0.6, (-0.25, -0.7, 1.45 + 0.055 - 0.3),
+        P["thatch_dk"], seg=8, ry=math.radians(90))
 
     # cloth awnings: tied at the roof edge, sloping down-and-out over goods
     cols = [(-0.75, "cl_yel"), (-0.25, "cl_org"), (0.375, "cl_yel"),
@@ -435,22 +452,24 @@ def build_emmer_field(P):
                 bed_w = bed_d = 1.28
             box("ef_crop_bed", bed_w + 0.06, bed_d + 0.06, 0.1,
                 (cx0, cy0, 0.1), P["crop_dk"])
-            # crop rows: fine two-tone rows (green base, amber heads) + tufts
-            rows = 6
+            # crop rows: many fine low rows in 3 green tones + amber heads
+            # (workers are ~0.6 shoulder height — stalks stay well below)
+            rows = 9
+            greens = ("crop_gr", "crop_dk", "crop_lt")
             for r in range(rows):
                 ry = cy0 - bed_d / 2 + (r + 0.5) * bed_d / rows
-                hh = 0.22 + 0.05 * (r % 3) + rnd.random() * 0.04
-                box("ef_crop_rowbase", bed_w, bed_d / rows * 0.66, hh,
-                    (cx0, ry, 0.2), P["crop_gr"])
-                box("ef_crop_rowhead", bed_w * 0.97, bed_d / rows * 0.5, 0.1,
+                hh = 0.13 + 0.035 * (r % 3) + rnd.random() * 0.03
+                box("ef_crop_rowbase", bed_w, bed_d / rows * 0.55, hh,
+                    (cx0, ry, 0.2), P[greens[r % 3]])
+                box("ef_crop_rowhead", bed_w * 0.97, bed_d / rows * 0.4, 0.06,
                     (cx0, ry, 0.2 + hh), P["crop_g"])
             for _ in range(14):
                 tx = cx0 + (rnd.random() - 0.5) * bed_w * 0.9
                 ty = cy0 + (rnd.random() - 0.5) * bed_d * 0.9
-                th = 0.4 + rnd.random() * 0.2
-                box("ef_crop_tuft", 0.055, 0.055, th, (tx, ty, 0.24),
-                    P["crop_g"] if rnd.random() > 0.3 else P["crop_gr"],
-                    rz=rnd.random())
+                th = 0.26 + rnd.random() * 0.13
+                box("ef_crop_tuft", 0.038, 0.038, th, (tx, ty, 0.24),
+                    P[greens[rnd.randrange(3)]] if rnd.random() > 0.25
+                    else P["crop_g"], rz=rnd.random())
 
     # banded mudbrick shed (front-left quadrant, open front)
     shx, shy = -0.62, -0.95
@@ -691,16 +710,36 @@ def build_river_clay_pit(P):
     # plank ramp down the front face
     box("cp_wood_ramp", 0.4, 1.15, 0.06, (-0.45, -0.95, 0.18), P["wood"],
         rx=math.radians(14))
+    # timber tripod hoist straddling the pit, rope down to a hanging basket
+    tilt, ang0 = 0.66, math.radians(90)
+    for k in range(3):
+        ang = ang0 + k * math.radians(120)
+        cyl("cp_wood_tripodleg", 0.035, 1.32, (0.36 * math.cos(ang),
+            0.36 * math.sin(ang), 0.21), P["wood_dk"], seg=7,
+            ry=tilt, rz=ang + math.pi)
+    cyl("cp_rope_lash", 0.075, 0.09, (0, 0, 1.24), P["rope"], seg=8)
+    cyl("cp_rope_hoist", 0.014, 0.7, (0, 0, 0.56), P["rope"], seg=6)
+    basket("cp_hang", 0, 0, 0.47, P, r=0.09, h=0.11, fill="grey")
+    # taller spoil mound on the back-right rim (dug earth, clay cap)
+    cyl("cp_earth_spoil", 0.52, 0.8, (1.0, 0.95, 0.1), P["earth"], seg=11,
+        rtop=0.07)
+    cyl("cp_mud_spoilfoot", 0.6, 0.14, (1.0, 0.95, 0.1), P["mud_tan"], seg=11,
+        rtop=0.5)
+    sphere("cp_grey_spoilcap", 0.09, (1.02, 0.92, 0.86), P["grey"], seg=6)
+    # low mudbrick wall segments on the back rim — built edge of the works
+    box("cp_mud_backwall", 1.45, 0.16, 0.34, (-0.55, 1.3, 0.1), P["mud"])
+    box("cp_mud_backwallcap", 1.49, 0.2, 0.05, (-0.55, 1.3, 0.44), P["mud_dk"])
+    box("cp_mud_backwall2", 0.55, 0.16, 0.24, (0.35, 1.3, 0.1), P["mud"])
     # clay ball piles + baskets on the rim
     for i, (px, py) in enumerate(((-1.1, 0.9), (-0.85, 1.1), (1.0, -0.95))):
         sphere(f"cp_grey_clay{i}", 0.1, (px, py, 0.1), P["grey"], seg=7)
         sphere(f"cp_grey_clay{i}b", 0.075, (px + 0.16, py - 0.08, 0.1),
                P["grey"], seg=7)
-    basket("cp", 1.15, 0.85, 0.1, P, r=0.12, fill="grey")
-    basket("cp2", 0.9, 1.05, 0.1, P, r=0.1, fill="grey")
+    basket("cp", 1.28, -0.15, 0.1, P, r=0.12, fill="grey")
+    basket("cp2", 1.1, 0.12, 0.1, P, r=0.1, fill="grey")
     amphora("cp", -1.2, -0.7, 0.1, P, s=0.9)
     # digging stakes
-    for px, py in ((0.7, 0.7), (-0.7, 0.55)):
+    for px, py in ((0.42, 0.5), (-0.7, 0.55)):
         cyl("cp_wood_stake", 0.03, 0.3, (px, py, 0.38), P["wood_dk"], seg=6)
 
 
@@ -721,19 +760,29 @@ def build_marsh_reed_bed(P):
     # dense rush clumps per paddy: solid mass + stalks + seed heads
     import random
     rnd = random.Random(7)
+    greens = ("crop_gr", "crop_dk", "crop_lt")
     for qx in (-1, 1):
         for qy in (-1, 1):
             cx0, cy0 = qx * 0.72, qy * 0.72
-            box("mr_rush_mass", 0.85, 0.85, 0.3, (cx0, cy0, 0.13),
+            # rounded clump: stacked shrinking boxes in 3 greens, jittered so
+            # the top reads as a mound, not one flat cube
+            jx = (rnd.random() - 0.5) * 0.1
+            jy = (rnd.random() - 0.5) * 0.1
+            box("mr_rush_mass", 0.85, 0.85, 0.15, (cx0, cy0, 0.13),
                 P["crop_dk"])
-            for _ in range(10):
-                tx = cx0 + (rnd.random() - 0.5) * 0.85
-                ty = cy0 + (rnd.random() - 0.5) * 0.85
-                th = 0.5 + rnd.random() * 0.35
-                cyl("mr_rush_stalk", 0.028, th, (tx, ty, 0.14), P["crop_gr"],
-                    seg=5)
-                if rnd.random() > 0.5:
-                    box("mr_crop_head", 0.05, 0.05, 0.1, (tx, ty, 0.14 + th),
+            box("mr_rush_mass2", 0.64, 0.64, 0.13,
+                (cx0 + jx, cy0 + jy, 0.28), P["crop_gr"])
+            box("mr_rush_mass3", 0.4, 0.4, 0.1,
+                (cx0 + jx * 2, cy0 + jy * 2, 0.41), P["crop_lt"])
+            # stalks: short and thin — workers are ~0.6 at the shoulder
+            for _ in range(12):
+                tx = cx0 + (rnd.random() - 0.5) * 0.8
+                ty = cy0 + (rnd.random() - 0.5) * 0.8
+                th = 0.32 + rnd.random() * 0.22
+                cyl("mr_rush_stalk", 0.018, th, (tx, ty, 0.14),
+                    P[greens[rnd.randrange(3)]], seg=5)
+                if rnd.random() > 0.55:
+                    box("mr_crop_head", 0.04, 0.04, 0.07, (tx, ty, 0.14 + th),
                         P["crop_g"])
     # cut bundle stack on the near rim + basket
     for i in range(3):
@@ -950,8 +999,9 @@ def build_ration_house(P):
             (0.22, -0.7 + i * 0.05, 0.3 + i * 0.24), P["wood"])
 
     # granary annex + beehive silos (cyl taper + sphere cap)
-    frustum("rh_mud_annex", 1.0, 1.2, 0.9, 1.1, 0.58, (0.85, 0.6, 0.07),
-            P["mud"])
+    annex = frustum("rh_mud_annex", 1.0, 1.2, 0.9, 1.1, 0.58, (0.85, 0.6, 0.07),
+                    P["mud"])
+    bevel(annex, 0.02)
     box("rh_mud_annexroof", 0.92, 1.12, 0.06, (0.85, 0.6, 0.65), P["mud_dk"])
     silos = ((1.02, 0.15, 1.0), (0.68, -0.42, 0.86), (1.08, -0.82, 0.72))
     for i, (sx, sy, s) in enumerate(silos):
@@ -999,23 +1049,38 @@ def build_luxury_material(P):
     bevel(base, 0.02)
     box("lm_stone_pad", 1.5, 1.2, 0.05, (-0.45, -0.35, 0.08), P["stone"])
 
-    # heavy material rack along the back wall
+    # heavy material rack along the back wall: chunky double-row post frame,
+    # thick planked shelves with support rails — every item visibly seated
     ry0 = 1.05
-    for px in (-1.05, -0.35, 0.35, 1.05):
-        box("lm_wood_rackpost", 0.07, 0.07, 1.1, (px, ry0, 0.08), P["wood_dk"])
-    for zz in (0.42, 0.78):
-        box("lm_wood_shelf", 2.35, 0.5, 0.055, (0, ry0, zz), P["wood"])
-    box("lm_wood_racktop", 2.45, 0.56, 0.05, (0, ry0, 1.14), P["wood_dk"])
-    # shelf goods: stone blocks, copper ingots, bundle
+    for px in (-1.12, 0.0, 1.12):
+        for py in (ry0 - 0.22, ry0 + 0.22):
+            box("lm_wood_rackpost", 0.1, 0.1, 1.14, (px, py, 0.08),
+                P["wood_dk"])
+    for zz in (0.38, 0.76):
+        # support rails under the shelf, spanning the posts front and back
+        box("lm_wood_shelfrail", 2.34, 0.07, 0.07, (0, ry0 - 0.22, zz - 0.07),
+            P["wood_dk"])
+        box("lm_wood_shelfrail2", 2.34, 0.07, 0.07, (0, ry0 + 0.22, zz - 0.07),
+            P["wood_dk"])
+        box("lm_wood_shelf", 2.4, 0.58, 0.07, (0, ry0, zz), P["wood"])
+    box("lm_wood_racktop", 2.5, 0.64, 0.06, (0, ry0, 1.22), P["wood_dk"])
+    # shelf goods seated flat on the shelf tops (lower top 0.45, upper 0.83)
     for i in range(3):
-        box("lm_stone_shelfblock", 0.32, 0.24, 0.2, (-0.85 + i * 0.36, ry0, 0.475),
+        box("lm_stone_shelfblock", 0.32, 0.24, 0.2, (-0.85 + i * 0.36, ry0, 0.45),
             P["stone_w"], rz=0.06 * (i - 1))
     for i in range(4):
         box("lm_copper_shelfingot", 0.2, 0.1, 0.07, (0.45 + (i % 2) * 0.26, ry0
-            - 0.06 + (i // 2) * 0.14, 0.475), P["copper"], rz=0.1 * (i % 2))
-    cyl("lm_thatch_shelfbundle", 0.08, 0.6, (-0.6, ry0, 0.835 + 0.08 - 0.3),
+            - 0.06 + (i // 2) * 0.14, 0.45), P["copper"], rz=0.1 * (i % 2))
+    cyl("lm_thatch_shelfbundle", 0.08, 0.6, (-0.6, ry0, 0.83 + 0.08 - 0.3),
         P["thatch"], seg=7, ry=math.radians(90))
-    box("lm_grey_shelfslab", 0.5, 0.3, 0.1, (0.55, ry0, 0.835), P["grey"])
+    box("lm_grey_shelfslab", 0.5, 0.3, 0.1, (0.55, ry0, 0.83), P["grey"])
+    # ground pallet with spare copper stock in front of the rack — ties the
+    # metal read to the ground plane
+    box("lm_wood_pallet", 0.62, 0.4, 0.06, (1.0, 0.55, 0.08), P["wood"])
+    for i in range(3):
+        box("lm_copper_palingot", 0.24, 0.11, 0.08,
+            (0.88 + (i % 2) * 0.26, 0.48 + (i // 2) * 0.13, 0.14), P["copper"],
+            rz=0.08 * i)
 
     # white-stone block stacks (left, 2 courses + offset cap)
     sx0, sy0 = -1.0, -0.15
@@ -1052,7 +1117,7 @@ def build_luxury_material(P):
     sphere("lm_gem_loose2", 0.04, (gx + 0.08, gy - 0.06, 0.36), P["gem"], seg=6)
 
     # rope-bound upright bundles (right side)
-    for i, (px, py, s) in enumerate(((1.15, 0.15, 1.0), (0.95, 0.42, 0.85))):
+    for i, (px, py, s) in enumerate(((1.15, 0.12, 1.0), (0.58, 0.38, 0.85))):
         cyl(f"lm_thatch_bund{i}", 0.12 * s, 0.55 * s, (px, py, 0.08),
             P["thatch"], seg=8)
         cyl(f"lm_rope_bind{i}", 0.13 * s, 0.05, (px, py, 0.08 + 0.3 * s),
@@ -1322,14 +1387,24 @@ def build_warehouse(P):
     for bxp in (-0.78, 0.78):
         frustum("wh_mud_buttress", 0.26, 0.14, 0.2, 0.1, 1.1,
                 (bxp, -0.85, 0.08), P["mud"])
-    box("wh_stone_cornice", 2.38, 1.94, 0.09, (0, 0.15, 1.36), P["stone"])
+    cor = box("wh_stone_cornice", 2.38, 1.94, 0.09, (0, 0.15, 1.36), P["stone"])
+    bevel(cor, 0.02)
     box("wh_mud_roof", 2.18, 1.74, 0.07, (0, 0.15, 1.45), P["mud_dk"])
-    # parapet rim strips (not a slab — roof surface stays visible)
-    for s in (-1, 1):
-        box("wh_mud_rimY", 2.2, 0.09, 0.08, (0, 0.15 + s * 0.83, 1.52),
-            P["mud"])
-        # X strips stop short of the corners — no coplanar overlap with rimY
-        box("wh_mud_rimX", 0.09, 1.55, 0.08, (s * 1.06, 0.15, 1.52), P["mud"])
+    # low parapet rim with crenel gaps (2 on the front run, 1 per flank)
+    for cx0, ln in ((-0.79, 0.62), (0.1, 0.66), (0.85, 0.5)):
+        box("wh_mud_rimF", ln, 0.09, 0.1, (cx0, -0.68, 1.52), P["mud"])
+    for cx0, ln in ((-0.45, 1.3), (0.78, 0.64)):
+        box("wh_mud_rimB", ln, 0.09, 0.1, (cx0, 0.98, 1.52), P["mud"])
+    # X strips stop short of the corners — no coplanar overlap with rim runs
+    box("wh_mud_rimL", 0.09, 1.55, 0.1, (-1.06, 0.15, 1.52), P["mud"])
+    for cy0, ln in ((-0.28, 0.65), (0.62, 0.6)):
+        box("wh_mud_rimR", 0.09, ln, 0.1, (1.06, cy0, 1.52), P["mud"])
+    # wood joist lines across the roof surface (thin proud strips)
+    for yy in (-0.42, -0.05, 0.32, 0.69):
+        box("wh_wood_joist", 1.96, 0.05, 0.03, (0, yy, 1.52), P["wood_dk"])
+    # roof hatch with frame
+    box("wh_wood_hatchframe", 0.4, 0.4, 0.05, (0.78, -0.4, 1.52), P["wood_dk"])
+    box("wh_dark_hatch", 0.28, 0.28, 0.045, (0.78, -0.4, 1.545), P["dark"])
 
     # blue clerestory band + dark vent slots near the top
     box("wh_blue_clerestory", 1.95, 0.05, 0.16, (0, -0.79, 1.08), P["blue"])
@@ -1347,13 +1422,13 @@ def build_warehouse(P):
                rx=math.radians(8))
     bevel(ramp, 0.02)
 
-    # roof mats + rolled bundles (on the roof surface, inside the rim)
-    box("wh_matting_roof", 0.7, 0.55, 0.04, (-0.5, 0.3, 1.485), P["thatch"])
-    box("wh_matting_roof2", 0.5, 0.4, 0.04, (0.45, -0.15, 1.485),
+    # roof mats + rolled bundles (proud of the roof surface, inside the rim)
+    box("wh_matting_roof", 0.7, 0.55, 0.04, (-0.5, 0.3, 1.52), P["thatch"])
+    box("wh_matting_roof2", 0.5, 0.4, 0.04, (0.35, -0.2, 1.52),
         P["thatch_dk"])
     for i in range(2):
         cyl(f"wh_thatch_roll{i}", 0.055, 0.6 - i * 0.12,
-            (0.35 + i * 0.18, 0.5, 1.485 + 0.055 - (0.6 - i * 0.12) / 2),
+            (0.35 + i * 0.18, 0.5, 1.52 + 0.055 - (0.6 - i * 0.12) / 2),
             P["thatch_dk"], seg=8, ry=math.radians(90))
 
     # crates stacked clear of the battered wall, front-left
@@ -1500,14 +1575,21 @@ def paint_variation(objs, seed=5):
         # cloth/ember/gold keep tighter jitter so accents stay clean
         tight = any(k in name for k in ("cloth", "gold", "ember", "glow",
                                         "water", "linen"))
-        amp = 0.05 if tight else 0.10
+        amp = 0.05 if tight else 0.16
+        mw = o.matrix_world
         for poly in me.polygons:
             f = 1.0 + rnd.uniform(-amp, amp)
             # faces near ground pick up dirt; high faces bleach in the sun
             zc = sum(me.vertices[v].co.z for v in poly.vertices) / len(poly.vertices)
             t = (zc - lo) / span
-            grade = 0.94 + 0.10 * min(1.0, max(0.0, t))
+            grade = 0.87 + 0.17 * min(1.0, max(0.0, t))
             v = f * grade
+            # ground-contact band: world-space low faces take extra dirt
+            if not tight:
+                zw = sum((mw @ me.vertices[vi].co).z
+                         for vi in poly.vertices) / len(poly.vertices)
+                if zw < 0.18:
+                    v *= 0.85
             for li in poly.loop_indices:
                 attr.data[li].color = (v, v, v, 1.0)
 

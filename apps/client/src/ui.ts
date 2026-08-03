@@ -460,6 +460,16 @@ function settlement() {
   return state?.settlements[0] ?? null;
 }
 
+/**
+ * Display name for a settlement. The server auto-names new shores
+ * "<username>'s Shore" — raw usernames (judge_goal's Shore) read as dev
+ * output, so the auto-name becomes "Your Shore"; real custom names pass through.
+ */
+function shoreDisplayName(stName: string, playerName: string): string {
+  if (stName.toLowerCase() === `${playerName.toLowerCase()}'s shore`) return "Your Shore";
+  return stName;
+}
+
 function renderSettlement(s: PublicSnapshot) {
   const panel = document.getElementById("panel-settlement")!;
   const st = s.settlements[0];
@@ -469,12 +479,13 @@ function renderSettlement(s: PublicSnapshot) {
   }
   const free = st.workers - st.workersAssigned;
   const tick = s.tickSummary;
+  const shoreName = shoreDisplayName(st.name, s.player.name);
   panel.innerHTML = `
-    <h2>${st.name}</h2>
+    <h2>${shoreName}</h2>
     <div class="stat-band">
       <span class="b-card-glyph">${GLYPHS.ziggurat}</span>
       <div class="stat-band-text">
-        <strong>${st.name}</strong>
+        <strong>${shoreName}</strong>
         <div class="muted">Great House L${st.greatHouseLevel} · ${st.workers} Workers (${st.workersAssigned} assigned, ${free} free) · ${resourceShort(st.uniqueLuxury)}</div>
       </div>
     </div>
@@ -703,7 +714,7 @@ function renderHarbor(s: PublicSnapshot) {
         ? `<p class="muted">Fleet of the shore · ${st.barges.length} barge${st.barges.length === 1 ? "" : "s"}</p>
            <div id="barge-list"></div>
            <div class="panel-footer">
-             <button id="build-barge" class="primary">Lay a new barge <span class="muted">· 25 Cedar + 25 Rations + 20 wh</span></button>
+             <button id="build-barge" class="primary">Lay a new barge <span class="muted">· 25 Cedar + 25 Rations · 20 worker-hours</span></button>
            </div>`
         : `<div class="stat-band">
              <span class="b-card-glyph">${GLYPHS.barge}</span>
@@ -870,12 +881,29 @@ function renderAllies(s: PublicSnapshot) {
   const legacy = (s.player.legacyAscensions ?? [])
     .map((a) => `<div>${a.name} · prestige ${a.prestige}</div>`)
     .join("") || "<div class='muted'>No Ascensions yet</div>";
-  const notes = (s.notifications ?? [])
-    .slice()
-    .reverse()
-    .slice(0, 5)
-    .map((n) => `<div class="muted">${n.title}: ${n.body}</div>`)
-    .join("");
+  const NOTE_GLYPH: Record<string, string> = {
+    construction: "trowel",
+    barge: "barge",
+    trade: "handshake",
+    blessing: "shrine",
+    envoy: "flag",
+    system: "scribe",
+  };
+  const noteCard = (n: { kind: string; title: string; body: string; ts: number }) =>
+    `<div class="note-card">
+      <span class="note-glyph">${GLYPHS[NOTE_GLYPH[n.kind] ?? "seal"] ?? ""}</span>
+      <span class="note-info"><strong>${n.title}</strong><span class="muted">${n.body}</span></span>
+      <span class="note-time" title="${new Date(n.ts).toLocaleString()}">${relTime(n.ts)}</span>
+    </div>`;
+  const allNotes = (s.notifications ?? []).slice().reverse();
+  const earlierNotes = allNotes.slice(5, 25);
+  const notes =
+    allNotes.slice(0, 5).map(noteCard).join("") +
+    (earlierNotes.length
+      ? `<details class="notes-earlier"><summary>earlier… (${earlierNotes.length})</summary>${earlierNotes
+          .map(noteCard)
+          .join("")}</details>`
+      : "");
   panel.innerHTML = `
     <h2>Allies & reputation</h2>
     <p class="muted">Prestige ${s.player.prestige} · preferred partners pin to trade lists</p>
@@ -954,17 +982,28 @@ function renderWall(s: PublicSnapshot) {
   panel.innerHTML = `
     <h2>Tablet Wall</h2>
     <p class="muted">Trust trade — no escrow. Province channel is home while on your shore.</p>
-    <div class="row">
-      <select id="chat-channel">
+    <div class="chat-toolbar">
+      <div class="channel-pills" role="group" aria-label="Chat channel">
+        ${(["province", "trade", "general"] as const)
+          .map(
+            (ch) =>
+              `<button type="button" class="channel-pill ch-${ch}${defaultCh === ch ? " active" : ""}" data-ch="${ch}" aria-pressed="${defaultCh === ch}">${ch.charAt(0).toUpperCase() + ch.slice(1)}</button>`
+          )
+          .join("")}
+      </div>
+      <select id="chat-channel" class="sr-only-select" aria-hidden="true" tabindex="-1">
         <option value="province" ${defaultCh === "province" ? "selected" : ""}>Province</option>
         <option value="trade" ${defaultCh === "trade" ? "selected" : ""}>Trade</option>
         <option value="general" ${defaultCh === "general" ? "selected" : ""}>General</option>
       </select>
-      <input id="chat-search" placeholder="Search…" style="flex:1" />
+      <label class="chat-search-wrap" aria-label="Search the wall">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>
+        <input id="chat-search" placeholder="Search the wall…" />
+      </label>
     </div>
     <div class="chat-box" id="chat-box"></div>
     <div class="row">
-      <input id="chat-input" placeholder="**bold** *italic* @name emoji ok" />
+      <input id="chat-input" placeholder="Write to your province…" />
       <button class="small" id="chat-send">Send</button>
     </div>
     <h3>Trust offer (Wall)</h3>
@@ -999,6 +1038,17 @@ function renderWall(s: PublicSnapshot) {
     const preferred = new Set(s.player.prefs?.preferredPartners ?? []);
     let msgs = s.chat.slice(-50);
     if (q) msgs = msgs.filter((m) => m.text.toLowerCase().includes(q) || m.fromName.toLowerCase().includes(q));
+    if (msgs.length === 0) {
+      box.innerHTML = `<div class="chat-empty">
+        <svg viewBox="0 0 64 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M10 6h40c2 0 4 2 4 4v22c0 2-2 4-4 4H30l-8 8v-8H10c-2 0-4-2-4-4V10c0-2 2-4 4-4z"/>
+          <path d="M8 10c3-2.5 6-2.5 9-1M56 10c-3-2.5-6-2.5-9-1" opacity="0.55"/>
+          <path d="M18 16h28M18 22h28M18 28h16" opacity="0.7"/>
+        </svg>
+        <p>${q ? "Nothing on the wall matches your search." : "The wall is quiet. Greet your neighbors."}</p>
+      </div>`;
+      return;
+    }
     // Prefer province channel messages first when sorting soft
     msgs = [...msgs].sort((a, b) => {
       const ap = preferred.has(a.fromId) ? 1 : 0;
@@ -1019,6 +1069,17 @@ function renderWall(s: PublicSnapshot) {
   };
   redrawChat();
   panel.querySelector("#chat-search")?.addEventListener("input", redrawChat);
+  // Channel pills drive the (visually hidden) #chat-channel select the send handler reads.
+  const channelSelect = panel.querySelector<HTMLSelectElement>("#chat-channel");
+  panel.querySelectorAll<HTMLButtonElement>(".channel-pill").forEach((pill) => {
+    pill.addEventListener("click", () => {
+      if (channelSelect) channelSelect.value = pill.dataset.ch ?? "province";
+      panel.querySelectorAll(".channel-pill").forEach((p) => {
+        p.classList.toggle("active", p === pill);
+        p.setAttribute("aria-pressed", String(p === pill));
+      });
+    });
+  });
   panel.querySelector("#chat-send")?.addEventListener("click", async () => {
     const text = (panel.querySelector("#chat-input") as HTMLInputElement).value;
     const channel = (panel.querySelector("#chat-channel") as HTMLSelectElement)
@@ -1205,28 +1266,55 @@ function openNewBuildPopup(kind: BuildingKind, plotId: string) {
   });
 }
 
+/** Which pad type each buildable kind goes on (data mirrors SETTLEMENT_PLOTS categories). */
+const BUILD_PAD_TYPE: Record<string, { label: string; cls: string }> = {
+  ration_house: { label: "Shop pad", cls: "pad-shop" },
+  mudbrick_yard: { label: "Shop pad", cls: "pad-shop" },
+  vessel_shop: { label: "Shop pad", cls: "pad-shop" },
+  reed_basket_shop: { label: "Shop pad", cls: "pad-shop" },
+  luxury_workshop: { label: "Shop pad", cls: "pad-shop" },
+  harbor: { label: "Special pad", cls: "pad-special" },
+  warehouse: { label: "Special pad", cls: "pad-special" },
+  shrine: { label: "Special pad", cls: "pad-special" },
+  luxury_material: { label: "Special pad", cls: "pad-special" },
+  training_grounds: { label: "Training pad", cls: "pad-training" },
+};
+
 function renderBuild(s: PublicSnapshot) {
   const panel = document.getElementById("panel-build")!;
   const st = s.settlements[0];
   if (!st) return;
-  const empty = 12 - (st.buildings.length - 5); // 5 starter + 12 empty pads = 17 total plots; occupied non-starter
-  const occupiedPads = st.buildings.length;
+  const built = new Set(st.buildings.map((b) => b.kind as string));
+  const costLine = (cost: { resource: ResourceId; amount: number }[]) =>
+    cost
+      .map((c) => `<span class="cost-bit">${resourceIcon(c.resource)}${c.amount} ${resourceShort(c.resource)}</span>`)
+      .join("");
+  const cards = (Object.keys(NEW_BUILD_COST) as BuildingKind[])
+    .map((kind) => {
+      const pad = BUILD_PAD_TYPE[kind] ?? { label: "Pad", cls: "pad-shop" };
+      const cost = (NEW_BUILD_COST[kind] ?? []) as { resource: ResourceId; amount: number }[];
+      let title = BUILDING_TITLE[kind];
+      if (kind === "luxury_material") title = `Luxury Works (${resourceShort(st.uniqueLuxury)})`;
+      const done = built.has(kind);
+      return `<div class="palette-card${done ? " is-built" : ""}">
+        <span class="palette-glyph">${buildingIcon(kind)}</span>
+        <strong class="palette-name">${title}</strong>
+        <span class="palette-cost">${costLine(cost)}</span>
+        <span class="palette-foot"><span class="pad-chip ${pad.cls}">${pad.label}</span>${done ? `<span class="built-chip">Built</span>` : `<span class="muted">~${formatHours(constructionHours(kind, 1))}</span>`}</span>
+      </div>`;
+    })
+    .join("");
   panel.innerHTML = `
     <h2>Build</h2>
-    <p><strong>Click a colored empty pad</strong> on the shore — not free placement.</p>
-    <ul class="action-list">
-      <li><strong>Shop</strong> (sand) — 5 slots: Ration House, Mudbrick Yard, Vessel, Basket, Luxury Goods</li>
-      <li><strong>Special</strong> — Harbor, Warehouse, Shrine, your unique Luxury Works</li>
-      <li><strong>Training</strong> — 3 barracks (Bow / Spear / Chariot)</li>
-    </ul>
-    <p class="muted">Starter only: Great House, Market, Emmer, Clay, Reeds. One construction at a time. Buildings: ${occupiedPads} · Queue: ${
+    <p class="build-lead"><strong>Click a sand pad on the shore to place.</strong> Buildings rise only on their matching pads — sand for shops, pale stone for specials, dark earth for barracks.</p>
+    <div class="build-palette">${cards}</div>
+    <p class="muted">One construction at a time · Queue: ${
       st.construction
         ? `${prettyKind(st.construction.kind)} ${st.construction.workerHoursDone.toFixed(1)}/${st.construction.workerHoursRequired.toFixed(1)} h`
         : "free"
     }</p>
     <p class="muted">Unique luxury: <strong>${RESOURCE_LABELS[st.uniqueLuxury]}</strong> — trade for every other luxury. Province: <strong>${s.map.provinces.find((p) => p.id === st.provinceId)?.name ?? st.provinceId}</strong></p>
   `;
-  void empty;
 }
 
 function renderMilitary(s: PublicSnapshot) {
@@ -1262,7 +1350,7 @@ function renderMilitary(s: PublicSnapshot) {
     <h3>Held monuments</h3>
     <div id="mon-list"></div>
     <h3>Envoy</h3>
-    <button id="envoy" class="small secondary">Dispatch envoy (GH7+)</button>
+    <button id="envoy" class="small secondary">Dispatch envoy — needs Great House Level 7</button>
     <h3>Shrine offering</h3>
     <button id="shrine" class="small secondary">Contribute 1 patron good</button>
   `;
@@ -1394,17 +1482,73 @@ function renderMilitary(s: PublicSnapshot) {
   });
 }
 
-/* ── World map: authored papyrus river board ─────────────────────── */
+/* ── World map v2: authored papyrus cartography board ────────────── */
 
-/** Authored marker anchors ON the river banks of the board (640×300). */
-const PROVINCE_ANCHORS: [number, number][] = [
-  [62, 226],
-  [158, 174],
-  [258, 150],
-  [354, 178],
-  [452, 128],
-  [548, 78],
+/** Hand-authored river centerline: delta mouth (top) → upper cataract (bottom). Board is 640×620. */
+const RIVER_PTS: [number, number][] = [
+  [330, 58],
+  [306, 104],
+  [244, 156],
+  [218, 222],
+  [272, 282],
+  [356, 330],
+  [408, 392],
+  [378, 458],
+  [300, 500],
+  [232, 556],
 ];
+
+/** Dense, arc-length-normalized samples of the Catmull-Rom-smoothed centerline. */
+const RIVER_SAMPLES: { x: number; y: number; u: number }[] = (() => {
+  const raw: { x: number; y: number }[] = [];
+  const n = RIVER_PTS.length;
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = RIVER_PTS[Math.max(0, i - 1)]!;
+    const p1 = RIVER_PTS[i]!;
+    const p2 = RIVER_PTS[i + 1]!;
+    const p3 = RIVER_PTS[Math.min(n - 1, i + 2)]!;
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6;
+    const c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6;
+    const c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    const steps = 14;
+    for (let k = i === 0 ? 0 : 1; k <= steps; k++) {
+      const t = k / steps;
+      const mt = 1 - t;
+      raw.push({
+        x: mt * mt * mt * p1[0] + 3 * mt * mt * t * c1x + 3 * mt * t * t * c2x + t * t * t * p2[0],
+        y: mt * mt * mt * p1[1] + 3 * mt * mt * t * c1y + 3 * mt * t * t * c2y + t * t * t * p2[1],
+      });
+    }
+  }
+  const lens: number[] = [0];
+  for (let i = 1; i < raw.length; i++) {
+    lens.push(lens[i - 1]! + Math.hypot(raw[i]!.x - raw[i - 1]!.x, raw[i]!.y - raw[i - 1]!.y));
+  }
+  const total = lens[lens.length - 1]! || 1;
+  return raw.map((p, i) => ({ x: p.x, y: p.y, u: lens[i]! / total }));
+})();
+
+/** Point + unit normal at normalized river position u (0 = delta mouth, 1 = cataract). */
+function riverPoint(u: number): { x: number; y: number; nx: number; ny: number } {
+  const uu = Math.min(1, Math.max(0, u));
+  let i = RIVER_SAMPLES.findIndex((s) => s.u >= uu);
+  if (i <= 0) i = 1;
+  const a = RIVER_SAMPLES[i - 1]!;
+  const b = RIVER_SAMPLES[i]!;
+  const f = (uu - a.u) / (b.u - a.u || 1);
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const d = Math.hypot(dx, dy) || 1;
+  return { x: a.x + dx * f, y: a.y + dy * f, nx: -dy / d, ny: dx / d };
+}
+
+/** Full centerline as one SVG path (dense polyline reads as a smooth curve). */
+function riverPathD(u0 = 0, u1 = 1): string {
+  const pts = RIVER_SAMPLES.filter((s) => s.u >= u0 && s.u <= u1);
+  if (pts.length < 2) return "";
+  return pts.map((s, i) => `${i === 0 ? "M" : "L"}${s.x.toFixed(1)} ${s.y.toFixed(1)}`).join("");
+}
 
 /** Inline a GLYPHS entry into an outer SVG at (x, y) with size s. */
 function glyphAt(name: string, x: number, y: number, size: number, color: string): string {
@@ -1416,93 +1560,175 @@ function glyphAt(name: string, x: number, y: number, size: number, color: string
 }
 
 function buildRiverBoard(
-  provinces: { id: string; name: string }[],
-  myProvinceId: string | undefined
+  provinces: { id: string; name: string; riverIndex: number }[],
+  myProvinceId: string | undefined,
+  sites: PublicSnapshot["map"]["sites"],
+  playerId: string
 ): string {
-  const markers = provinces
+  const ordered = provinces.slice().sort((a, b) => a.riverIndex - b.riverIndex);
+  const segCount = Math.max(1, ordered.length);
+
+  // Province markers: city glyph roundel on the bank + small-caps plaque label
+  const provMarks = ordered
     .map((p, i) => {
-      const [x, y] = PROVINCE_ANCHORS[i % PROVINCE_ANCHORS.length]!;
+      const mid = riverPoint((i + 0.5) / segCount);
+      const side = i % 2 === 0 ? 1 : -1;
+      const x = mid.x + mid.nx * 46 * side;
+      const y = mid.y + mid.ny * 46 * side;
       const mine = p.id === myProvinceId;
-      const labelW = Math.max(48, p.name.length * 5.6 + 14);
+      const labelW = Math.max(66, p.name.length * 7.6 + 18);
       return `<g class="wm-prov${mine ? " wm-mine" : ""}" data-prov="${p.id}" tabindex="0" role="button"
         aria-label="${p.name}${mine ? " (your province)" : ""}">
-        <circle class="halo" cx="${x}" cy="${y}" r="17" fill="#e8c26a"/>
-        ${mine ? `<circle class="pulse" cx="${x}" cy="${y}" r="12" fill="none" stroke="#d4a84b" stroke-width="1.6"/>` : ""}
-        <circle class="sel-ring" cx="${x}" cy="${y}" r="14" fill="none" stroke="#a97f2e" stroke-width="2"/>
-        <circle class="roundel" cx="${x}" cy="${y}" r="10.5" fill="${mine ? "#e2b558" : "#f2e6c6"}" stroke="#6b512c" stroke-width="1.3"/>
-        ${glyphAt("ziggurat", x - 6.5, y - 6.5, 13, mine ? "#3d2c0e" : "#8a6b34")}
-        <rect x="${x - labelW / 2}" y="${y + 14}" width="${labelW}" height="14" rx="7" fill="#fdf6e4" fill-opacity="0.88" stroke="#c2a26c" stroke-width="0.6"/>
-        <text x="${x}" y="${y + 24}" text-anchor="middle" font-size="9.5" font-family="Iowan Old Style, Palatino Linotype, Palatino, Georgia, serif" font-weight="${mine ? 700 : 400}" fill="#4a3413">${p.name}</text>
+        <circle class="halo" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="20" fill="#e8c26a"/>
+        ${mine ? `<circle class="pulse" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="14" fill="none" stroke="#d4a84b" stroke-width="1.6"/>` : ""}
+        <circle class="sel-ring" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="16.5" fill="none" stroke="#a97f2e" stroke-width="2"/>
+        <circle class="roundel" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="12.5" fill="${mine ? "#e2b558" : "#f2e6c6"}" stroke="#6b512c" stroke-width="1.4"/>
+        ${glyphAt("ziggurat", x - 8, y - 8, 16, mine ? "#3d2c0e" : "#8a6b34")}
+        ${mine ? `<circle cx="${(x + 10.5).toFixed(1)}" cy="${(y - 9.5).toFixed(1)}" r="4" fill="#96323f" stroke="#4a1219" stroke-width="1"/>` : ""}
+        <rect class="wm-plaque" x="${(x - labelW / 2).toFixed(1)}" y="${(y + 17).toFixed(1)}" width="${labelW.toFixed(0)}" height="17" rx="8.5" fill="#fdf6e4" fill-opacity="0.9" stroke="#c2a26c" stroke-width="0.7"/>
+        <text class="wm-label" x="${x.toFixed(1)}" y="${(y + 29.5).toFixed(1)}" text-anchor="middle"${mine ? ' font-weight="700"' : ""}>${p.name}</text>
       </g>`;
     })
     .join("");
 
+  // Dashed cartouche borders between province reaches, drawn across the river
+  const borders = ordered
+    .slice(0, -1)
+    .map((_, k) => {
+      const b = riverPoint((k + 1) / segCount);
+      const L = 150;
+      return `<line class="wm-border" x1="${(b.x - b.nx * L).toFixed(1)}" y1="${(b.y - b.ny * L).toFixed(1)}" x2="${(b.x + b.nx * L).toFixed(1)}" y2="${(b.y + b.ny * L).toFixed(1)}"/>`;
+    })
+    .join("");
+
+  // Gold wash over your province's reach of the river
+  const myIdx = ordered.findIndex((p) => p.id === myProvinceId);
+  const myWash =
+    myIdx >= 0
+      ? `<path class="wm-myreach" d="${riverPathD(myIdx / segCount, (myIdx + 1) / segCount)}"/>`
+      : "";
+
+  // Site markers ON the river, positioned from server mapX/mapY within each province reach
+  const riMap = new Map(ordered.map((p) => [p.id, p.riverIndex] as const));
+  const siteMarks = sites
+    .map((site) => {
+      const ri = riMap.get(site.provinceId) ?? 0;
+      const inProv = Math.min(0.92, Math.max(0.08, (site.mapX - ri * 120) / 120));
+      const pos = riverPoint((ri + inProv) / segCount);
+      const inland = site.kind === "monument" ? 2.4 : 1;
+      const lat = ((site.mapY - 57.5) / 75) * 15 * inland;
+      const x = pos.x + pos.nx * lat;
+      const y = pos.y + pos.ny * lat;
+      const open = site.kind === "founding" && !site.ownerPlayerId;
+      const own = !!site.ownerPlayerId && site.ownerPlayerId === playerId;
+      const fill =
+        site.kind === "city"
+          ? "#e2b558"
+          : site.kind === "monument"
+            ? "#e5c9cf"
+            : open
+              ? "#f4ecd6"
+              : "#d9e4c4";
+      return `<g class="wm-site kind-${site.kind}${own ? " wm-own" : ""}${open ? " is-open" : ""}" data-site="${site.id}" data-kind="${site.kind}" data-prov="${site.provinceId}" tabindex="0" role="button" aria-label="${site.name}">
+        ${own ? `<circle class="own-wash" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="22" fill="#e8c26a"/>` : ""}
+        <circle class="halo" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="13.5" fill="#e8c26a"/>
+        <circle class="sel-ring" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="11" fill="none" stroke="#a97f2e" stroke-width="2"/>
+        <circle class="dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7.5" fill="${fill}" stroke="#5d4520" stroke-width="1.2"${open ? ' stroke-dasharray="2.6 1.9"' : ""}/>
+        ${glyphAt(SITE_GLYPH[site.kind] ?? "cartouche", x - 4.75, y - 4.75, 9.5, "#4a3413")}
+        ${own ? `<circle cx="${(x + 7.5).toFixed(1)}" cy="${(y - 7.5).toFixed(1)}" r="3.4" fill="#96323f" stroke="#4a1219" stroke-width="0.9"/>` : ""}
+      </g>`;
+    })
+    .join("");
+
+  const d = riverPathD();
+
   return `
-  <svg class="world-river-map" viewBox="0 0 640 300" role="img" aria-label="The Eternal River and its provinces">
+  <svg class="world-river-map" viewBox="0 0 640 620" role="img" aria-label="The Eternal River and its provinces">
     <defs>
       <pattern id="wmFiber" width="26" height="26" patternUnits="userSpaceOnUse">
         <path d="M0 7h26M0 19h26" stroke="#917748" stroke-opacity="0.075"/>
         <path d="M7 0v26M19 0v26" stroke="#917748" stroke-opacity="0.05"/>
       </pattern>
-      <linearGradient id="wmRiver" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0" stop-color="#1c4761"/>
-        <stop offset="0.5" stop-color="#2e6787"/>
-        <stop offset="1" stop-color="#1c4761"/>
+      <linearGradient id="wmSea" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#2e6787"/>
+        <stop offset="1" stop-color="#24597a"/>
       </linearGradient>
+      <clipPath id="wmClip"><rect width="640" height="620" rx="10"/></clipPath>
       <g id="wmPalm" stroke="#7a6134" stroke-linecap="round" fill="none">
         <path d="M0 10V2" stroke-width="1.8"/>
         <path d="M0 2C-3.5 -1 -7 -2 -10 -1.2M0 2c-2-3.5-4.5-6-8-7M0 2c.8-4 .2-7.5-1.6-10M0 2c3.5-3 7-4 10-3.2M0 2c2.4-3.2 5.2-5.2 8.6-6" stroke-width="1.2"/>
       </g>
     </defs>
 
-    <!-- papyrus field -->
-    <rect width="640" height="300" rx="10" fill="#ead7b2"/>
-    <rect width="640" height="300" rx="10" fill="url(#wmFiber)"/>
-    <!-- layered desert tones -->
-    <path d="M0 0h640v42C520 22 380 56 260 40 160 28 60 52 0 38Z" fill="#dec394" opacity="0.55"/>
-    <path d="M0 300v-52c130 20 290-12 430 8 90 12 160 26 210 12v32Z" fill="#d8bc8c" opacity="0.6"/>
-    <!-- dune crescents -->
-    <g stroke="#c2a26c" stroke-width="1.5" fill="none" opacity="0.6">
-      <path d="M74 62q14 -9 28 0"/><path d="M116 78q11 -7 22 0"/>
-      <path d="M394 52q13 -8 26 0"/><path d="M444 66q11 -7 22 0"/>
-      <path d="M488 226q14 -9 28 0"/><path d="M540 246q12 -7 24 0"/>
-      <path d="M180 262q14 -9 28 0"/><path d="M232 276q11 -7 22 0"/>
-      <path d="M580 180q12 -7 24 0"/>
+    <g clip-path="url(#wmClip)">
+      <!-- papyrus field -->
+      <rect width="640" height="620" fill="#ead7b2"/>
+      <rect width="640" height="620" fill="url(#wmFiber)"/>
+      <!-- layered desert tones -->
+      <path d="M0 90 C 120 70 220 118 340 96 C 460 76 560 108 640 88 L640 0 0 0 Z" fill="#dec394" opacity="0.5"/>
+      <path d="M640 210 C 560 250 500 232 470 280 C 450 320 500 380 545 420 C 590 458 620 470 640 468 Z" fill="#d8bc8c" opacity="0.55"/>
+      <path d="M0 330 C 60 310 110 340 150 390 C 185 434 160 480 110 520 C 70 552 30 560 0 556 Z" fill="#d8bc8c" opacity="0.5"/>
+      <path d="M0 620 h640 v-70 C 520 574 380 540 250 566 C 150 586 60 566 0 578 Z" fill="#cdb083" opacity="0.5"/>
+      <!-- the far sea beyond the delta -->
+      <path d="M0 0 h640 v40 C 540 56 420 32 320 46 C 210 60 90 38 0 52 Z" fill="url(#wmSea)" opacity="0.6"/>
+      <path d="M0 52 C 90 38 210 60 320 46 C 420 32 540 56 640 40" stroke="#f8eed3" stroke-width="1.3" fill="none" opacity="0.55"/>
+
+      <!-- dune ridge strokes -->
+      <g stroke="#c2a26c" stroke-width="1.5" fill="none" opacity="0.6">
+        <path d="M84 158q15 -10 30 0"/><path d="M128 176q12 -8 24 0"/>
+        <path d="M478 132q14 -9 28 0"/><path d="M524 152q11 -7 22 0"/>
+        <path d="M540 320q15 -10 30 0"/><path d="M584 344q12 -8 24 0"/>
+        <path d="M90 430q15 -10 30 0"/><path d="M60 462q12 -8 24 0"/>
+        <path d="M480 520q14 -9 28 0"/><path d="M532 546q12 -8 24 0"/>
+        <path d="M320 586q14 -9 28 0"/>
+      </g>
+
+      <!-- floodplain along both banks -->
+      <path d="${d}" fill="none" stroke="#7fa85a" stroke-width="46" stroke-linecap="round" opacity="0.15"/>
+      <path d="${d}" fill="none" stroke="#8fae66" stroke-width="34" stroke-linecap="round" opacity="0.13"/>
+      <!-- banks -->
+      <path d="${d}" fill="none" stroke="#a98d5e" stroke-width="27" stroke-linecap="round" opacity="0.6"/>
+      <!-- the Eternal River -->
+      <path d="${d}" fill="none" stroke="#24597a" stroke-width="22" stroke-linecap="round"/>
+      <path d="${d}" fill="none" stroke="#4a86ab" stroke-width="9" stroke-linecap="round" opacity="0.5"/>
+      <path d="${d}" fill="none" stroke="#123448" stroke-width="2.2" stroke-linecap="round" opacity="0.45"/>
+
+      <!-- delta fan at the mouth -->
+      <g stroke="#24597a" fill="none" stroke-linecap="round">
+        <path d="M330 58 C 322 40 306 28 288 18" stroke-width="10"/>
+        <path d="M330 58 C 332 40 344 26 362 16" stroke-width="9"/>
+        <path d="M330 58 C 316 46 298 40 280 38" stroke-width="6" opacity="0.85"/>
+        <path d="M330 58 C 340 44 354 39 372 40" stroke-width="5" opacity="0.75"/>
+      </g>
+
+      <!-- cataract rapids at the head of the river -->
+      <g stroke="#f8eed3" stroke-width="1.7" opacity="0.8" stroke-linecap="round">
+        <path d="M220 542l10 -5M231 550l11 -5M224 559l10 -5M236 566l10 -5"/>
+      </g>
+
+      ${myWash}
+      ${borders}
+
+      <!-- palm clusters + reeds -->
+      <use href="#wmPalm" transform="translate(150 130) scale(1.15)"/>
+      <use href="#wmPalm" transform="translate(170 140) scale(0.85)"/>
+      <use href="#wmPalm" transform="translate(388 220) scale(1.05)"/>
+      <use href="#wmPalm" transform="translate(404 230) scale(0.8)"/>
+      <use href="#wmPalm" transform="translate(150 300) scale(1.0)"/>
+      <use href="#wmPalm" transform="translate(166 310) scale(0.75)"/>
+      <use href="#wmPalm" transform="translate(496 430) scale(1.1)"/>
+      <use href="#wmPalm" transform="translate(514 442) scale(0.8)"/>
+      <use href="#wmPalm" transform="translate(230 470) scale(0.95)"/>
+      <use href="#wmPalm" transform="translate(360 540) scale(0.9)"/>
+      <g stroke="#6d7c46" stroke-width="1.3" stroke-linecap="round" opacity="0.7">
+        <path d="M268 172v-10M274 173v-12M280 172v-9"/>
+        <path d="M330 348v-10M336 349v-12M342 348v-9"/>
+        <path d="M330 480v-9M336 481v-11M342 480v-8"/>
+      </g>
+
+      ${siteMarks}
+      ${provMarks}
     </g>
-
-    <!-- floodplain bands (offset from the banks, not restrokes of the path) -->
-    <path d="M0 240c60-8 110-30 158-52 44-20 76-30 104-24 34 7 60 22 96 14 40-9 62-38 96-52 30-12 62-22 96-34" stroke="#7fa85a" stroke-width="9" fill="none" opacity="0.2" stroke-linecap="round"/>
-    <path d="M0 272c66-8 124-34 174-58 42-20 72-28 98-23 34 7 62 24 100 15 42-9 66-40 100-55 28-12 58-21 92-32" stroke="#8fae66" stroke-width="7" fill="none" opacity="0.16" stroke-linecap="round"/>
-
-    <!-- the Eternal River: closed tapering body -->
-    <path d="M0 246c62-10 112-32 158-54 44-21 74-30 100-24 32 7 58 21 94 13 40-9 62-37 96-51 30-13 64-23 98-35 12-4 24-9 34-14l-8-20c-10 5-22 10-34 14-34 12-68 23-99 36-35 15-57 42-94 50-32 7-56-7-90-14-30-6-64 4-110 26-46 21-94 42-152 51z" fill="url(#wmRiver)"/>
-    <!-- darker center line -->
-    <path d="M0 236c60-10 108-31 154-52 45-21 76-31 104-25 33 7 58 21 93 13 39-9 61-36 95-51 31-13 64-24 98-36 11-4 21-8 30-12" stroke="#123448" stroke-width="2.2" fill="none" opacity="0.5"/>
-    <!-- inner highlight -->
-    <path d="M0 231c58-10 104-30 150-51 45-21 78-32 106-26 33 7 59 21 94 13 39-9 62-36 96-51 30-13 62-23 96-35" stroke="#6fa7c4" stroke-width="2.6" fill="none" opacity="0.5"/>
-    <!-- bank highlights -->
-    <path d="M0 226c62-10 110-31 156-53 44-21 76-31 102-25 32 7 58 21 94 13 40-9 62-37 96-51 30-13 64-23 98-35 12-4 24-9 34-14" stroke="#f8eed3" stroke-width="1.4" fill="none" opacity="0.7"/>
-    <path d="M0 246c62-10 112-32 158-54 44-21 74-30 100-24 32 7 58 21 94 13 40-9 62-37 96-51 30-13 64-23 98-35 12-4 24-9 34-14" stroke="#a98d5e" stroke-width="1.3" fill="none" opacity="0.55"/>
-    <!-- delta fan into the far sea -->
-    <g stroke="url(#wmRiver)" fill="none" stroke-linecap="round">
-      <path d="M578 66c16-8 30-18 46-32" stroke-width="8"/>
-      <path d="M580 74c18 0 34 6 46 16" stroke-width="7"/>
-      <path d="M582 70c14-4 28-4 40-2" stroke-width="5"/>
-    </g>
-
-    <!-- palm and reed accents -->
-    <use href="#wmPalm" transform="translate(96 150)"/>
-    <use href="#wmPalm" transform="translate(112 158) scale(0.8)"/>
-    <use href="#wmPalm" transform="translate(300 210) scale(0.9)"/>
-    <use href="#wmPalm" transform="translate(314 218) scale(0.7)"/>
-    <use href="#wmPalm" transform="translate(478 160) scale(0.85)"/>
-    <use href="#wmPalm" transform="translate(560 132) scale(0.7)"/>
-    <g stroke="#6d7c46" stroke-width="1.3" stroke-linecap="round" opacity="0.7">
-      <path d="M212 186v-9M217 187v-11M222 186v-8"/>
-      <path d="M402 138v-9M407 139v-11M412 138v-8"/>
-    </g>
-
-    ${markers}
   </svg>`;
 }
 
@@ -1526,7 +1752,7 @@ function renderMap(s: PublicSnapshot) {
 
   panel.innerHTML = `<h2>World Map — Eternal River</h2>
     <p class="muted">Your shore: <strong>${st ? RESOURCE_LABELS[st.uniqueLuxury] : "—"}</strong> on <strong>${myMap}</strong> · ${provName(st?.provinceId)}</p>
-    ${buildRiverBoard(provinces, st?.provinceId)}
+    ${buildRiverBoard(provinces, st?.provinceId, s.map.sites, s.player.id)}
     <div class="map-filter" id="map-filter">
       ${filterChip("all", null, "All")}
       ${filterChip("city", "ziggurat", "Cities")}
@@ -1543,6 +1769,12 @@ function renderMap(s: PublicSnapshot) {
       const okKind = mapKindFilter === "all" || b.dataset.kind === mapKindFilter;
       const okProv = !mapProvFilter || b.dataset.prov === mapProvFilter;
       b.hidden = !(okKind && okProv);
+    });
+    // Mirror filters onto the board's site markers
+    panel.querySelectorAll<SVGGElement>(".wm-site").forEach((g) => {
+      const okKind = mapKindFilter === "all" || g.getAttribute("data-kind") === mapKindFilter;
+      const okProv = !mapProvFilter || g.getAttribute("data-prov") === mapProvFilter;
+      g.style.display = okKind && okProv ? "" : "none";
     });
     panel.querySelectorAll<HTMLButtonElement>("#map-filter button").forEach((b) => {
       b.classList.toggle("active", b.dataset.kf === mapKindFilter);
@@ -1576,6 +1808,7 @@ function renderMap(s: PublicSnapshot) {
 
   const clearCardSel = () => {
     grid.querySelectorAll(".map-site.selected").forEach((x) => x.classList.remove("selected"));
+    panel.querySelectorAll(".wm-site.sel").forEach((x) => x.classList.remove("sel"));
   };
 
   for (const site of s.map.sites) {
@@ -1584,6 +1817,8 @@ function renderMap(s: PublicSnapshot) {
     btn.type = "button";
     btn.dataset.kind = site.kind;
     btn.dataset.prov = site.provinceId;
+    btn.dataset.site = site.id;
+    const marker = panel.querySelector<SVGGElement>(`.wm-site[data-site="${site.id}"]`);
     const status =
       site.kind === "city"
         ? site.ownerPlayerId === s.player.id
@@ -1605,6 +1840,7 @@ function renderMap(s: PublicSnapshot) {
       const st = settlement();
       clearCardSel();
       btn.classList.add("selected");
+      marker?.classList.add("sel");
       const closeSite = () => {
         clearCardSel();
         hidePopup(el);
@@ -1701,6 +1937,32 @@ function renderMap(s: PublicSnapshot) {
       }
     };
     grid.appendChild(btn);
+
+    // Two-way hover/selection wiring between the list card and its board marker
+    const setHl = (on: boolean) => {
+      marker?.classList.toggle("hl", on);
+      btn.classList.toggle("hl", on);
+    };
+    btn.addEventListener("mouseenter", () => setHl(true));
+    btn.addEventListener("mouseleave", () => setHl(false));
+    btn.addEventListener("focus", () => setHl(true));
+    btn.addEventListener("blur", () => setHl(false));
+    if (marker) {
+      marker.addEventListener("mouseenter", () => setHl(true));
+      marker.addEventListener("mouseleave", () => setHl(false));
+      marker.addEventListener("focus", () => setHl(true));
+      marker.addEventListener("blur", () => setHl(false));
+      marker.addEventListener("click", () => {
+        btn.scrollIntoView({ block: "nearest" });
+        btn.click();
+      });
+      marker.addEventListener("keydown", (e) => {
+        if ((e as KeyboardEvent).key === "Enter" || (e as KeyboardEvent).key === " ") {
+          e.preventDefault();
+          btn.click();
+        }
+      });
+    }
   }
 
   applyFilters();

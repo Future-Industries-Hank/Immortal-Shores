@@ -65,6 +65,9 @@ export const GLYPHS: Record<string, string> = {
     '<rect x="4" y="12" width="7" height="7" rx="0.5"/><rect x="13" y="12" width="7" height="7" rx="0.5"/><rect x="8.5" y="5" width="7" height="7" rx="0.5"/>'
   ),
   spear: G('<path d="M4 20l9.8-9.8"/><path d="M13 6.5L17.5 4 20 8.5l-3.6 2.7-3.4-4.7z"/>'),
+  trowel: G(
+    '<path d="M13.5 10.5L20 4"/><path d="M13.8 10.2l-8.6 3.1c-1.5.6-1.8 2.6-.6 3.7l2.4 2.4c1.1 1.2 3.1.9 3.7-.6l3.1-8.6z"/>'
+  ),
   bow: G('<path d="M6.5 3.5C12.5 5 17.5 10 19 16"/><path d="M6.5 3.5L19 16"/><path d="M4.5 19.5L15 9M15 9l-.4 3M15 9l-3 .4"/>'),
   wheel: G(
     '<circle cx="12" cy="12" r="7.5"/><path d="M12 4.5v15M4.5 12h15M6.7 6.7l10.6 10.6M17.3 6.7L6.7 17.3"/>'

@@ -253,6 +253,36 @@ html.dark .auth-panel h1 {
   font-family: var(--font-body);
 }
 
+/* Panel selects: consistent crafted chrome + gold chevron, no native arrow */
+.side-panel select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8'><path d='M2 2l4 4 4-4' fill='none' stroke='%23a97f2e' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 0.55rem center;
+  background-size: 10px 7px;
+  padding-right: 1.8rem;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 252, 240, 0.5), 0 1px 2px rgba(40, 28, 14, 0.08);
+}
+
+html.dark .side-panel select {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8'><path d='M2 2l4 4 4-4' fill='none' stroke='%23d4a84b' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  box-shadow: none;
+}
+
+/* A select kept in the DOM only so existing handlers still read its value */
+.sr-only-select {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  border: 0 !important;
+}
+
 .row {
   display: flex;
   gap: 0.5rem;
@@ -286,7 +316,8 @@ button:hover {
 }
 
 button:active {
-  transform: scale(0.98);
+  transform: translateY(1px) scale(0.985);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.28);
 }
 
 button.primary {
@@ -304,16 +335,43 @@ button.primary:hover {
   background: linear-gradient(180deg, #f2cf7c 0%, #ddb256 45%, #b3893a 100%);
 }
 
+button.primary:active {
+  transform: translateY(1px) scale(0.985);
+  box-shadow:
+    inset 0 2px 5px rgba(110, 78, 22, 0.45),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
 button.secondary {
-  background: rgba(196, 165, 116, 0.16);
+  background: linear-gradient(180deg, rgba(255, 252, 240, 0.55) 0%, rgba(214, 186, 138, 0.35) 100%);
   border: 1px solid var(--hairline-strong);
   color: var(--ink-ui);
-  box-shadow: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 252, 240, 0.65),
+    inset 0 -1px 2px rgba(120, 90, 45, 0.14),
+    0 1px 2px rgba(40, 28, 14, 0.12);
 }
 
 button.secondary:hover {
-  background: rgba(196, 165, 116, 0.3);
+  background: linear-gradient(180deg, rgba(255, 252, 240, 0.7) 0%, rgba(212, 168, 75, 0.32) 100%);
   border-color: var(--gold-soft);
+}
+
+button.secondary:active {
+  transform: translateY(1px) scale(0.985);
+  box-shadow: inset 0 2px 4px rgba(120, 90, 45, 0.28);
+}
+
+html.dark button.secondary {
+  background: linear-gradient(180deg, rgba(90, 74, 56, 0.5) 0%, rgba(50, 42, 32, 0.6) 100%);
+  color: var(--ink-ui);
+  box-shadow:
+    inset 0 1px 0 rgba(243, 230, 200, 0.12),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+html.dark button.secondary:hover {
+  background: linear-gradient(180deg, rgba(110, 90, 66, 0.55) 0%, rgba(60, 50, 38, 0.65) 100%);
 }
 
 button.active {
@@ -414,6 +472,25 @@ button:disabled {
   border: 1px solid rgba(212, 168, 75, 0.55);
   box-shadow: inset 0 1px 0 rgba(255, 245, 220, 0.1), 0 1px 2px rgba(0, 0, 0, 0.35);
   border-radius: var(--radius-sm);
+}
+
+/* HUD selects: kill the native OS dropdown look — chip chrome + gold chevron */
+#hud-top .hud-actions select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image:
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8'><path d='M2 2l4 4 4-4' fill='none' stroke='%23e8c26a' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>"),
+    linear-gradient(180deg, rgba(60, 48, 34, 0.95), rgba(36, 28, 20, 0.98));
+  background-repeat: no-repeat, no-repeat;
+  background-position:
+    right 0.4rem center,
+    center;
+  background-size:
+    9px 6px,
+    cover;
+  padding-right: 1.35rem;
+  cursor: pointer;
+  font-weight: 600;
 }
 
 #resources {
@@ -690,7 +767,8 @@ button:disabled {
   left: 50%;
   bottom: 0.65rem;
   transform: translateX(-50%);
-  width: min(470px, calc(100% - 1rem));
+  width: min(470px, calc(100vw - 1rem));
+  max-width: calc(100vw - 0.75rem);
   max-height: min(60vh, 520px);
   z-index: 20;
   display: flex;
@@ -786,9 +864,25 @@ button:disabled {
 
 .menu-popup-body {
   overflow: auto;
-  padding: 0.65rem 0.8rem 0.9rem;
+  overscroll-behavior: contain;
+  padding: 0.65rem 0.8rem 1.4rem;
   min-height: 0;
   flex: 1 1 auto;
+}
+
+/* Never let flex rows push the popup wider than its shell */
+.menu-popup-body .row,
+.menu-popup-body .b-card-actions {
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.menu-popup-body .b-card-head {
+  min-width: 0;
+}
+
+.menu-popup-body .stat-band-text .muted {
+  overflow-wrap: anywhere;
 }
 
 .side-panel {
@@ -1055,6 +1149,155 @@ html.dark .b-card-glyph {
 
 .settings-debug > div:last-child {
   padding-bottom: 0.6rem;
+}
+
+button.linklike:active {
+  transform: none;
+  box-shadow: none;
+}
+
+/* ── Wall chat toolbar: channel pills + search ───────────────────── */
+
+.chat-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0.35rem 0 0.45rem;
+}
+
+.channel-pills {
+  display: inline-flex;
+  gap: 0;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface-inset);
+  flex: 0 0 auto;
+}
+
+.channel-pill {
+  min-height: 30px;
+  padding: 0.15rem 0.7rem;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  box-shadow: none;
+}
+
+.channel-pill + .channel-pill {
+  border-left: 1px solid var(--hairline);
+}
+
+.channel-pill:hover {
+  background: rgba(212, 168, 75, 0.16);
+  color: var(--ink-ui);
+  border-color: var(--hairline);
+}
+
+.channel-pill.active {
+  background: rgba(212, 168, 75, 0.24);
+  color: var(--ink-ui);
+  box-shadow: inset 0 1px 0 rgba(255, 250, 225, 0.4);
+}
+
+.channel-pill.active.ch-province {
+  color: var(--reed-green);
+}
+
+.channel-pill.active.ch-trade {
+  color: var(--gold-deep);
+}
+
+.channel-pill.active.ch-general {
+  color: var(--river-deep);
+}
+
+html.dark .channel-pill.active {
+  box-shadow: inset 0 1px 0 rgba(243, 230, 200, 0.1);
+}
+
+html.dark .channel-pill.active.ch-trade {
+  color: var(--gold-soft);
+}
+
+.chat-search-wrap {
+  flex: 1 1 8rem;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.55rem;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 999px;
+  background: var(--surface-field);
+  color: var(--ink-soft);
+}
+
+.chat-search-wrap svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  color: var(--gold-deep);
+}
+
+html.dark .chat-search-wrap svg {
+  color: var(--gold-soft);
+}
+
+.chat-search-wrap input,
+.side-panel .chat-search-wrap input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+  margin: 0;
+  padding: 0.32rem 0;
+  border: none;
+  background: transparent;
+  font-size: 0.85rem;
+  outline: none;
+}
+
+.chat-search-wrap:focus-within {
+  border-color: var(--gold-soft);
+  box-shadow: 0 0 0 2px rgba(212, 168, 75, 0.25);
+}
+
+/* Chat empty state — quiet papyrus */
+.chat-empty {
+  height: 100%;
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  text-align: center;
+  color: var(--ink-soft);
+  padding: 1rem;
+}
+
+.chat-empty svg {
+  width: 64px;
+  height: 48px;
+  color: var(--gold-deep);
+  opacity: 0.65;
+}
+
+html.dark .chat-empty svg {
+  color: var(--gold-soft);
+}
+
+.chat-empty p {
+  margin: 0;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 0.9rem;
+  opacity: 0.85;
 }
 
 .chat-box {
@@ -1333,6 +1576,87 @@ html.dark .tablet-card {
   height: 5px;
   border-radius: 50%;
   background: var(--gold-soft);
+}
+
+/* ── Notifications: iconed cards w/ relative time ────────────────── */
+
+.note-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0.35rem 0;
+  padding: 0.45rem 0.55rem;
+  background: var(--surface-inset);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+}
+
+.note-glyph {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(212, 168, 75, 0.14);
+  border: 1px solid var(--hairline);
+  color: var(--gold-deep);
+}
+
+html.dark .note-glyph {
+  color: var(--gold-soft);
+}
+
+.note-glyph svg {
+  width: 15px;
+  height: 15px;
+}
+
+.note-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.note-info strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  letter-spacing: 0.01em;
+}
+
+.note-info .muted {
+  display: block;
+  font-size: 0.76rem;
+}
+
+.note-time {
+  flex: 0 0 auto;
+  font-size: 0.7rem;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  margin-top: 0.15rem;
+}
+
+.notes-earlier {
+  margin: 0.3rem 0 0.2rem;
+}
+
+.notes-earlier summary {
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+  padding: 0.25rem 0.1rem;
+  border-radius: var(--radius-sm);
+}
+
+.notes-earlier summary:hover {
+  color: var(--ink-ui);
+  background: rgba(212, 168, 75, 0.1);
 }
 
 /* ── Military unit cards ─────────────────────────────────────────── */
@@ -1928,6 +2252,143 @@ button.build-choice strong {
   color: var(--ink-ui);
 }
 
+/* ── Build panel: visual palette of buildable kinds ──────────────── */
+
+.build-lead {
+  margin: 0.3rem 0 0.55rem;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.build-palette {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 0.45rem;
+  margin: 0.4rem 0 0.6rem;
+}
+
+.palette-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+  min-width: 0;
+  padding: 0.55rem 0.6rem 0.5rem;
+  background: var(--surface-inset);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  font-size: 0.76rem;
+}
+
+.palette-card.is-built {
+  opacity: 0.62;
+}
+
+.palette-glyph {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(212, 168, 75, 0.14);
+  border: 1px solid var(--hairline);
+  color: var(--gold-deep);
+}
+
+html.dark .palette-glyph {
+  color: var(--gold-soft);
+}
+
+.palette-glyph svg {
+  width: 19px;
+  height: 19px;
+}
+
+.palette-name {
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+  letter-spacing: 0.01em;
+}
+
+.palette-cost {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.5rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
+
+.palette-cost .cost-bit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  white-space: nowrap;
+}
+
+.palette-cost svg {
+  width: 13px;
+  height: 13px;
+  color: var(--gold-deep);
+}
+
+html.dark .palette-cost svg {
+  color: var(--gold-soft);
+}
+
+.palette-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.1rem;
+  width: 100%;
+}
+
+.pad-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.08rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid var(--hairline);
+}
+
+.pad-chip.pad-shop {
+  background: rgba(196, 165, 116, 0.22);
+  color: #7a5c28;
+}
+
+.pad-chip.pad-special {
+  background: rgba(58, 124, 165, 0.14);
+  color: var(--river-deep);
+}
+
+.pad-chip.pad-training {
+  background: rgba(139, 58, 74, 0.12);
+  color: var(--seal-accent);
+}
+
+html.dark .pad-chip.pad-shop {
+  color: var(--gold-soft);
+}
+
+.built-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.08rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--reed-green);
+  border: 1px solid currentColor;
+  opacity: 0.85;
+}
+
 @media (max-width: 600px) {
   .popup-card {
     width: calc(100vw - 0.75rem);
@@ -1960,8 +2421,79 @@ button.build-choice strong {
   box-shadow: inset 0 0 0 1px rgba(255, 250, 235, 0.4), 0 2px 8px rgba(30, 20, 10, 0.18);
 }
 
-.wm-prov {
+.wm-label {
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  font-variant: small-caps;
+  letter-spacing: 0.05em;
+  fill: #4a3413;
+  pointer-events: none;
+}
+
+.wm-border {
+  stroke: #a97f2e;
+  stroke-width: 1.6;
+  stroke-dasharray: 7 5;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.wm-myreach {
+  stroke: #e8c26a;
+  stroke-width: 30;
+  fill: none;
+  opacity: 0.18;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.wm-prov,
+.wm-site {
   cursor: pointer;
+  outline: none;
+}
+
+/* Site markers on the river */
+.wm-site .halo {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.wm-site:hover .halo,
+.wm-site:focus-visible .halo,
+.wm-site.hl .halo {
+  opacity: 0.55;
+}
+
+.wm-site .sel-ring {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.wm-site.sel .sel-ring {
+  opacity: 1;
+}
+
+.wm-site .dot {
+  transition: transform 0.15s ease;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.wm-site:hover .dot,
+.wm-site.hl .dot {
+  transform: scale(1.2);
+}
+
+.wm-site .own-wash {
+  opacity: 0.2;
+  pointer-events: none;
+}
+
+/* List card highlighted from its board marker */
+.map-site.hl {
+  border-color: var(--gold-soft);
+  box-shadow: 0 3px 10px rgba(90, 64, 25, 0.16);
 }
 
 .wm-prov .halo {
@@ -2165,21 +2697,94 @@ html.dark .map-legend svg {
 /* ── Narrow screens ──────────────────────────────────────────────── */
 
 @media (max-width: 720px) {
-  #nav button {
-    min-width: 3rem;
-    font-size: 0.58rem;
-    padding: 0.15rem 0.2rem 0.25rem;
+  /* HUD: seals + settings on the first row, resources as a compact 2-row chip grid */
+  #hud-top {
+    flex-wrap: wrap;
+    row-gap: 0.3rem;
+  }
+
+  #seals {
+    order: 1;
+    flex: 1 1 auto;
+    justify-content: flex-start;
+  }
+
+  .hud-actions {
+    order: 2;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    max-width: 100%;
   }
 
   #resources {
-    flex-wrap: wrap;
-    overflow-x: visible;
-    row-gap: 0.25rem;
+    order: 3;
+    flex: 1 1 100%;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.25rem;
+    overflow: visible;
+  }
+
+  .res-chip {
+    justify-content: flex-start;
+    padding: 0.2rem 0.35rem;
+    font-size: 0.7rem;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .res-chip .res-note {
+    display: none;
+  }
+
+  /* Bottom nav: horizontal scroll with a visible fade + chevron affordance */
+  #hub {
+    position: relative;
+  }
+
+  #hub::after {
+    content: "›";
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: env(safe-area-inset-bottom);
+    width: 2.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 0.3rem;
+    font-size: 1.35rem;
+    line-height: 1;
+    color: var(--gold-bright);
+    background: linear-gradient(90deg, rgba(22, 18, 14, 0) 0%, rgba(22, 18, 14, 0.92) 65%);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  #nav {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding-right: 2.2rem;
+  }
+
+  #nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  #nav button {
+    flex: 0 0 auto;
+    min-width: 3.6rem;
+    font-size: 0.58rem;
+    padding: 0.15rem 0.35rem 0.25rem;
   }
 
   .menu-popup {
     bottom: 0.4rem;
-    width: calc(100% - 0.75rem);
+    width: calc(100vw - 0.75rem);
+    max-width: calc(100vw - 0.75rem);
     max-height: min(62vh, 520px);
   }
 
@@ -2197,6 +2802,25 @@ html.dark .map-legend svg {
     bottom: auto;
     top: 0.5rem;
     left: 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  /* icon + value only — labels drop out */
+  .res-chip .res-name {
+    display: none;
+  }
+
+  #resources {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .hud-select span {
+    display: none;
+  }
+
+  .build-palette {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

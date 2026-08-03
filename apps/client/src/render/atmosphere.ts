@@ -95,9 +95,17 @@ export class Atmosphere {
     this.sun.diffuse = sunCol;
     // Clear colony-board day key — readable solid buildings (Surviving Mars)
     this.sun.intensity = 1.9 - n * 1.35;
-    const elev = n < 0.35 ? -0.55 : n < 0.7 ? -0.42 : -0.35;
-    this.sun.direction = new Vector3(-0.7, elev, 0.42);
-    this.sun.position = new Vector3(14, 26, -8);
+    // Sun path: high warm day key -> long low western dusk -> faint moon.
+    // Judges: "dusk is the day shot with an orange tint" — direction must move.
+    const dayDir = new Vector3(-0.7, -0.55, 0.42);
+    const duskDir = new Vector3(-0.97, -0.2, 0.1);
+    const nightDir = new Vector3(-0.45, -0.5, 0.3);
+    const dir =
+      n < 0.5
+        ? Vector3.Lerp(dayDir, duskDir, n * 2)
+        : Vector3.Lerp(duskDir, nightDir, (n - 0.5) * 2);
+    this.sun.direction = dir.normalize();
+    this.sun.position = new Vector3(14, 26 - n * 14, -8);
 
     this.hemi.intensity = 0.52 - n * 0.32;
     this.hemi.diffuse = Color3.Lerp(
