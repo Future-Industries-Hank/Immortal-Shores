@@ -231,9 +231,10 @@ html.dark .auth-panel h1 {
 .auth-panel label {
   display: block;
   margin-bottom: 0.65rem;
-  font-size: 0.78rem;
+  font-family: var(--font-display);
+  font-size: 0.82rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--ink-soft);
 }
@@ -251,6 +252,37 @@ html.dark .auth-panel h1 {
   color: var(--ink-ui);
   font-size: 1rem;
   font-family: var(--font-body);
+}
+
+/* Auth fields: papyrus-tinted, inset-shadowed — never raw default white */
+.auth-panel input {
+  padding: 0.62rem 0.7rem;
+  background: #fbf6e8;
+  border: 1px solid var(--hairline-strong);
+  box-shadow:
+    inset 0 1px 3px rgba(120, 90, 45, 0.16),
+    inset 0 0 0 1px rgba(255, 252, 240, 0.45);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.auth-panel input:focus-visible {
+  outline: none;
+  border-color: var(--gold-soft);
+  box-shadow:
+    0 0 0 3px rgba(212, 168, 75, 0.3),
+    inset 0 1px 3px rgba(120, 90, 45, 0.12);
+}
+
+html.dark .auth-panel input {
+  background: #241e16;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+html.dark .auth-panel input:focus-visible {
+  border-color: var(--gold-soft);
+  box-shadow:
+    0 0 0 3px rgba(212, 168, 75, 0.25),
+    inset 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
 /* Panel selects: consistent crafted chrome + gold chevron, no native arrow */
@@ -405,6 +437,31 @@ button:disabled {
   cursor: not-allowed;
 }
 
+/* Locked action: visually inert, dashed border, inline lock glyph */
+button.btn-locked,
+button.btn-locked:hover,
+button.btn-locked:active {
+  opacity: 0.65;
+  cursor: not-allowed;
+  background: var(--surface-inset);
+  color: var(--ink-soft);
+  border: 1px dashed var(--hairline-strong);
+  box-shadow: none;
+  transform: none;
+}
+
+button.btn-locked svg {
+  width: 14px;
+  height: 14px;
+  vertical-align: -2px;
+  margin-right: 0.35rem;
+  color: var(--gold-deep);
+}
+
+html.dark button.btn-locked svg {
+  color: var(--gold-soft);
+}
+
 .error {
   color: var(--seal-accent);
   font-size: 0.9rem;
@@ -425,6 +482,21 @@ button:disabled {
 #auth[hidden],
 .auth-panel[hidden] {
   display: none !important;
+}
+
+/* Chrome bars are grid items of #game — without min-width:0 their nowrap
+   content (7 nav tabs ≈ 460px min-content) blows the single grid column past
+   the viewport on phones, slicing HUD chips and pushing the nav's scroll
+   affordance offscreen. Let them shrink; their own overflow handling takes it
+   from there. */
+#hud-top,
+#hub,
+#nav {
+  min-width: 0;
+}
+
+#hud-top > * {
+  min-width: 0;
 }
 
 #hud-top {
@@ -764,11 +836,13 @@ button:disabled {
 
 .menu-popup {
   position: absolute;
-  left: 50%;
+  left: 0;
+  right: 0;
   bottom: 0.65rem;
-  transform: translateX(-50%);
-  width: min(470px, calc(100vw - 1rem));
-  max-width: calc(100vw - 0.75rem);
+  margin-inline: auto; /* inset centering — immune to wide-ancestor drift */
+  box-sizing: border-box;
+  width: min(460px, calc(100vw - 16px));
+  max-width: calc(100vw - 16px);
   max-height: min(60vh, 520px);
   z-index: 20;
   display: flex;
@@ -800,12 +874,26 @@ button:disabled {
 @keyframes popup-up {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(10px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
-    transform: translateX(-50%) translateY(0);
+    transform: translateY(0);
   }
+}
+
+/* Bottom fade + soft "more below" shadow so hard-clipped content reads as scrollable */
+.menu-popup::after {
+  content: "";
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  bottom: 0;
+  height: 26px;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  background: linear-gradient(180deg, transparent 0%, var(--surface-card-2) 88%);
+  box-shadow: 0 -8px 12px -10px rgba(40, 28, 14, 0.4);
+  pointer-events: none;
 }
 
 .menu-popup-head {
@@ -863,11 +951,19 @@ button:disabled {
 }
 
 .menu-popup-body {
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch; /* momentum scrolling on iOS */
   overscroll-behavior: contain;
-  padding: 0.65rem 0.8rem 1.4rem;
+  max-height: 100%;
+  padding: 0.65rem 0.8rem 1.9rem; /* bottom padding clears the fade mask */
   min-height: 0;
   flex: 1 1 auto;
+}
+
+/* Last card never sits flush against the clipped edge */
+.menu-popup-body .side-panel > :last-child {
+  margin-bottom: 0.65rem;
 }
 
 /* Never let flex rows push the popup wider than its shell */
@@ -1638,6 +1734,39 @@ html.dark .note-glyph {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   margin-top: 0.15rem;
+}
+
+/* ×N chip on collapsed runs of identical notifications */
+.note-count {
+  flex: 0 0 auto;
+  align-self: center;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--gold-soft);
+  background: rgba(212, 168, 75, 0.14);
+  color: var(--gold-deep);
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+html.dark .note-count {
+  color: var(--gold-soft);
+}
+
+/* Styled papyrus empty state — replaces bare em-dash placeholders */
+.empty-card {
+  margin: 0.35rem 0;
+  padding: 0.7rem 0.8rem;
+  border: 1px dashed var(--hairline-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-inset);
+  color: var(--ink-soft);
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 0.88rem;
+  text-align: center;
 }
 
 .notes-earlier {
@@ -2684,14 +2813,21 @@ html.dark .site-glyph {
   background: var(--surface-inset);
 }
 
-.map-legend svg {
-  width: 13px;
-  height: 13px;
-  color: var(--gold-deep);
+/* Legend swatches are miniatures of the board markers (sized by their own
+   attributes — do not blanket-resize nested svgs here) */
+.map-legend .legend-dot {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
 }
 
-html.dark .map-legend svg {
-  color: var(--gold-soft);
+.map-legend .legend-dash {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 18px;
+  height: 0;
+  border-top: 2px dashed #a97f2e;
+  opacity: 0.7;
 }
 
 /* ── Narrow screens ──────────────────────────────────────────────── */
@@ -2765,6 +2901,7 @@ html.dark .map-legend svg {
     flex-wrap: nowrap;
     justify-content: flex-start;
     overflow-x: auto;
+    scroll-snap-type: x proximity;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
     padding-right: 2.2rem;
@@ -2779,12 +2916,13 @@ html.dark .map-legend svg {
     min-width: 3.6rem;
     font-size: 0.58rem;
     padding: 0.15rem 0.35rem 0.25rem;
+    scroll-snap-align: start;
   }
 
   .menu-popup {
     bottom: 0.4rem;
-    width: calc(100vw - 0.75rem);
-    max-width: calc(100vw - 0.75rem);
+    width: min(460px, calc(100vw - 12px));
+    max-width: calc(100vw - 12px);
     max-height: min(62vh, 520px);
   }
 

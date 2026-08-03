@@ -271,8 +271,16 @@ def build_great_house(P):
     tower = frustum("gh_mud_tower", 1.28, 2.2, 1.2, 2.1, 0.82,
                     (-0.62, 0, 1.88), P["mud"])
     bevel(tower, 0.02)
-    box("gh_stone_parapet", 1.3, 2.22, 0.09, (-0.62, 0, 2.7), P["stone"])
-    box("gh_vent_box", 0.18, 0.18, 0.16, (-0.75, 0.55, 2.79), P["stone_w"])
+    # tower roof: mud-dark slab with a pale parapet rim (not one big white slab)
+    box("gh_mud_towerroof", 1.24, 2.14, 0.07, (-0.62, 0, 2.7), P["mud_dk"])
+    for s in (-1, 1):
+        box("gh_stone_rimY", 1.2, 0.08, 0.14, (-0.62, s * 1.0, 2.73),
+            P["stone"])
+        box("gh_stone_rimX", 0.08, 1.92, 0.14, (-0.62 + s * 0.56, 0, 2.73),
+            P["stone"])
+    # small mud stair-bulkhead seated on the roof slab (was a stray white cube)
+    box("gh_mud_bulkhead", 0.3, 0.36, 0.24, (-0.85, 0.55, 2.77), P["mud_tan"])
+    box("gh_dark_bulkdoor", 0.2, 0.03, 0.17, (-0.85, 0.36, 2.79), P["dark"])
     # tower roofline trim (cornice teeth suggestion: 3 small blocks)
     for i, yy in enumerate((-0.7, 0, 0.7)):
         box("gh_trim", 0.1, 0.3, 0.07, (-1.24, yy, 2.62), P["stone_w"])
@@ -298,11 +306,27 @@ def build_great_house(P):
         P["thatch"])
     box("gh_wood_fascia", lw + 0.27, 0.06, 0.06, (lx, -(ld + 0.25) / 2 + 0.02,
         deckz + 0.74), P["wood_dk"])
-    # hanging rug on loggia front rail
-    box("gh_rug_hang", 0.46, 0.045, 0.52, (lx + 0.25, -ld / 2 + 0.02,
-        deckz + 0.02), P["rug"])
-    box("gh_rug_hang2", 0.4, 0.045, 0.44, (lx - 0.62, ld / 2 - 0.02,
-        deckz + 0.06), P["cl_org"])
+    # hanging rugs: wooden rod + rope ties + bracket arms so they read as
+    # hung textiles (proud of the lattice, shaded by the thatch overhang)
+    rgx, rgy = lx + 0.25, -ld / 2 - 0.035
+    cyl("gh_wood_rugrod", 0.024, 0.62, (rgx, rgy, deckz + 0.275),
+        P["wood_dk"], seg=7, ry=math.radians(90))
+    for s in (-1, 1):
+        box("gh_rope_rugtie", 0.035, 0.035, 0.1,
+            (rgx + s * 0.17, rgy, deckz + 0.5), P["rope"])
+        box("gh_wood_rodarm", 0.045, 0.1, 0.045,
+            (rgx + s * 0.26, -ld / 2 + 0.005, deckz + 0.555), P["wood_dk"])
+    box("gh_rug_hang", 0.46, 0.05, 0.5, (rgx, rgy, deckz + 0.02), P["rug"])
+    rg2x, rg2y = lx - 0.62, ld / 2 + 0.035
+    cyl("gh_wood_rugrod2", 0.022, 0.54, (rg2x, rg2y, deckz + 0.275),
+        P["wood_dk"], seg=7, ry=math.radians(90))
+    for s in (-1, 1):
+        box("gh_rope_rugtie2", 0.03, 0.03, 0.1,
+            (rg2x + s * 0.14, rg2y, deckz + 0.5), P["rope"])
+    box("gh_wood_rodarm2", 0.045, 0.1, 0.045,
+        (0.125, ld / 2 - 0.005, deckz + 0.555), P["wood_dk"])
+    box("gh_rug_hang2", 0.4, 0.05, 0.44, (rg2x, rg2y, deckz + 0.06),
+        P["cl_org"])
 
     # external stair: proud of the front face, climbing left→right to terrace
     sy = -1.42  # fully outside the battered wall (base face ≈ -1.22)
@@ -322,7 +346,7 @@ def build_great_house(P):
     box("gh_stone_jambR", 0.1, 0.12, 0.9, (dx + 0.33, fy - 0.03, 0.12), P["stone_w"])
     box("gh_stone_lintel", 0.78, 0.13, 0.13, (dx, fy - 0.03, 1.0), P["stone_w"])
     # gold sun disc above lintel
-    cyl("gh_gold_disc", 0.09, 0.05, (dx, fy - 0.02, 1.2), P["gold"], seg=12,
+    cyl("gh_gold_disc", 0.09, 0.05, (dx, fy + 0.02, 1.2), P["gold"], seg=12,
         rx=math.radians(90))
     # striped awning over door: red canopy angled + 2 slim poles
     box("gh_cloth_awn_door", 0.9, 0.55, 0.045, (dx, fy - 0.28, 1.06), P["cl_red"],
@@ -968,13 +992,11 @@ def build_ration_house(P):
     # chimney stub back corner (board 09)
     box("rh_mud_chimney", 0.2, 0.2, 0.32, (-1.0, 0.7, 1.12), P["mud_tan"])
     box("rh_dark_chimtop", 0.12, 0.12, 0.05, (-1.0, 0.7, 1.44), P["dark"])
-    # roof drying: mat + grain rows + rolled bundle
+    # roof drying: mat + two grain rows (roll + third row cut for legibility)
     box("rh_matting_roof", 0.6, 0.5, 0.03, (-0.42, 0.1, 1.18), P["thatch"])
-    for i in range(3):
-        box("rh_crop_dryrow", 0.5, 0.1, 0.045, (-0.42, -0.28 + i * 0.16, 1.2),
-            P["crop_g"], rz=0.08 * (i - 1))
-    cyl("rh_thatch_roll", 0.055, 0.45, (-0.42, 0.52, 1.18 + 0.055 - 0.225),
-        P["thatch_dk"], seg=8, ry=math.radians(90))
+    for i in range(2):
+        box("rh_crop_dryrow", 0.5, 0.1, 0.045, (-0.42, -0.02 + i * 0.2, 1.2),
+            P["crop_g"], rz=0.07 * (i * 2 - 1))
 
     # arched oven mouth on the front face (pot arch ring + dark throat +
     # warm cloth-orange inset suggesting the fire, no emissive)
@@ -990,20 +1012,19 @@ def build_ration_house(P):
     sphere("rh_linen_bread", 0.06, (-0.56, fy - 0.16, 0.17), P["linen"], seg=7)
     sphere("rh_linen_bread2", 0.05, (-0.28, fy - 0.18, 0.17), P["linen"], seg=7)
 
-    # ladder leaning on the front face, right of the oven (board 09)
-    for s in (-1, 1):
-        cyl("rh_wood_ladrail", 0.02, 1.1, (0.22 + s * 0.1, -0.74, 0.07),
-            P["wood_dk"], seg=6, rx=math.radians(-11))
-    for i in range(4):
-        box("rh_wood_ladrung", 0.24, 0.035, 0.035,
-            (0.22, -0.7 + i * 0.05, 0.3 + i * 0.24), P["wood"])
+    # door right of the oven (dark recess + wood lintel); the apron strip in
+    # front stays clear so the entrance reads (ladder cut — crowded the face)
+    box("rh_dark_door", 0.38, 0.22, 0.64, (0.18, fy - 0.01, 0.07), P["dark"])
+    box("rh_wood_doorlintel", 0.5, 0.2, 0.09, (0.18, fy + 0.01, 0.71),
+        P["wood_dk"])
 
     # granary annex + beehive silos (cyl taper + sphere cap)
     annex = frustum("rh_mud_annex", 1.0, 1.2, 0.9, 1.1, 0.58, (0.85, 0.6, 0.07),
                     P["mud"])
     bevel(annex, 0.02)
     box("rh_mud_annexroof", 0.92, 1.12, 0.06, (0.85, 0.6, 0.65), P["mud_dk"])
-    silos = ((1.02, 0.15, 1.0), (0.68, -0.42, 0.86), (1.08, -0.82, 0.72))
+    # silos enlarged so the beehive silhouette leads the read
+    silos = ((1.02, 0.15, 1.18), (0.68, -0.44, 1.02), (1.12, -0.86, 0.86))
     for i, (sx, sy, s) in enumerate(silos):
         cyl(f"rh_mud_silo{i}", 0.27 * s, 0.52 * s, (sx, sy, 0.07), P["mud_tan"],
             seg=12, rtop=0.2 * s)
@@ -1029,15 +1050,13 @@ def build_ration_house(P):
         cyl("rh_wood_awnpole", 0.025, 0.9, (sxp, cy - 0.42, 0.07),
             P["wood_dk"], seg=7)
 
-    # ground props: sacks, jars, baskets (board 09 foreground)
-    for i, (px, py, rr) in enumerate(((0.35, -1.05, 0.4), (0.62, -1.18, -0.2))):
-        s = box(f"rh_linen_sack{i}", 0.24, 0.2, 0.2, (px, py, 0.07), P["linen"],
-                rz=rr)
-        bevel(s, 0.04)
-    basket("rh_g1", 0.1, -1.15, 0.07, P, r=0.13, fill="crop_g")
-    basket("rh_g2", -0.15, -1.28, 0.07, P, r=0.1, fill="linen")
-    amphora("rh_j1", 1.25, -0.35, 0.07, P, s=1.15)
-    amphora("rh_j2", 1.3, -0.02, 0.07, P, s=0.9)
+    # two readable clusters, open apron kept in front of the door:
+    # counter cluster gets one sack + one basket; a jar tucks by the silos
+    s = box("rh_linen_sack0", 0.24, 0.2, 0.2, (-1.05, -1.24, 0.07), P["linen"],
+            rz=0.35)
+    bevel(s, 0.04)
+    basket("rh_g1", -0.65, -1.16, 0.07, P, r=0.12, fill="crop_g")
+    amphora("rh_j1", 1.3, -0.34, 0.07, P, s=1.1)
 
 
 # ---------------------------------------------------------------- LUXURY MATERIAL

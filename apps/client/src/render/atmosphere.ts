@@ -94,10 +94,10 @@ export class Atmosphere {
         : Color3.Lerp(duskColor, nightColor, (n - 0.5) * 2);
     this.sun.diffuse = sunCol;
     // Clear colony-board day key — readable solid buildings (Surviving Mars)
-    this.sun.intensity = 1.9 - n * 1.35;
+    this.sun.intensity = 1.9 - n * 1.15;
     // Sun path: high warm day key -> long low western dusk -> faint moon.
     // Judges: "dusk is the day shot with an orange tint" — direction must move.
-    const dayDir = new Vector3(-0.7, -0.55, 0.42);
+    const dayDir = new Vector3(-0.72, -0.46, 0.4);
     const duskDir = new Vector3(-0.97, -0.2, 0.1);
     const nightDir = new Vector3(-0.45, -0.5, 0.3);
     const dir =
@@ -134,8 +134,8 @@ export class Atmosphere {
       this.scene.fogDensity = 0.012 * fogScale;
       this.scene.fogColor = hexToColor3("#C4B898");
     } else if (n < 0.7) {
-      this.scene.fogDensity = 0.015 * fogScale;
-      this.scene.fogColor = hexToColor3("#B8A080");
+      this.scene.fogDensity = 0.010 * fogScale;
+      this.scene.fogColor = hexToColor3("#C89878");
     } else {
       this.scene.fogDensity = 0.018 * fogScale;
       this.scene.fogColor = hexToColor3("#101820");

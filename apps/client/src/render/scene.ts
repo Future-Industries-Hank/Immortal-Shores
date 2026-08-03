@@ -156,7 +156,7 @@ export class SettlementView {
     this.shadowGen = new ShadowGenerator(2048, this.sun);
     this.shadowGen.useBlurExponentialShadowMap = true;
     this.shadowGen.blurKernel = 24;
-    this.shadowGen.darkness = 0.52;
+    this.shadowGen.darkness = 0.58;
     this.shadowGen.bias = 0.0005;
     this.shadowGen.normalBias = 0.02;
 
@@ -534,7 +534,7 @@ export class SettlementView {
     frondDry.diffuseColor = hexToColor3("#9A9050");
     frondDry.specularColor = Color3.Black();
     const rockMatN = new StandardMaterial("outcropMat", this.scene);
-    rockMatN.diffuseColor = hexToColor3("#8A7654");
+    rockMatN.diffuseColor = hexToColor3("#6E5C44");
     rockMatN.specularColor = hexToColor3("#3A3020").scale(0.1);
     const duneMatN = new StandardMaterial("duneRidgeMat", this.scene);
     duneMatN.diffuseColor = hexToColor3("#9E8B66"); // ground-family ridge mass, never a glow
@@ -582,23 +582,26 @@ export class SettlementView {
       }
       const crownY = h * 0.98;
       const crownZ = lean * h * 0.42;
-      for (let f = 0; f < 8; f++) {
-        const fr = MeshBuilder.CreateBox(
-          "palmFr",
-          { width: 0.13, height: 0.035, depth: h * 0.62 },
-          this.scene
-        );
-        const a = (f / 8) * Math.PI * 2;
-        fr.position.set(
-          Math.sin(a) * h * 0.2,
-          crownY - 0.06 * (f % 3),
-          crownZ + Math.cos(a) * h * 0.2
-        );
-        fr.rotation.y = a;
-        fr.rotation.x = 0.42 + (f % 3) * 0.14;
-        fr.material = f % 4 === 3 ? frondDry : frondMat;
-        fr.parent = root;
-        fr.isPickable = false;
+      for (let ring = 0; ring < 2; ring++) {
+        const count = ring === 0 ? 5 : 6;
+        for (let f = 0; f < count; f++) {
+          const fr = MeshBuilder.CreateBox(
+            "palmFr",
+            { width: 0.17 - ring * 0.04, height: 0.03, depth: h * (0.66 - ring * 0.1) },
+            this.scene
+          );
+          const a = ((f + ring * 0.5) / count) * Math.PI * 2;
+          fr.position.set(
+            Math.sin(a) * h * 0.16,
+            crownY + 0.05 - ring * 0.1,
+            crownZ + Math.cos(a) * h * 0.16
+          );
+          fr.rotation.y = a;
+          fr.rotation.x = 0.34 + ring * 0.34 + (f % 3) * 0.08;
+          fr.material = (f + ring) % 5 === 4 ? frondDry : frondMat;
+          fr.parent = root;
+          fr.isPickable = false;
+        }
       }
       if (cast && this.shadowGen) {
         for (const c of root.getChildMeshes()) this.shadowGen.addShadowCaster(c as Mesh, false);
@@ -654,11 +657,12 @@ export class SettlementView {
       const n = 3 + ((ox * 7 + oz * 3) & 1);
       for (let i = 0; i < n; i++) {
         const sz = 0.5 + ((i * 2.7 + ox) % 1) * 0.7;
-        const rock = MeshBuilder.CreateBox(
+        const rock = MeshBuilder.CreateSphere(
           `outcrop-${ox}-${oz}-${i}`,
-          { width: sz, height: sz * 0.62, depth: sz * 0.8 },
+          { diameter: sz, segments: 5 },
           this.scene
         );
+        rock.scaling.set(1.15, 0.52, 0.85);
         const rx2 = ox + Math.sin(i * 2.4) * 0.7 * (1 + i * 0.2);
         const rz2 = oz + Math.cos(i * 2.4) * 0.55;
         rock.position.set(rx2, groundY(rx2, rz2) - sz * 0.05, rz2);
@@ -761,40 +765,65 @@ export class SettlementView {
 
   private makeSandTexture(baseHex: string) {
     try {
-      const size = this.quality === "low" ? 128 : 256;
+      const size = this.quality === "low" ? 256 : 1024;
       const tex = new DynamicTexture("sandTex", size, this.scene, false);
       const ctx = tex.getContext() as CanvasRenderingContext2D;
       const base = baseHex.replace("#", "");
       const br = parseInt(base.slice(0, 2), 16);
       const bg = parseInt(base.slice(2, 4), 16);
       const bb = parseInt(base.slice(4, 6), 16);
-      const img = ctx.createImageData(size, size);
-      for (let i = 0; i < size * size; i++) {
-        const n = (Math.random() - 0.5) * 52;
-        const n2 = ((i * 17) % 29) - 14;
-        const n3 = ((i * 31) % 11) - 5;
-        img.data[i * 4] = Math.max(0, Math.min(255, br + n + n2));
-        img.data[i * 4 + 1] = Math.max(0, Math.min(255, bg + n * 0.85 + n2 * 0.5 + n3));
-        img.data[i * 4 + 2] = Math.max(0, Math.min(255, bb + n * 0.55 + n3 * 0.4));
-        img.data[i * 4 + 3] = 255;
-      }
-      ctx.putImageData(img, 0, 0);
-      // Soft mottles + dark silt flecks (materials craft)
-      for (let k = 0; k < 55; k++) {
+      ctx.fillStyle = `rgb(${br},${bg},${bb})`;
+      ctx.fillRect(0, 0, size, size);
+      // MACRO: large soft tonal blotches (visible at board distance)
+      for (let k = 0; k < 14; k++) {
         const x = Math.random() * size;
         const y = Math.random() * size;
-        const r = 6 + Math.random() * 26;
+        const r = size * (0.12 + Math.random() * 0.2);
+        const dv = (Math.random() - 0.45) * 26;
         const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-        g.addColorStop(0, k % 3 === 0 ? "rgba(90,70,40,0.22)" : "rgba(170,130,75,0.2)");
-        g.addColorStop(1, "rgba(160,120,70,0)");
+        g.addColorStop(0, `rgba(${br + dv},${bg + dv * 0.9},${bb + dv * 0.7},0.5)`);
+        g.addColorStop(1, "rgba(0,0,0,0)");
         ctx.fillStyle = g;
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fill();
       }
+      // Wind streaks: long soft diagonal bands
+      ctx.save();
+      ctx.translate(size / 2, size / 2);
+      ctx.rotate(-0.6);
+      for (let k = 0; k < 7; k++) {
+        const y = (k / 7 - 0.5) * size * 1.6 + (Math.random() - 0.5) * 40;
+        const g = ctx.createLinearGradient(0, y - 14, 0, y + 14);
+        g.addColorStop(0, "rgba(0,0,0,0)");
+        g.addColorStop(0.5, `rgba(${br - 12},${bg - 12},${bb - 14},0.12)`);
+        g.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = g;
+        ctx.fillRect(-size, y - 14, size * 2, 28);
+      }
+      ctx.restore();
+      // MICRO: grit speckle + silt flecks
+      const img = ctx.getImageData(0, 0, size, size);
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const n = (Math.random() - 0.5) * 14;
+        d[i] = Math.max(0, Math.min(255, d[i]! + n));
+        d[i + 1] = Math.max(0, Math.min(255, d[i + 1]! + n));
+        d[i + 2] = Math.max(0, Math.min(255, d[i + 2]! + n * 0.9));
+      }
+      ctx.putImageData(img, 0, 0);
+      for (let k = 0; k < 70; k++) {
+        const x = Math.random() * size;
+        const y = Math.random() * size;
+        const r = 2 + Math.random() * 7;
+        ctx.fillStyle = k % 3 === 0
+          ? "rgba(90,70,40,0.25)"
+          : "rgba(170,140,90,0.2)";
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
       tex.update(false);
-      tex.uScale = 8;
-      tex.vScale = 7;
       return tex;
     } catch {
       return null;
@@ -834,8 +863,8 @@ export class SettlementView {
     const grit = this.makeSandTexture(pal.sand);
     if (grit) {
       mat.diffuseTexture = grit;
-      grit.uScale = 9;
-      grit.vScale = 8;
+      grit.uScale = 2.6;
+      grit.vScale = 2.3;
     } else {
       mat.diffuseColor = hexToColor3(pal.sand);
     }
@@ -924,7 +953,7 @@ export class SettlementView {
     wetLineMat.specularColor = hexToColor3("#D0E8F0").scale(1.0);
     wetLineMat.specularPower = 128;
     wetLineMat.emissiveColor = hexToColor3("#3A5850").scale(0.18);
-    wetLineMat.alpha = 0.92;
+    wetLineMat.alpha = 0.4;
     wetLine.material = wetLineMat;
     wetLine.parent = this.envRoot;
     wetLine.isPickable = false;
@@ -940,7 +969,7 @@ export class SettlementView {
     wetLine2Mat.specularColor = hexToColor3("#E0F0F8").scale(0.7);
     wetLine2Mat.specularPower = 64;
     wetLine2Mat.emissiveColor = hexToColor3("#4A6058").scale(0.1);
-    wetLine2Mat.alpha = 0.75;
+    wetLine2Mat.alpha = 0.4;
     wetLine2.material = wetLine2Mat;
     wetLine2.parent = this.envRoot;
     wetLine2.isPickable = false;
@@ -970,7 +999,7 @@ export class SettlementView {
     );
     mid.position.set(-11.6, 0.0, 2);
     const midMat = new StandardMaterial("riverMidMat", this.scene);
-    midMat.diffuseColor = hexToColor3("#0E3048");
+    midMat.diffuseColor = hexToColor3("#0A2434");
     midMat.specularColor = hexToColor3("#78B0C8").scale(0.45);
     midMat.specularPower = 56;
     midMat.alpha = 0.94;
@@ -987,7 +1016,7 @@ export class SettlementView {
     );
     shallow.position.set(-10.35, 0.03, 2);
     const shMat = new StandardMaterial("shallowMat", this.scene);
-    shMat.diffuseColor = hexToColor3("#2A4A52");
+    shMat.diffuseColor = hexToColor3("#1E3A44");
     shMat.specularColor = hexToColor3("#88B0B8").scale(0.3);
     shMat.specularPower = 28;
     shMat.alpha = 0.88;
@@ -1086,14 +1115,15 @@ export class SettlementView {
     if (this.quality !== "low") {
       const rockMat = new StandardMaterial("rockMat", this.scene);
       // Warm sandstone — pale white read as paper scraps on the sand
-      rockMat.diffuseColor = hexToColor3("#83704F");
+      rockMat.diffuseColor = hexToColor3("#6E5C44");
       rockMat.specularColor = Color3.Black();
       for (let i = 0; i < 10; i++) {
-        const rock = MeshBuilder.CreateBox(
+        const rock = MeshBuilder.CreateSphere(
           `rock-${i}`,
-          { width: 0.3 + (i % 3) * 0.14, height: 0.16, depth: 0.26 },
+          { diameter: 0.3 + (i % 3) * 0.14, segments: 5 },
           this.scene
         );
+        rock.scaling.set(1.2, 0.5, 0.9);
         rock.position.set(-9.2 + (i % 2) * 0.4, 0.03, -8 + i * 2.1);
         rock.rotation.set(0.18 * ((i % 3) - 1), i * 0.7, 0.14 * (i % 2 ? 1 : -1));
         rock.material = rockMat;
@@ -1171,7 +1201,7 @@ export class SettlementView {
   private makeOneBarge(name: string, x: number, z: number, scale: number): TransformNode {
     const root = new TransformNode(name, this.scene);
     root.parent = this.envRoot;
-    root.position.set(x, 0.12, z);
+    root.position.set(x, 0.08, z);
     root.scaling.setAll(scale);
     const dark = name.endsWith("2") ? "#4E3018" : "#5A3A22";
     const hm = new StandardMaterial(`${name}HullMat`, this.scene);
@@ -1826,7 +1856,7 @@ export class SettlementView {
       if (tier !== "stone") {
         const rim = MeshBuilder.CreateBox(
           `roadRim-${aId}-${bId}`,
-          { width: len + 0.08, height: height * 0.6, depth: width + 0.22 },
+          { width: len - 0.04, height: height * 0.55, depth: width + 0.1 },
           this.scene
         );
         rim.position.set(midX, height * 0.25, midZ);

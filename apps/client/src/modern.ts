@@ -68,9 +68,20 @@ export const GLYPHS: Record<string, string> = {
   trowel: G(
     '<path d="M13.5 10.5L20 4"/><path d="M13.8 10.2l-8.6 3.1c-1.5.6-1.8 2.6-.6 3.7l2.4 2.4c1.1 1.2 3.1.9 3.7-.6l3.1-8.6z"/>'
   ),
-  bow: G('<path d="M6.5 3.5C12.5 5 17.5 10 19 16"/><path d="M6.5 3.5L19 16"/><path d="M4.5 19.5L15 9M15 9l-.4 3M15 9l-3 .4"/>'),
+  /* Recurve bow: vertical string, curved limb, arrow through it with head + fletching */
+  bow: G(
+    '<path d="M7.5 3.5c4.2 5.3 4.2 11.7 0 17"/><path d="M7.5 3.5v17"/><path d="M3.5 12h16"/><path d="M15.9 8.6l3.6 3.4-3.6 3.4"/><path d="M3.5 12l2.7-2.3M3.5 12l2.7 2.3"/>'
+  ),
+  /* Spear behind a round shield with boss — infantry, not a key */
+  spearshield: G(
+    '<path d="M13.2 10.8L20.5 3.5"/><path d="M20.5 3.5l-4 .9M20.5 3.5l-.9 4"/><circle cx="9.5" cy="14.5" r="6"/><circle cx="9.5" cy="14.5" r="1.3"/>'
+  ),
+  /* Chariot wheel: rim, hub, eight spokes stopping at the hub */
   wheel: G(
-    '<circle cx="12" cy="12" r="7.5"/><path d="M12 4.5v15M4.5 12h15M6.7 6.7l10.6 10.6M17.3 6.7L6.7 17.3"/>'
+    '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.2"/><path d="M12 4v5.8M12 14.2V20M4 12h5.8M14.2 12H20M6.3 6.3l4.1 4.1M17.7 6.3l-4.1 4.1M6.3 17.7l4.1-4.1M17.7 17.7l-4.1-4.1"/>'
+  ),
+  lock: G(
+    '<rect x="6" y="10.5" width="12" height="9" rx="1.8"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/><path d="M12 14v2.5"/>'
   ),
   scribe: G(
     '<rect x="4" y="4.5" width="10" height="15" rx="1.5"/><path d="M7 9h4M7 12.5h4M7 16h2.5"/><path d="M20.5 6L15 11.5l-.5 2.7 2.7-.5L22.5 8 20.5 6z"/>'
@@ -163,7 +174,7 @@ export function buildingIcon(kind: string): string {
 
 export const UNIT_GLYPH: Record<string, string> = {
   bowmen: "bow",
-  spearmen: "spear",
+  spearmen: "spearshield",
   chariot_warriors: "wheel",
 };
 

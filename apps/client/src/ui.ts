@@ -801,7 +801,7 @@ function renderTablets(s: PublicSnapshot) {
     <h2>Private Tablets</h2>
     <h3>Send gift</h3>
     <label>To <input id="gift-to" placeholder="player name" /></label>
-    <label>Amount of unique luxury <input id="gift-amt" type="number" value="2" min="1" /></label>
+    <label>How much of your unique luxury to send <input id="gift-amt" type="number" value="2" min="1" /></label>
     <div class="row"><button id="send-gift" class="primary small">Send gift</button></div>
     <h3>Inbox</h3>
     <div id="mail-list"></div>
@@ -889,13 +889,24 @@ function renderAllies(s: PublicSnapshot) {
     envoy: "flag",
     system: "scribe",
   };
-  const noteCard = (n: { kind: string; title: string; body: string; ts: number }) =>
+  const noteCard = (n: { kind: string; title: string; body: string; ts: number; count: number }) =>
     `<div class="note-card">
       <span class="note-glyph">${GLYPHS[NOTE_GLYPH[n.kind] ?? "seal"] ?? ""}</span>
       <span class="note-info"><strong>${n.title}</strong><span class="muted">${n.body}</span></span>
+      ${n.count > 1 ? `<span class="note-count" title="${n.count} identical notifications">×${n.count}</span>` : ""}
       <span class="note-time" title="${new Date(n.ts).toLocaleString()}">${relTime(n.ts)}</span>
     </div>`;
-  const allNotes = (s.notifications ?? []).slice().reverse();
+  // Newest first; collapse consecutive identical notifications into one card with a ×N chip
+  const allNotes: { kind: string; title: string; body: string; ts: number; count: number }[] = [];
+  for (const n of (s.notifications ?? []).slice().reverse()) {
+    const last = allNotes[allNotes.length - 1];
+    if (last && last.kind === n.kind && last.title === n.title && last.body === n.body) {
+      last.count += 1;
+      last.ts = Math.max(last.ts, n.ts);
+    } else {
+      allNotes.push({ kind: n.kind, title: n.title, body: n.body, ts: n.ts, count: 1 });
+    }
+  }
   const earlierNotes = allNotes.slice(5, 25);
   const notes =
     allNotes.slice(0, 5).map(noteCard).join("") +
@@ -910,7 +921,7 @@ function renderAllies(s: PublicSnapshot) {
     <h3>Trade partners</h3>
     ${rep || "<p class='muted'>No completed trades yet — the river remembers every honest deal.</p>"}
     <h3>Trade history</h3>
-    ${hist || "<p class='muted'>—</p>"}
+    ${hist || `<div class="empty-card">No trades yet — post an offer on the Wall.</div>`}
     <h3>Trading Circles</h3>
     ${circles || "<p class='muted'>None joined</p>"}
     <div class="row"><button class="small secondary" id="mk-circle">Create circle</button></div>
@@ -1350,7 +1361,12 @@ function renderMilitary(s: PublicSnapshot) {
     <h3>Held monuments</h3>
     <div id="mon-list"></div>
     <h3>Envoy</h3>
-    <button id="envoy" class="small secondary">Dispatch envoy — needs Great House Level 7</button>
+    ${
+      st.greatHouseLevel >= 7
+        ? `<button id="envoy" class="small secondary">Dispatch envoy</button>`
+        : `<button id="envoy" class="small secondary btn-locked" disabled aria-disabled="true"
+             title="Unlocks at Great House Level 7 — yours is L${st.greatHouseLevel}">${GLYPHS.lock}Locked — needs Great House Level 7 (yours: L${st.greatHouseLevel})</button>`
+    }
     <h3>Shrine offering</h3>
     <button id="shrine" class="small secondary">Contribute 1 patron good</button>
   `;
@@ -1429,7 +1445,7 @@ function renderMilitary(s: PublicSnapshot) {
     };
     mon.appendChild(row);
   }
-  panel.querySelector("#envoy")?.addEventListener("click", () => {
+  if (st.greatHouseLevel >= 7) panel.querySelector("#envoy")?.addEventListener("click", () => {
     const el = document.getElementById("building-inspect")!;
     renderGenericPopup(el, {
       title: "Envoy expedition",
@@ -1610,15 +1626,45 @@ function buildRiverBoard(
 
   // Site markers ON the river, positioned from server mapX/mapY within each province reach
   const riMap = new Map(ordered.map((p) => [p.id, p.riverIndex] as const));
-  const siteMarks = sites
-    .map((site) => {
-      const ri = riMap.get(site.provinceId) ?? 0;
-      const inProv = Math.min(0.92, Math.max(0.08, (site.mapX - ri * 120) / 120));
-      const pos = riverPoint((ri + inProv) / segCount);
-      const inland = site.kind === "monument" ? 2.4 : 1;
-      const lat = ((site.mapY - 57.5) / 75) * 15 * inland;
-      const x = pos.x + pos.nx * lat;
-      const y = pos.y + pos.ny * lat;
+  const sitePts = sites.map((site) => {
+    const ri = riMap.get(site.provinceId) ?? 0;
+    const inProv = Math.min(0.92, Math.max(0.08, (site.mapX - ri * 120) / 120));
+    const pos = riverPoint((ri + inProv) / segCount);
+    const inland = site.kind === "monument" ? 2.4 : 1;
+    const lat = ((site.mapY - 57.5) / 75) * 20 * inland;
+    return { site, x: pos.x + pos.nx * lat, y: pos.y + pos.ny * lat };
+  });
+  // Collision relaxation: markers are ~22px round — push overlapping pairs apart
+  for (let iter = 0; iter < 24; iter++) {
+    let moved = false;
+    for (let i = 0; i < sitePts.length; i++) {
+      for (let j = i + 1; j < sitePts.length; j++) {
+        const a = sitePts[i]!;
+        const b = sitePts[j]!;
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const d = Math.hypot(dx, dy);
+        const minD = 27;
+        if (d < minD) {
+          const ux = d > 0.01 ? dx / d : 1;
+          const uy = d > 0.01 ? dy / d : 0;
+          const push = (minD - d) / 2 + 0.4;
+          a.x -= ux * push;
+          a.y -= uy * push;
+          b.x += ux * push;
+          b.y += uy * push;
+          moved = true;
+        }
+      }
+    }
+    if (!moved) break;
+  }
+  for (const p of sitePts) {
+    p.x = Math.min(614, Math.max(26, p.x));
+    p.y = Math.min(594, Math.max(26, p.y));
+  }
+  const siteMarks = sitePts
+    .map(({ site, x, y }) => {
       const open = site.kind === "founding" && !site.ownerPlayerId;
       const own = !!site.ownerPlayerId && site.ownerPlayerId === playerId;
       const fill =
@@ -1630,12 +1676,12 @@ function buildRiverBoard(
               ? "#f4ecd6"
               : "#d9e4c4";
       return `<g class="wm-site kind-${site.kind}${own ? " wm-own" : ""}${open ? " is-open" : ""}" data-site="${site.id}" data-kind="${site.kind}" data-prov="${site.provinceId}" tabindex="0" role="button" aria-label="${site.name}">
-        ${own ? `<circle class="own-wash" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="22" fill="#e8c26a"/>` : ""}
-        <circle class="halo" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="13.5" fill="#e8c26a"/>
-        <circle class="sel-ring" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="11" fill="none" stroke="#a97f2e" stroke-width="2"/>
-        <circle class="dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7.5" fill="${fill}" stroke="#5d4520" stroke-width="1.2"${open ? ' stroke-dasharray="2.6 1.9"' : ""}/>
-        ${glyphAt(SITE_GLYPH[site.kind] ?? "cartouche", x - 4.75, y - 4.75, 9.5, "#4a3413")}
-        ${own ? `<circle cx="${(x + 7.5).toFixed(1)}" cy="${(y - 7.5).toFixed(1)}" r="3.4" fill="#96323f" stroke="#4a1219" stroke-width="0.9"/>` : ""}
+        ${own ? `<circle class="own-wash" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="27" fill="#e8c26a"/>` : ""}
+        <circle class="halo" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="18" fill="#e8c26a"/>
+        <circle class="sel-ring" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="14.5" fill="none" stroke="#a97f2e" stroke-width="2"/>
+        <circle class="dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="11" fill="${fill}" stroke="#5d4520" stroke-width="1.4"${open ? ' stroke-dasharray="3.4 2.4"' : ""}/>
+        ${glyphAt(SITE_GLYPH[site.kind] ?? "cartouche", x - 7, y - 7, 14, "#4a3413")}
+        ${own ? `<circle cx="${(x + 10.2).toFixed(1)}" cy="${(y - 10.2).toFixed(1)}" r="4.2" fill="#96323f" stroke="#4a1219" stroke-width="1"/>` : ""}
       </g>`;
     })
     .join("");
@@ -1739,10 +1785,33 @@ const SITE_GLYPH: Record<string, string> = {
   ancestral: "cartouche",
 };
 
+/** Miniature of a board site marker, for the map legend (same fills/glyphs as the board). */
+function legendDot(kind: "city" | "monument" | "open" | "mine"): string {
+  const fill =
+    kind === "monument" ? "#e5c9cf" : kind === "open" ? "#f4ecd6" : "#e2b558";
+  const glyph = kind === "monument" ? "obelisk" : kind === "open" ? "flag" : "ziggurat";
+  const dash = kind === "open" ? ' stroke-dasharray="2.6 1.9"' : "";
+  const seal =
+    kind === "mine"
+      ? '<circle cx="15.6" cy="4.4" r="2.8" fill="#96323f" stroke="#4a1219" stroke-width="0.8"/>'
+      : "";
+  return `<svg class="legend-dot" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+    <circle cx="10" cy="10" r="8" fill="${fill}" stroke="#5d4520" stroke-width="1.2"${dash}/>
+    ${glyphAt(glyph, 5, 5, 10, "#4a3413")}
+    ${seal}
+  </svg>`;
+}
+
 function renderMap(s: PublicSnapshot) {
   const panel = document.getElementById("panel-map")!;
   const st = s.settlements[0];
-  const myMap = st?.mapArchetypeId?.replace(/_/g, " ") ?? "—";
+  // Humanized display name for the shore layout archetype — never a raw id slug
+  const archetype = st?.mapArchetypeId
+    ? st.mapArchetypeId
+        .split("_")
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ")
+    : null;
   const provinces = s.map.provinces ?? [];
   const provName = (id: string | undefined) =>
     provinces.find((p) => p.id === id)?.name ?? "the river";
@@ -1751,8 +1820,15 @@ function renderMap(s: PublicSnapshot) {
     `<button type="button" data-kf="${kf}" class="${mapKindFilter === kf ? "active" : ""}">${glyphName ? GLYPHS[glyphName] : ""}${label}</button>`;
 
   panel.innerHTML = `<h2>World Map — Eternal River</h2>
-    <p class="muted">Your shore: <strong>${st ? RESOURCE_LABELS[st.uniqueLuxury] : "—"}</strong> on <strong>${myMap}</strong> · ${provName(st?.provinceId)}</p>
+    <p class="muted">Your shore: <strong>${archetype ? `${archetype} Shore` : "—"}</strong>${st ? ` — <strong>${RESOURCE_LABELS[st.uniqueLuxury]}</strong> province specialty` : ""}</p>
     ${buildRiverBoard(provinces, st?.provinceId, s.map.sites, s.player.id)}
+    <div class="map-legend" role="list" aria-label="Map legend">
+      <span role="listitem">${legendDot("city")}City</span>
+      <span role="listitem">${legendDot("monument")}Monument</span>
+      <span role="listitem">${legendDot("open")}Open shore</span>
+      <span role="listitem">${legendDot("mine")}Your shore</span>
+      <span role="listitem"><i class="legend-dash" aria-hidden="true"></i>Province border</span>
+    </div>
     <div class="map-filter" id="map-filter">
       ${filterChip("all", null, "All")}
       ${filterChip("city", "ziggurat", "Cities")}
