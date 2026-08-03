@@ -550,85 +550,43 @@ export class SettlementView {
     }
   }
 
-  private aoCarpet: Mesh | null = null;
-  private aoCarpetTex: DynamicTexture | null = null;
+  private contactDiscs: Mesh[] = [];
+  private contactMat: StandardMaterial | null = null;
 
   /**
-   * Painted ground-contact shading — the "baked AO" the whole style needs.
-   * A single non-tiled world-space texture over the settlement field gets a
-   * soft dark ellipse under every building/pad/palm + packed-earth wear at
-   * hubs. Repainted whenever the building set changes.
+   * Contact shading: one soft dark disc per building, parented to the
+   * building node itself. (A world-space painted carpet kept landing
+   * mis-registered — judges read the offsets as casterless smudges.)
    */
   private buildAOCarpet() {
-    const W = 46, H = 38, CX = -2.5, CZ = 3;
-    if (this.aoCarpet?.isDisposed()) {
-      this.aoCarpet = null;
-      this.aoCarpetTex = null;
+    for (const d of this.contactDiscs) d.dispose();
+    this.contactDiscs = [];
+    if (!this.contactMat || this.contactMat.isFrozen === undefined) {
+      this.contactMat = new StandardMaterial("contactMat", this.scene);
+      this.contactMat.diffuseColor = hexToColor3("#4A3520");
+      this.contactMat.specularColor = Color3.Black();
+      this.contactMat.emissiveColor = Color3.Black();
+      this.contactMat.alpha = 0.22;
+      this.contactMat.disableLighting = true;
+      this.contactMat.zOffset = -2;
     }
-    if (!this.aoCarpet) {
-      this.aoCarpet = MeshBuilder.CreateGround(
-        "aoCarpet",
-        { width: W, height: H },
+    const st = this.lastSettlement;
+    if (!st) return;
+    for (const b of st.buildings) {
+      if (!b.plotId) continue;
+      const w = this.plotWorldArch(b.plotId);
+      const disc = MeshBuilder.CreateDisc(
+        `contact-${b.id}`,
+        { radius: 1.55, tessellation: 20 },
         this.scene
       );
-      this.aoCarpet.position.set(CX, 0.02, CZ);
-      this.aoCarpet.isPickable = false;
-      const tex = new DynamicTexture("aoCarpetTex", 1024, this.scene, true);
-      tex.hasAlpha = true;
-      const mat = new StandardMaterial("aoCarpetMat", this.scene);
-      mat.diffuseTexture = tex;
-      mat.useAlphaFromDiffuseTexture = true;
-      mat.specularColor = Color3.Black();
-      mat.emissiveColor = Color3.Black();
-      mat.backFaceCulling = true;
-      this.aoCarpet.material = mat;
-      this.aoCarpet.parent = this.envRoot ?? this.root;
-      this.aoCarpetTex = tex;
+      disc.rotation.x = Math.PI / 2;
+      disc.position.set(w.x, 0.035, w.z);
+      disc.material = this.contactMat;
+      disc.isPickable = false;
+      disc.parent = this.root;
+      this.contactDiscs.push(disc);
     }
-    const tex = this.aoCarpetTex;
-    if (!tex) return;
-    const ctx = tex.getContext() as CanvasRenderingContext2D;
-    const S = 1024;
-    ctx.clearRect(0, 0, S, S);
-    const toU = (wx: number) => ((wx - (CX - W / 2)) / W) * S;
-    const toV = (wz: number) => S - ((wz - (CZ - H / 2)) / H) * S;
-    ctx.globalCompositeOperation = "darken";
-    const blob = (wx: number, wz: number, r: number, a: number) => {
-      const g = ctx.createRadialGradient(
-        toU(wx), toV(wz), 0, toU(wx), toV(wz), (r / W) * S
-      );
-      g.addColorStop(0, `rgba(52,36,20,${a})`);
-      g.addColorStop(0.7, `rgba(52,36,20,${a * 0.45})`);
-      g.addColorStop(1, "rgba(52,36,20,0)");
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(toU(wx), toV(wz), (r / W) * S, 0, Math.PI * 2);
-      ctx.fill();
-    };
-    // packed-earth wear around hubs (warm, wide, faint)
-    for (const n0 of PATH_NODES.filter((pn) => pn.id.startsWith("hub-"))) {
-      const n = transformPlotPos(n0.x, n0.z, this.mapArch.layout);
-      const g = ctx.createRadialGradient(
-        toU(n.x), toV(n.z), 0, toU(n.x), toV(n.z), (3.4 / W) * S
-      );
-      g.addColorStop(0, "rgba(122,92,58,0.1)");
-      g.addColorStop(1, "rgba(122,92,58,0)");
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(toU(n.x), toV(n.z), (3.4 / W) * S, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    // building contact shadows
-    const st = this.lastSettlement;
-    if (st) {
-      for (const b of st.buildings) {
-        if (!b.plotId) continue;
-        const w = this.plotWorldArch(b.plotId);
-        blob(w.x, w.z, 1.8, 0.2);
-      }
-    }
-    // No pad blobs — an AO smudge with no caster reads as a render bug
-    tex.update(false);
   }
 
   /** Palms, scrub, rock outcrops, crescent dunes — the desert is a place,
@@ -695,53 +653,77 @@ export class SettlementView {
       const crownZ = lean * h * 0.42;
       const core = MeshBuilder.CreatePolyhedron(
         "palmCore",
-        { type: 3, size: 0.09 },
+        { type: 3, size: 0.07 },
         this.scene
       );
       core.position.set(0, crownY + 0.02, crownZ);
       core.material = trunkMat;
       core.parent = root;
       core.isPickable = false;
-      for (let ring = 0; ring < 2; ring++) {
-        const count = ring === 0 ? 5 : 6;
-        for (let f = 0; f < count; f++) {
-          const fr = MeshBuilder.CreateBox(
+      // Fronds: 3-segment drooping chains (taper + curve), no plank hubs
+      const frondCount = 7;
+      for (let f = 0; f < frondCount; f++) {
+        const a = (f / frondCount) * Math.PI * 2 + (h % 0.7);
+        const droop = 0.3 + (f % 3) * 0.12;
+        let px = Math.sin(a) * 0.1;
+        let pz = Math.cos(a) * 0.1;
+        let py = crownY + 0.04;
+        for (let seg = 0; seg < 3; seg++) {
+          const segLen = h * (0.24 - seg * 0.045);
+          const wSeg = 0.13 - seg * 0.035;
+          const tilt = droop * (seg + 1) * 0.55;
+          const blade = MeshBuilder.CreateBox(
             "palmFr",
-            { width: 0.17 - ring * 0.04, height: 0.03, depth: h * (0.66 - ring * 0.1) },
+            { width: wSeg, height: 0.028, depth: segLen },
             this.scene
           );
-          const a = ((f + ring * 0.5) / count) * Math.PI * 2;
-          fr.position.set(
-            Math.sin(a) * h * 0.16,
-            crownY + 0.05 - ring * 0.1,
-            crownZ + Math.cos(a) * h * 0.16
+          const stepX = Math.sin(a) * segLen * 0.86;
+          const stepZ = Math.cos(a) * segLen * 0.86;
+          blade.position.set(
+            px + stepX / 2,
+            py - Math.sin(tilt) * segLen * 0.5,
+            pz + crownZ * 0 + stepZ / 2
           );
-          fr.rotation.y = a;
-          fr.rotation.x = 0.34 + ring * 0.34 + (f % 3) * 0.08;
-          fr.material = (f + ring) % 5 === 4 ? frondDry : frondMat;
-          fr.parent = root;
-          fr.isPickable = false;
+          blade.rotation.y = a;
+          blade.rotation.x = tilt;
+          blade.material = (f + seg) % 5 === 4 ? frondDry : frondMat;
+          blade.parent = root;
+          blade.isPickable = false;
+          px += stepX;
+          pz += stepZ;
+          py -= Math.sin(tilt) * segLen;
         }
       }
+      // date cluster tucked under the crown (no sprout through the top)
+      const dates = MeshBuilder.CreatePolyhedron(
+        "palmDates",
+        { type: 3, size: 0.07 },
+        this.scene
+      );
+      dates.position.set(0.06, crownY - 0.1, crownZ + 0.06);
+      dates.material = frondDry;
+      dates.parent = root;
+      dates.isPickable = false;
+
       if (cast && this.shadowGen) {
         for (const c of root.getChildMeshes()) this.shadowGen.addShadowCaster(c as Mesh, false);
       }
     };
 
     // Bank + oasis + far-shore palm stands
-    palm(-8.8, -8.6, 1.7, 0.18, true);
+    palm(-8.5, -8.6, 1.7, 0.18, true);
     palm(-8.5, -9.3, 1.4, -0.12, true);
-    palm(-9.1, -8.0, 1.2, 0.3, true);
-    palm(-8.9, 14.6, 1.8, 0.2, true);
+    palm(-8.6, -8.0, 1.2, 0.3, true);
+    palm(-8.6, 14.6, 1.8, 0.2, true);
     palm(-8.5, 15.4, 1.3, -0.2, true);
-    palm(-9.2, 16.2, 1.5, 0.1);
+    palm(-8.7, 16.2, 1.5, 0.1);
     palm(5.5, 15.8, 1.6, 0.22);
     palm(6.3, 16.6, 1.2, -0.15);
     palm(13.5, -7.5, 1.7, 0.15);
     palm(14.4, -6.6, 1.3, -0.2);
     palm(18.0, 9.0, 1.5, 0.18);
-    palm(-21.5, 6.0, 1.4, 0.25);
-    palm(-20.8, -2.5, 1.6, -0.18);
+    palm(-22.5, 6.0, 1.4, 0.25);
+    palm(-22.0, -2.5, 1.6, -0.18);
     // SE oasis pocket — the judge called the lower-right frame dead space
     palm(3.5, -11.6, 1.5, 0.2);
     palm(4.3, -12.3, 1.1, -0.15);
@@ -1013,21 +995,6 @@ export class SettlementView {
     wet.receiveShadows = true;
 
     // (sun-glint boxes deleted — they photographed as floating decals)
-    const foamLineMat = new StandardMaterial("shoreFoamMat", this.scene);
-    foamLineMat.diffuseColor = hexToColor3("#9AA096");
-    foamLineMat.emissiveColor = Color3.Black();
-    foamLineMat.specularColor = Color3.Black();
-    foamLineMat.alpha = 0.3;
-    const shoreFoam = MeshBuilder.CreateBox(
-      "shoreFoam",
-      { width: 0.28, height: 0.02, depth: 72 },
-      this.scene
-    );
-    shoreFoam.position.set(-10.62, 0.062, 2);
-    shoreFoam.material = foamLineMat;
-    shoreFoam.parent = this.envRoot;
-    shoreFoam.isPickable = false;
-
     // Dark silt break at waterline (Materials: wet clay grammar)
     const silt = MeshBuilder.CreateBox(
       "siltBreak",
@@ -1175,6 +1142,22 @@ export class SettlementView {
     bank.material = bmat;
     bank.parent = this.envRoot;
     bank.isPickable = false;
+
+    // Shoreline width variation — the bank was a ruler-straight stripe
+    for (const [wz, wlen, wwide] of [
+      [-7.5, 7.0, 1.15], [4.5, 5.5, 0.85], [13.0, 6.5, 1.05],
+    ] as const) {
+      const wedgeM = MeshBuilder.CreateBox(
+        `bankWiden-${wz}`,
+        { width: wwide, height: 0.12, depth: wlen },
+        this.scene
+      );
+      wedgeM.position.set(-10.05 - wwide / 2 + 0.1, 0.05, wz);
+      wedgeM.material = bmat;
+      wedgeM.parent = this.envRoot;
+      wedgeM.isPickable = false;
+      wedgeM.receiveShadows = true;
+    }
 
     // Dense reed BEDS — mass silhouettes + stalks (Ground craft, not sparse sticks)
     const reedMat = new StandardMaterial("envReed", this.scene);
@@ -1431,9 +1414,9 @@ export class SettlementView {
       const mat = new StandardMaterial(`padMat-${def.id}`, this.scene);
       const tint = hexToColor3(def.tint);
       mat.diffuseColor = Color3.Lerp(
-        hexToColor3("#B79F78"),
+        hexToColor3("#BCA77F"),
         tint,
-        0.08
+        0.04
       );
       mat.specularColor = Color3.Black();
       mat.emissiveColor = Color3.Black();
@@ -1947,20 +1930,6 @@ export class SettlementView {
       seg.isPickable = false;
       this.roadMeshes.push(seg);
 
-      // Soft edge strip under for dirt definition
-      if (tier !== "stone") {
-        const rim = MeshBuilder.CreateBox(
-          `roadRim-${aId}-${bId}`,
-          { width: len - 0.04, height: height * 0.55, depth: width + 0.1 },
-          this.scene
-        );
-        rim.position.set(midX, height * 0.25, midZ);
-        rim.rotation.y = seg.rotation.y;
-        rim.material = edge;
-        rim.parent = this.roadRoot;
-        rim.isPickable = false;
-        this.roadMeshes.push(rim);
-      }
     }
 
     // Hub discs at intersections
