@@ -20,6 +20,7 @@ import {
 } from "@immortal/shared";
 import { api } from "./api.js";
 import { sfx } from "./audio.js";
+import { GLYPHS, buildingIcon, levelPips, resourceIcon } from "./modern.js";
 
 export type InspectHandlers = {
   onSnapshot: (s: PublicSnapshot) => void;
@@ -42,12 +43,12 @@ function costHtml(
   const parts = cost.map((c) => {
     const have = vault[c.resource] ?? 0;
     const ok = have >= c.amount;
-    return `<span class="${ok ? "cost-ok" : "cost-short"}">${c.amount} ${RESOURCE_LABELS[c.resource]} <small>(${Math.floor(have)})</small></span>`;
+    return `<span class="${ok ? "cost-ok" : "cost-short"}">${resourceIcon(c.resource)}${c.amount} ${RESOURCE_LABELS[c.resource]} <small>(${Math.floor(have)})</small></span>`;
   });
   if (sealCost > 0) {
     const ok = seals >= sealCost;
     parts.push(
-      `<span class="${ok ? "cost-ok" : "cost-short"}">${sealCost} Sacred Seal <small>(${seals})</small></span>`
+      `<span class="${ok ? "cost-ok" : "cost-short"}">${GLYPHS.seal}${sealCost} Sacred Seal <small>(${seals})</small></span>`
     );
   }
   return parts.join(" · ") || "—";
@@ -123,97 +124,109 @@ export function renderBuildingPopup(
     <div class="popup-card" role="dialog" aria-modal="true" aria-labelledby="popup-title">
       <button type="button" class="close-x" id="inspect-close" aria-label="Close">×</button>
       <header class="popup-head">
-        <h2 id="popup-title">${title}</h2>
-        <p class="muted">Level ${building.level}${next.maxed ? " (max)" : ""} · Plot (${building.plotX}, ${building.plotY})</p>
+        <span class="popup-glyph">${buildingIcon(building.kind)}</span>
+        <div class="popup-head-text">
+          <h2 id="popup-title">${title}</h2>
+          <p class="muted">Level ${building.level}${next.maxed ? " (max)" : ""} ${levelPips(building.level)}</p>
+        </div>
       </header>
 
-      <section class="popup-section">
-        <h3>What it is</h3>
-        <p>${blurb}</p>
-      </section>
+      <div class="popup-body">
+        <section class="popup-section">
+          <h3>What it is</h3>
+          <p>${blurb}</p>
+        </section>
 
-      <section class="popup-section">
-        <h3>Right now</h3>
-        <p class="expected"><strong>${expected}</strong></p>
-        ${
-          assignable
-            ? `<p class="muted">${building.workers} / ${cap} Workers · ${free} free in settlement · ${st.workers} total</p>
-               <div class="worker-ctrl">
-                 <button type="button" id="w-minus" aria-label="Fewer workers">−</button>
-                 <div class="count">${building.workers}</div>
-                 <button type="button" id="w-plus" aria-label="More workers">+</button>
-               </div>
-               <div class="actions">
-                 <button type="button" class="small secondary" id="w-zero">Clear</button>
-                 <button type="button" class="small" id="w-max">Fill cap</button>
-               </div>`
-            : `<p class="muted">This structure does not take production Workers.</p>`
-        }
-      </section>
-
-      <section class="popup-section">
-        <h3>Next upgrade</h3>
-        ${
-          next.maxed
-            ? `<p>Maximum level reached.</p>`
-            : `<p>Upgrade to <strong>L${next.toLevel}</strong> · <strong>${formatHours(next.hours)}</strong> worker-hours</p>
-               <p class="cost-line">${costHtml(state.player.vault, state.player.seals, next.cost, next.seals)}</p>
-               <div class="actions">
-                 <button type="button" class="small ${affordable ? "" : "secondary"}" id="w-upgrade" ${affordable ? "" : "title=\"Missing resources\""}>
-                   ${building.kind === "great_house" ? "Upgrade Great House" : "Start upgrade"}
-                 </button>
-               </div>
-               ${
-                 st.construction
-                   ? `<p class="muted">Queue busy: ${st.construction.kind} → L${st.construction.targetLevel} (${st.construction.workerHoursDone.toFixed(1)}/${st.construction.workerHoursRequired.toFixed(1)} h)
-                      <button type="button" class="small secondary" id="cancel-build">Cancel (~25% refund)</button></p>`
-                   : ""
-               }`
-        }
-      </section>
-
-      <section class="popup-section">
-        <h3>Level path</h3>
-        <p class="muted">Preview of levels, upgrade cost to reach each tier, build time, and outputs.</p>
-        <div class="lvl-table-wrap">
-          <table class="lvl-table">
-            <thead>
-              <tr>
-                <th>Lvl</th>
-                <th>Workers</th>
-                <th>Time</th>
-                <th>Cost to reach</th>
-                <th>Outputs / effects</th>
-              </tr>
-            </thead>
-            <tbody>${levelRows}</tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="popup-section">
-        <h3>What you can do</h3>
-        <ul class="action-list">
-          ${actions.map((a) => `<li>${a}</li>`).join("")}
-        </ul>
-        <div class="actions">
+        <section class="popup-section">
+          <h3>Right now</h3>
+          <p class="expected"><strong>${expected}</strong></p>
           ${
-            building.kind === "market"
-              ? `<button type="button" class="small" id="go-wall">Open Tablet Wall</button>`
-              : ""
+            assignable
+              ? `<p class="muted">${building.workers} / ${cap} Workers · ${free} free in settlement · ${st.workers} total</p>
+                 <div class="worker-ctrl">
+                   <button type="button" id="w-minus" aria-label="Fewer workers">−</button>
+                   <div class="count">${building.workers}</div>
+                   <button type="button" id="w-plus" aria-label="More workers">+</button>
+                 </div>
+                 <div class="actions">
+                   <button type="button" class="small secondary" id="w-zero">Clear</button>
+                   <button type="button" class="small secondary" id="w-max">Fill cap</button>
+                 </div>`
+              : `<p class="muted">This structure does not take production Workers.</p>`
           }
+        </section>
+
+        <section class="popup-section">
+          <h3>Next upgrade</h3>
           ${
-            building.kind === "harbor"
-              ? `<button type="button" class="small" id="go-harbor">Open Harbor</button>`
-              : ""
+            next.maxed
+              ? `<p>Maximum level reached.</p>`
+              : `<p>Upgrade to <strong>L${next.toLevel}</strong> · <strong>${formatHours(next.hours)}</strong> worker-hours</p>
+                 <p class="cost-line">${costHtml(state.player.vault, state.player.seals, next.cost, next.seals)}</p>
+                 ${
+                   st.construction
+                     ? `<p class="muted">Queue busy: ${BUILDING_TITLE[st.construction.kind] ?? st.construction.kind} → L${st.construction.targetLevel} (${st.construction.workerHoursDone.toFixed(1)}/${st.construction.workerHoursRequired.toFixed(1)} h)
+                        <button type="button" class="small secondary" id="cancel-build">Cancel (~25% refund)</button></p>`
+                     : ""
+                 }`
           }
-          ${
-            building.kind === "training_grounds" || building.kind === "shrine"
-              ? `<button type="button" class="small" id="go-military">Open Military</button>`
-              : ""
-          }
-        </div>
-      </section>
+        </section>
+
+        <section class="popup-section">
+          <h3>Level path</h3>
+          <p class="muted">Preview of levels, upgrade cost to reach each tier, build time, and outputs.</p>
+          <div class="lvl-table-wrap">
+            <table class="lvl-table">
+              <thead>
+                <tr>
+                  <th>Lvl</th>
+                  <th>Workers</th>
+                  <th>Time</th>
+                  <th>Cost to reach</th>
+                  <th>Outputs / effects</th>
+                </tr>
+              </thead>
+              <tbody>${levelRows}</tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="popup-section">
+          <h3>What you can do</h3>
+          <ul class="action-list">
+            ${actions.map((a) => `<li>${a}</li>`).join("")}
+          </ul>
+          <div class="actions">
+            ${
+              building.kind === "market"
+                ? `<button type="button" class="small secondary" id="go-wall">Open Tablet Wall</button>`
+                : ""
+            }
+            ${
+              building.kind === "harbor"
+                ? `<button type="button" class="small secondary" id="go-harbor">Open Harbor</button>`
+                : ""
+            }
+            ${
+              building.kind === "training_grounds" || building.kind === "shrine"
+                ? `<button type="button" class="small secondary" id="go-military">Open Military</button>`
+                : ""
+            }
+          </div>
+        </section>
+      </div>
+
+      ${
+        next.maxed
+          ? ""
+          : `<footer class="popup-footer">
+               <span class="muted">To L${next.toLevel} · ${formatHours(next.hours)}</span>
+               <span class="spacer"></span>
+               <button type="button" class="small ${affordable ? "primary" : "secondary"}" id="w-upgrade" ${affordable ? "" : 'title="Missing resources"'}>
+                 ${building.kind === "great_house" ? "Upgrade Great House" : "Start upgrade"}
+               </button>
+             </footer>`
+      }
     </div>
   `;
 
@@ -290,6 +303,10 @@ export function renderGenericPopup(
   opts: {
     title: string;
     subtitle?: string;
+    /** Building kind whose glyph decorates the header band. */
+    glyphKind?: string;
+    /** Direct GLYPHS key for the header band (wins over glyphKind). */
+    glyphName?: string;
     what: string;
     details?: string[];
     levelTableHtml?: string;
@@ -303,50 +320,58 @@ export function renderGenericPopup(
 ) {
   root.hidden = false;
   root.classList.add("popup-open");
+  const glyph = opts.glyphName
+    ? (GLYPHS[opts.glyphName] ?? GLYPHS.cartouche!)
+    : opts.glyphKind
+      ? buildingIcon(opts.glyphKind)
+      : GLYPHS.cartouche!;
   root.innerHTML = `
     <div class="popup-backdrop" id="popup-backdrop"></div>
     <div class="popup-card" role="dialog" aria-modal="true">
       <button type="button" class="close-x" id="inspect-close" aria-label="Close">×</button>
       <header class="popup-head">
-        <h2>${opts.title}</h2>
-        ${opts.subtitle ? `<p class="muted">${opts.subtitle}</p>` : ""}
-      </header>
-      <section class="popup-section">
-        <h3>What it is</h3>
-        <p>${opts.what}</p>
-      </section>
-      ${
-        opts.details?.length
-          ? `<section class="popup-section">
-              <h3>Details</h3>
-              <ul class="action-list">${opts.details.map((d) => `<li>${d}</li>`).join("")}</ul>
-            </section>`
-          : ""
-      }
-      ${
-        opts.levelTableHtml
-          ? `<section class="popup-section">
-              <h3>Levels & outputs</h3>
-              <div class="lvl-table-wrap">${opts.levelTableHtml}</div>
-            </section>`
-          : ""
-      }
-      <section class="popup-section">
-        <h3>Actions</h3>
-        <div class="actions">
-          ${
-            opts.primaryLabel
-              ? `<button type="button" class="small" id="popup-primary" ${opts.primaryDisabled ? "disabled" : ""}>${opts.primaryLabel}</button>`
-              : ""
-          }
-          ${
-            opts.secondaryLabel
-              ? `<button type="button" class="small secondary" id="popup-secondary">${opts.secondaryLabel}</button>`
-              : ""
-          }
-          <button type="button" class="small secondary" id="popup-dismiss">Close</button>
+        <span class="popup-glyph">${glyph}</span>
+        <div class="popup-head-text">
+          <h2>${opts.title}</h2>
+          ${opts.subtitle ? `<p class="muted">${opts.subtitle}</p>` : ""}
         </div>
-      </section>
+      </header>
+      <div class="popup-body">
+        <section class="popup-section">
+          <h3>What it is</h3>
+          <p>${opts.what}</p>
+        </section>
+        ${
+          opts.details?.length
+            ? `<section class="popup-section">
+                <h3>Details</h3>
+                <ul class="action-list">${opts.details.map((d) => `<li>${d}</li>`).join("")}</ul>
+              </section>`
+            : ""
+        }
+        ${
+          opts.levelTableHtml
+            ? `<section class="popup-section">
+                <h3>Levels & outputs</h3>
+                <div class="lvl-table-wrap">${opts.levelTableHtml}</div>
+              </section>`
+            : ""
+        }
+      </div>
+      <footer class="popup-footer">
+        <button type="button" class="small secondary" id="popup-dismiss">Close</button>
+        ${
+          opts.secondaryLabel
+            ? `<button type="button" class="small secondary" id="popup-secondary">${opts.secondaryLabel}</button>`
+            : ""
+        }
+        <span class="spacer"></span>
+        ${
+          opts.primaryLabel
+            ? `<button type="button" class="small primary" id="popup-primary" ${opts.primaryDisabled ? "disabled" : ""}>${opts.primaryLabel}</button>`
+            : ""
+        }
+      </footer>
     </div>
   `;
   const close = () => opts.onClose();

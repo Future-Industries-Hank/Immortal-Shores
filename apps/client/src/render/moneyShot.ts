@@ -21,11 +21,12 @@ export function applyStandardBoardCamera(camera: ArcRotateCamera) {
   // High classic isometric full-board (director POV law)
   camera.alpha = -Math.PI / 3.5;
   camera.beta = 0.78; // more top-down than mid-iso money-shot
-  // Slightly tighter than full pull-back (director: zoom in just a little)
-  camera.radius = 48;
-  camera.target.set(-3.0, 0, 2.2);
-  camera.lowerRadiusLimit = 48;
-  camera.upperRadiusLimit = 48;
+  // Owner law (full-overhaul goal): board was too zoomed out at 48 —
+  // settlement + river should FILL the frame. Still fixed: no wheel zoom.
+  camera.radius = 34;
+  camera.target.set(-2.6, 0, 2.2);
+  camera.lowerRadiusLimit = 34;
+  camera.upperRadiusLimit = 34;
   camera.lowerBetaLimit = 0.78;
   camera.upperBetaLimit = 0.78;
   camera.lowerAlphaLimit = camera.alpha;

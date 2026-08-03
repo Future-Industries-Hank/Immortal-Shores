@@ -12,13 +12,102 @@
   </head>
   <body>
     <div id="app">
+      <!-- Key-art backdrop behind the login card: dusk sky, dune bands, the Eternal River -->
+      <div class="auth-backdrop" aria-hidden="true">
+        <svg viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+          <defs>
+            <linearGradient id="ab-sky" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#3b2a14" />
+              <stop offset="0.45" stop-color="#5a4120" />
+              <stop offset="1" stop-color="#2a1d10" />
+            </linearGradient>
+            <radialGradient id="ab-sun" cx="0.5" cy="0.5" r="0.5">
+              <stop offset="0" stop-color="#f2d492" stop-opacity="0.95" />
+              <stop offset="0.55" stop-color="#e0b25e" stop-opacity="0.5" />
+              <stop offset="1" stop-color="#e0b25e" stop-opacity="0" />
+            </radialGradient>
+            <linearGradient id="ab-river" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#2c5a74" />
+              <stop offset="0.5" stop-color="#173a4e" />
+              <stop offset="1" stop-color="#0c2230" />
+            </linearGradient>
+          </defs>
+          <rect width="1440" height="900" fill="url(#ab-sky)" />
+          <circle cx="720" cy="300" r="290" fill="url(#ab-sun)" />
+          <circle cx="720" cy="300" r="84" fill="#f0cd83" opacity="0.85" />
+          <!-- far dune bands -->
+          <path d="M0 432 C 240 384 430 470 720 432 S 1160 380 1440 442 L1440 900 0 900 Z" fill="#6d5026" opacity="0.5" />
+          <path d="M0 502 C 300 452 560 542 860 502 S 1240 452 1440 507 L1440 900 0 900 Z" fill="#57401f" opacity="0.78" />
+          <!-- the river -->
+          <path
+            d="M0 560 C 260 585 520 545 780 570 S 1220 600 1440 565 L1440 642 C 1180 668 900 640 640 660 S 200 642 0 656 Z"
+            fill="url(#ab-river)"
+          />
+          <path
+            d="M0 592 C 300 607 700 580 1050 596 S 1360 602 1440 592"
+            stroke="#7fb2c9"
+            stroke-width="2.5"
+            fill="none"
+            opacity="0.35"
+          />
+          <path
+            d="M120 616 C 380 628 620 610 900 620 S 1280 630 1440 618"
+            stroke="#5d93ab"
+            stroke-width="1.5"
+            fill="none"
+            opacity="0.25"
+          />
+          <!-- near banks -->
+          <path d="M0 656 C 200 642 440 668 640 660 C 900 640 1180 668 1440 642 L1440 900 0 900 Z" fill="#3a2a15" />
+          <path d="M0 732 C 320 702 640 752 960 722 S 1280 702 1440 732 L1440 900 0 900 Z" fill="#241809" />
+          <!-- palm silhouettes, left bank -->
+          <g stroke="#171006" stroke-linecap="round" fill="none">
+            <g stroke-width="7">
+              <path d="M186 742c2-36 7-62 16-84" />
+              <path d="M202 658c-18-12-36-14-52-9M202 658c-9-18-23-29-39-33M202 658c2-20-3-38-12-51M202 658c14-16 29-25 45-27M202 658c18-7 36-4 50 5" stroke-width="5.5" />
+            </g>
+            <g stroke-width="5">
+              <path d="M258 738c1-28 5-48 12-64" />
+              <path d="M270 674c-14-9-28-11-40-7M270 674c-7-14-17-22-30-25M270 674c2-16-2-29-9-39M270 674c11-12 22-19 34-20M270 674c14-5 27-3 38 4" stroke-width="4" />
+            </g>
+          </g>
+          <!-- palm silhouettes, right bank -->
+          <g stroke="#171006" stroke-linecap="round" fill="none">
+            <g stroke-width="6">
+              <path d="M1218 748c-2-32-6-56-14-76" />
+              <path d="M1204 672c16-11 32-13 47-8M1204 672c8-16 20-27 35-30M1204 672c-2-18 2-34 11-46M1204 672c-13-14-27-22-41-24M1204 672c-16-6-32-4-45 4" stroke-width="4.5" />
+            </g>
+            <g stroke-width="4.5">
+              <path d="M1300 736c-1-26-4-44-11-58" />
+              <path d="M1289 678c12-8 25-10 36-6M1289 678c6-12 15-20 27-23M1289 678c-2-14 2-26 8-35M1289 678c-10-10-20-16-31-18" stroke-width="3.5" />
+            </g>
+          </g>
+          <!-- reed clumps at the water line -->
+          <g stroke="#131008" stroke-width="2.5" stroke-linecap="round" opacity="0.85">
+            <path d="M420 664v-26M427 664v-32M434 664v-24M441 664v-30" />
+            <path d="M980 652v-24M987 652v-30M994 652v-22M1001 652v-28" />
+            <path d="M120 668v-22M127 668v-28M134 668v-20" />
+          </g>
+        </svg>
+      </div>
+
       <div id="auth" class="panel auth-panel">
-        <h1>Immortal Shores</h1>
+        <div class="auth-brand">
+          <span class="auth-seal" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="46" height="46" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+              <ellipse cx="12" cy="12" rx="7.5" ry="10" />
+              <circle cx="12" cy="8.4" r="2.6" />
+              <path d="M12 11v6.4M8.8 13.6h6.4" />
+            </svg>
+          </span>
+          <h1>Immortal Shores</h1>
+          <span class="gold-rule" aria-hidden="true"></span>
+        </div>
         <p class="tagline">Found a shore. Build on the pads. Feed the workshops. Trade the river.</p>
         <label>Name <input id="auth-name" autocomplete="username" maxlength="24" /></label>
         <label>Password <input id="auth-pass" type="password" autocomplete="current-password" /></label>
         <div class="row">
-          <button id="btn-register" type="button">Found settlement</button>
+          <button id="btn-register" type="button" class="primary">Found settlement</button>
           <button id="btn-login" type="button" class="secondary">Return</button>
         </div>
         <p id="auth-error" class="error" hidden></p>
@@ -30,19 +119,35 @@
           <div id="resources"></div>
           <div id="seals"></div>
           <div class="row gap hud-actions">
-            <select id="quality" title="Quality">
-              <option value="high">High</option>
-              <option value="med" selected>Med</option>
-              <option value="low">Low</option>
-            </select>
-            <select id="tod" title="Time of day">
-              <option value="auto">Auto</option>
-              <option value="day" selected>Day</option>
-              <option value="dusk">Dusk</option>
-              <option value="night">Night</option>
-            </select>
-            <button id="btn-map" type="button" title="World Map">Map</button>
-            <button id="btn-postcard" type="button" title="Postcard">✉</button>
+            <label class="hud-select" title="Quality">
+              <span>Quality</span>
+              <select id="quality">
+                <option value="high">High</option>
+                <option value="med" selected>Med</option>
+                <option value="low">Low</option>
+              </select>
+            </label>
+            <label class="hud-select" title="Time of day">
+              <span>Light</span>
+              <select id="tod">
+                <option value="auto">Auto</option>
+                <option value="day" selected>Day</option>
+                <option value="dusk">Dusk</option>
+                <option value="night">Night</option>
+              </select>
+            </label>
+            <button id="btn-map" type="button" title="World Map">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 5.5l5-2 6 2 5-2v15l-5 2-6-2-5 2v-15z" />
+                <path d="M9 3.5v15M15 5.5v15" />
+              </svg>Map
+            </button>
+            <button id="btn-postcard" type="button" title="Postcard" aria-label="Postcard">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3.5" y="5" width="17" height="14" rx="2" />
+                <path d="M3.5 7.5l8.5 5.5 8.5-5.5" />
+              </svg>
+            </button>
           </div>
         </header>
 
@@ -73,16 +178,56 @@
           </div>
         </div>
 
-        <!-- Thin bottom chrome — tabs only -->
+        <!-- Thin bottom chrome — etched-gold glyph dock -->
         <footer id="hub">
           <nav id="nav" aria-label="Menus">
-            <button data-panel="settlement" type="button">Shore</button>
-            <button data-panel="harbor" type="button">Harbor</button>
-            <button data-panel="tablets" type="button">Tablets</button>
-            <button data-panel="allies" type="button">Allies</button>
-            <button data-panel="wall" type="button">Wall</button>
-            <button data-panel="build" type="button">Build</button>
-            <button data-panel="military" type="button">Military</button>
+            <button data-panel="settlement" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3.5 20h17M5.5 20v-8.5L12 5l6.5 6.5V20M9.5 20v-6h5v6" />
+              </svg>
+              <span>Shore</span>
+            </button>
+            <button data-panel="harbor" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 14.5h18c-.5 2.6-3 4.5-6 4.5H9c-3 0-5.5-1.9-6-4.5z" />
+                <path d="M7 14.5V12h10v2.5M12 12V5.5M12 5.5c2.8.6 4.5 2.4 5 4.5" />
+              </svg>
+              <span>Harbor</span>
+            </button>
+            <button data-panel="tablets" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="6" y="3.5" width="12" height="17" rx="2" />
+                <path d="M9 8h6M9 11.5h6M9 15h4" />
+              </svg>
+              <span>Tablets</span>
+            </button>
+            <button data-panel="allies" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="8.8" cy="12" r="4.8" />
+                <circle cx="15.2" cy="12" r="4.8" />
+              </svg>
+              <span>Allies</span>
+            </button>
+            <button data-panel="wall" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 20v-9h3V8h3v3h4V8h3v3h3v9H4zM4 20h16M9.5 20v-4h5v4" />
+              </svg>
+              <span>Wall</span>
+            </button>
+            <button data-panel="build" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M13.5 10.5L20 4" />
+                <path d="M13.8 10.2l-8.6 3.1c-1.5.6-1.8 2.6-.6 3.7l2.4 2.4c1.1 1.2 3.1.9 3.7-.6l3.1-8.6z" />
+              </svg>
+              <span>Build</span>
+            </button>
+            <button data-panel="military" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 20l9.8-9.8" />
+                <path d="M13 6.5L17.5 4 20 8.5l-3.6 2.7-3.4-4.7z" />
+              </svg>
+              <span>Military</span>
+            </button>
           </nav>
         </footer>
 

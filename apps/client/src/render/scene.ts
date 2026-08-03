@@ -15,6 +15,8 @@ import {
   StandardMaterial,
   TransformNode,
   Vector3,
+  VertexBuffer,
+  VertexData,
   ArcRotateCamera,
 } from "@babylonjs/core";
 import {
@@ -176,9 +178,18 @@ export class SettlementView {
       this.animateWorkers();
       const nf = this.atmosphere.nightFactor(now);
       animateBuildingKit(this.buildingKits, now, nf);
-      // Night facade lamps only after dusk
-      for (const w of this.nightWindows) {
-        if (!w.isDisposed()) w.setEnabled(nf > 0.45);
+      // Night facade lamps: soft fade-in with per-window flicker variance
+      const lampT = Math.min(1, Math.max(0, (nf - 0.45) / 0.25));
+      const lampBase = lampT * lampT * (3 - 2 * lampT); // smoothstep
+      // Mist is a day phenomenon — at night the emissive spheres would
+      // read as glowing pancakes on black water
+      if (this.bankMistMat) this.bankMistMat.alpha = 0.1 * (1 - nf * 0.9);
+      for (let wi = 0; wi < this.nightWindows.length; wi++) {
+        const w = this.nightWindows[wi]!;
+        if (w.isDisposed()) continue;
+        w.setEnabled(lampBase > 0.02);
+        w.visibility =
+          lampBase * (0.82 + Math.sin(now * (1.1 + (wi % 5) * 0.3) + wi) * 0.08);
       }
       this.animateRiverLife(now);
       this.scene.render();
@@ -509,6 +520,241 @@ export class SettlementView {
     return transformPlotPos(def.worldX, def.worldZ, this.mapArch.layout);
   }
 
+  /** Palms, scrub, rock outcrops, crescent dunes — the desert is a place,
+   *  not a tan void. All opaque, all outside the gameplay rect. */
+  private buildNaturalFeatures() {
+    const trunkMat = new StandardMaterial("palmTrunk", this.scene);
+    trunkMat.diffuseColor = hexToColor3("#6A4A2A");
+    trunkMat.specularColor = Color3.Black();
+    const frondMat = new StandardMaterial("palmFrond", this.scene);
+    frondMat.diffuseColor = hexToColor3("#55743A");
+    frondMat.specularColor = Color3.Black();
+    frondMat.emissiveColor = hexToColor3("#2A3A1C").scale(0.06);
+    const frondDry = new StandardMaterial("palmFrondDry", this.scene);
+    frondDry.diffuseColor = hexToColor3("#9A9050");
+    frondDry.specularColor = Color3.Black();
+    const rockMatN = new StandardMaterial("outcropMat", this.scene);
+    rockMatN.diffuseColor = hexToColor3("#A89275");
+    rockMatN.specularColor = hexToColor3("#3A3020").scale(0.1);
+    const duneMatN = new StandardMaterial("duneRidgeMat", this.scene);
+    duneMatN.diffuseColor = hexToColor3("#9E8B66"); // ground-family ridge mass, never a glow
+    duneMatN.specularColor = Color3.Black();
+    const scrubMat = new StandardMaterial("scrubMat", this.scene);
+    scrubMat.diffuseColor = hexToColor3("#8A8A52");
+    scrubMat.specularColor = Color3.Black();
+    const scrubDryMat = new StandardMaterial("scrubDryMat", this.scene);
+    scrubDryMat.diffuseColor = hexToColor3("#AA9A64");
+    scrubDryMat.specularColor = Color3.Black();
+
+    const groundY = (wx: number, wz: number) => {
+      const rectDx = Math.max(0, Math.max(-12.5 - wx, wx - 10.5));
+      const rectDz = Math.max(0, Math.max(-9.5 - wz, wz - 13.5));
+      const dRect = Math.hypot(rectDx, rectDz);
+      const d = wx < -8.4 ? Math.max(0, -19.5 - wx) : dRect;
+      const mask = Math.min(1, d / 18);
+      return Math.max(-0.15, this.desertNoise(wx, wz) * 1.15) * mask * mask;
+    };
+
+    const palm = (x: number, z: number, h: number, lean: number, cast = false) => {
+      const y0 = groundY(x, z);
+      const root = new TransformNode(`palm-${x}-${z}`, this.scene);
+      root.parent = this.envRoot;
+      root.position.set(x, y0, z);
+      root.rotation.y = (x * 7.3 + z * 3.1) % Math.PI;
+      const t1 = MeshBuilder.CreateCylinder(
+        "palmT1",
+        { height: h * 0.6, diameterBottom: 0.16, diameterTop: 0.12, tessellation: 7 },
+        this.scene
+      );
+      t1.position.set(0, h * 0.3, 0);
+      t1.rotation.x = lean * 0.5;
+      const t2 = MeshBuilder.CreateCylinder(
+        "palmT2",
+        { height: h * 0.5, diameterBottom: 0.12, diameterTop: 0.08, tessellation: 7 },
+        this.scene
+      );
+      t2.position.set(0, h * 0.72, lean * h * 0.28);
+      t2.rotation.x = lean;
+      for (const m of [t1, t2]) {
+        m.material = trunkMat;
+        m.parent = root;
+        m.isPickable = false;
+      }
+      const crownY = h * 0.98;
+      const crownZ = lean * h * 0.42;
+      for (let f = 0; f < 8; f++) {
+        const fr = MeshBuilder.CreateBox(
+          "palmFr",
+          { width: 0.13, height: 0.035, depth: h * 0.62 },
+          this.scene
+        );
+        const a = (f / 8) * Math.PI * 2;
+        fr.position.set(
+          Math.sin(a) * h * 0.2,
+          crownY - 0.06 * (f % 3),
+          crownZ + Math.cos(a) * h * 0.2
+        );
+        fr.rotation.y = a;
+        fr.rotation.x = 0.42 + (f % 3) * 0.14;
+        fr.material = f % 4 === 3 ? frondDry : frondMat;
+        fr.parent = root;
+        fr.isPickable = false;
+      }
+      if (cast && this.shadowGen) {
+        for (const c of root.getChildMeshes()) this.shadowGen.addShadowCaster(c as Mesh, false);
+      }
+    };
+
+    // Bank + oasis + far-shore palm stands
+    palm(-8.8, -8.6, 1.7, 0.18, true);
+    palm(-8.5, -9.3, 1.4, -0.12, true);
+    palm(-9.1, -8.0, 1.2, 0.3, true);
+    palm(-8.9, 14.6, 1.8, 0.2, true);
+    palm(-8.5, 15.4, 1.3, -0.2, true);
+    palm(-9.2, 16.2, 1.5, 0.1);
+    palm(5.5, 15.8, 1.6, 0.22);
+    palm(6.3, 16.6, 1.2, -0.15);
+    palm(13.5, -7.5, 1.7, 0.15);
+    palm(14.4, -6.6, 1.3, -0.2);
+    palm(18.0, 9.0, 1.5, 0.18);
+    palm(-21.5, 6.0, 1.4, 0.25);
+    palm(-20.8, -2.5, 1.6, -0.18);
+
+    // Crescent dune ridges — shared NW-SE wind direction
+    const duneSpecs: Array<[number, number, number, number]> = [
+      [16, -3, 5.5, 1.1], [21, 7, 7, 1.4], [13.5, 16.5, 5, 0.9],
+      [26, 15, 8, 1.6], [11, -11, 4.5, 0.8], [-20, 12, 6, 1.2],
+      [-21, -8, 5, 1.0], [30, 0, 9, 1.8],
+    ];
+    for (const [dx, dz, len, ht] of duneSpecs) {
+      const dune = MeshBuilder.CreateSphere(
+        `duneRidge-${dx}-${dz}`,
+        { diameter: 2, segments: 10 },
+        this.scene
+      );
+      dune.scaling.set(len / 2, ht * 0.3, len / 4.6);
+      dune.position.set(dx, groundY(dx, dz) - ht * 0.34, dz);
+      dune.rotation.y = -0.65 + ((dx * 3 + dz) % 10) * 0.05;
+      dune.material = duneMatN;
+      dune.parent = this.envRoot;
+      dune.isPickable = false;
+      dune.receiveShadows = true;
+    }
+
+    // Sandstone outcrops — clustered, tilted, part-buried
+    const outcrops: Array<[number, number]> = [
+      [12.5, -8.5], [17, 12.5], [-8.4, 17.8], [8.5, -11.5], [24, 4],
+      [13.5, 3.5], [12, 15],
+    ];
+    for (const [ox, oz] of outcrops) {
+      const n = 3 + ((ox * 7 + oz * 3) & 1);
+      for (let i = 0; i < n; i++) {
+        const sz = 0.5 + ((i * 2.7 + ox) % 1) * 0.7;
+        const rock = MeshBuilder.CreateBox(
+          `outcrop-${ox}-${oz}-${i}`,
+          { width: sz, height: sz * 0.62, depth: sz * 0.8 },
+          this.scene
+        );
+        const rx2 = ox + Math.sin(i * 2.4) * 0.7 * (1 + i * 0.2);
+        const rz2 = oz + Math.cos(i * 2.4) * 0.55;
+        rock.position.set(rx2, groundY(rx2, rz2) + sz * 0.08, rz2);
+        rock.rotation.set(0.12 * (i % 3), i * 1.2, 0.1 * ((i + 1) % 3));
+        rock.material = rockMatN;
+        rock.parent = this.envRoot;
+        rock.isPickable = false;
+        rock.receiveShadows = true;
+      }
+    }
+
+    // Scrub tuft ring — deterministic scatter outside the plot field
+    for (let i = 0; i < 30; i++) {
+      const a = i * 2.399963; // golden angle
+      const r = 13 + (i % 7) * 2.6;
+      const sx = Math.cos(a) * r + 2;
+      const sz = Math.sin(a) * r * 0.8 + 3;
+      // keep off the river/water and out of the gameplay rect
+      if (sx < -8.2) continue;
+      if (sx > -12.5 && sx < 10.5 && sz > -9.5 && sz < 13.5) {
+        const inPlots = sx > -9.5 && sx < 9 && sz > -7 && sz < 11;
+        if (inPlots) continue;
+      }
+      const y0 = groundY(sx, sz);
+      const tufts = 3 + (i % 3);
+      for (let t = 0; t < tufts; t++) {
+        const th = 0.14 + ((t * 3 + i) % 4) * 0.06;
+        const tuft = MeshBuilder.CreateBox(
+          `scrub-${i}-${t}`,
+          { width: 0.06, height: th, depth: 0.06 },
+          this.scene
+        );
+        tuft.position.set(
+          sx + Math.sin(t * 2.7 + i) * 0.16,
+          y0 + th / 2,
+          sz + Math.cos(t * 1.9 + i) * 0.16
+        );
+        tuft.rotation.set(0.14 * (t % 2 ? 1 : -1), t * 1.1, 0.1 * (t % 3));
+        tuft.material = (i + t) % 3 === 0 ? scrubDryMat : scrubMat;
+        tuft.parent = this.envRoot;
+        tuft.isPickable = false;
+      }
+    }
+  }
+
+  /** Smooth deterministic 2-octave value noise for terrain relief. */
+  private desertNoise(x: number, z: number): number {
+    return (
+      Math.sin(x * 0.075 + z * 0.11 + 1.3) * 0.55 +
+      Math.sin(x * 0.16 - z * 0.09 + 4.1) * 0.3 +
+      Math.sin(x * 0.31 + z * 0.27 + 2.2) * 0.15
+    );
+  }
+
+  /**
+   * Owner law: no more "tan flat plane". Rolling dune relief outside the
+   * gameplay rect + warm macro tonal variation baked into vertex colors.
+   * The playfield itself stays flat so pads/roads/buildings sit true.
+   */
+  private displaceDesert(ground: Mesh) {
+    const pos = ground.getVerticesData(VertexBuffer.PositionKind);
+    if (!pos) return;
+    const colors: number[] = new Array((pos.length / 3) * 4);
+    const gx = ground.position.x;
+    const gz = ground.position.z;
+    for (let i = 0; i < pos.length; i += 3) {
+      const wx = pos[i]! + gx;
+      const wz = pos[i + 2]! + gz;
+      // flatness mask: 0 across the gameplay rect AND the full river strip
+      // (water planes are y-flat boxes — relief must never poke through)
+      const rectDx = Math.max(0, Math.max(-12.5 - wx, wx - 10.5));
+      const rectDz = Math.max(0, Math.max(-9.5 - wz, wz - 13.5));
+      const dRect = Math.hypot(rectDx, rectDz);
+      const dRiver = Math.max(0, Math.max(-19.5 - wx, wx - 8.4 - 17.9));
+      const d = Math.min(dRect, wx < -8.4 ? Math.max(0, -19.5 - wx) : dRect);
+      const mask = Math.min(1, d / 18);
+      const n = this.desertNoise(wx, wz);
+      pos[i + 1] = Math.max(-0.15, n * 1.15) * mask * mask;
+      // macro tonal variation: ±6% warm patchiness + cool far-east grade
+      const t =
+        1 +
+        this.desertNoise(wz * 0.7 + 31, wx * 0.7 - 17) * 0.06 +
+        Math.min(0.05, Math.max(0, (wx - 20) * 0.002));
+      const ci = (i / 3) * 4;
+      colors[ci] = t;
+      colors[ci + 1] = t * (1 - Math.max(0, (wx - 25) * 0.0012));
+      colors[ci + 2] = t * (1 - Math.max(0, (wx - 25) * 0.002));
+      colors[ci + 3] = 1;
+    }
+    ground.updateVerticesData(VertexBuffer.PositionKind, pos);
+    ground.setVerticesData(VertexBuffer.ColorKind, colors);
+    const normals = ground.getVerticesData(VertexBuffer.NormalKind);
+    const indices = ground.getIndices();
+    if (normals && indices) {
+      VertexData.ComputeNormals(pos, indices, normals);
+      ground.updateVerticesData(VertexBuffer.NormalKind, normals);
+    }
+    ground.useVertexColors = true;
+  }
+
   private makeSandTexture(baseHex: string) {
     try {
       const size = this.quality === "low" ? 128 : 256;
@@ -563,94 +809,36 @@ export class SettlementView {
     this.mapArch = arch;
     const pal = arch.palette;
 
-    // Vast continuous desert — player must never see a hard map edge (02.9)
+    // Vast continuous desert — one displaced macro-varied ground (no plane
+    // stack: the old skirt/midSand/farCarpet/farWash washes greyed the board)
     const ground = MeshBuilder.CreateGround(
       "ground",
-      { width: 160, height: 140, subdivisions: this.quality === "low" ? 12 : 32 },
+      {
+        width: 240,
+        height: 210,
+        subdivisions: this.quality === "low" ? 24 : 48,
+        updatable: true,
+      },
       this.scene
     );
-    ground.position.set(0, 0, 2);
+    ground.position.set(4, 0, 4);
+    this.displaceDesert(ground);
     const mat = new StandardMaterial("groundMat", this.scene);
-    mat.diffuseColor = hexToColor3(pal.sand);
+    mat.diffuseColor = Color3.White();
     mat.specularColor = hexToColor3("#3A3020").scale(0.08);
     mat.emissiveColor = hexToColor3(pal.sand).scale(0.03);
     const grit = this.makeSandTexture(pal.sand);
     if (grit) {
       mat.diffuseTexture = grit;
-      mat.diffuseColor = Color3.White();
-      grit.uScale = 18;
-      grit.vScale = 16;
+      grit.uScale = 9;
+      grit.vScale = 8;
+    } else {
+      mat.diffuseColor = hexToColor3(pal.sand);
     }
     ground.material = mat;
     ground.parent = this.envRoot;
     ground.isPickable = false;
     ground.receiveShadows = true;
-
-    // Outer skirt — same sand, slightly cooler, extends beyond any ortho framing
-    const skirt = MeshBuilder.CreateGround(
-      "sandSkirt",
-      { width: 220, height: 200, subdivisions: 4 },
-      this.scene
-    );
-    skirt.position.set(2, -0.03, 3);
-    const skirtMat = new StandardMaterial("sandSkirtMat", this.scene);
-    skirtMat.diffuseColor = hexToColor3("#C2AC82"); // warm family — grey steps washed the board
-    skirtMat.emissiveColor = hexToColor3("#8A7A58").scale(0.05);
-    skirtMat.specularColor = Color3.Black();
-    skirt.material = skirtMat;
-    skirt.parent = this.envRoot;
-    skirt.isPickable = false;
-    skirt.receiveShadows = true;
-
-    // Mid-distance cooler strip (subtle falloff, not an edge)
-    const midSand = MeshBuilder.CreateGround(
-      "midSand",
-      { width: 70, height: 60, subdivisions: 4 },
-      this.scene
-    );
-    midSand.position.set(8, -0.01, 5);
-    const midSandMat = new StandardMaterial("midSandMat", this.scene);
-    midSandMat.diffuseColor = hexToColor3("#B49C74");
-    midSandMat.emissiveColor = hexToColor3("#7A6A50").scale(0.05);
-    midSandMat.specularColor = Color3.Black();
-    midSand.material = midSandMat;
-    midSand.parent = this.envRoot;
-    midSand.isPickable = false;
-    midSand.receiveShadows = true;
-
-    // Soft far wash (atmospheric, not a wall)
-    const farCarpetMat = new StandardMaterial("farCarpetMat", this.scene);
-    farCarpetMat.diffuseColor = hexToColor3("#A89468");
-    farCarpetMat.emissiveColor = hexToColor3("#8A7A58").scale(0.15);
-    farCarpetMat.alpha = 0.10; // thin — stacked washes greyed the whole board
-    farCarpetMat.disableLighting = true;
-    farCarpetMat.backFaceCulling = false;
-    const farCarpet = MeshBuilder.CreateGround(
-      "farCarpet",
-      { width: 90, height: 80 },
-      this.scene
-    );
-    farCarpet.position.set(14, 0.1, 8);
-    farCarpet.material = farCarpetMat;
-    farCarpet.parent = this.envRoot;
-    farCarpet.isPickable = false;
-
-    // Soft far haze (low alpha — continuous desert, no edge wall)
-    const farWashMat = new StandardMaterial("farWashMat", this.scene);
-    farWashMat.diffuseColor = hexToColor3("#BCA478");
-    farWashMat.emissiveColor = hexToColor3("#807860").scale(0.12);
-    farWashMat.alpha = 0.07;
-    farWashMat.disableLighting = true;
-    farWashMat.backFaceCulling = false;
-    const farWash = MeshBuilder.CreateGround(
-      "farWash0",
-      { width: 100, height: 90 },
-      this.scene
-    );
-    farWash.position.set(16, 0.25, 8);
-    farWash.material = farWashMat;
-    farWash.parent = this.envRoot;
-    farWash.isPickable = false;
 
     // Wet silt bank — brown-green wet mud, not dry sand
     const wet = MeshBuilder.CreateGround(
@@ -668,6 +856,41 @@ export class SettlementView {
     wet.parent = this.envRoot;
     wet.isPickable = false;
     wet.receiveShadows = true;
+
+    // Mudflat lobes — the shoreline is a river edge, not a ruler
+    const flatMat = new StandardMaterial("mudflatMat", this.scene);
+    flatMat.diffuseColor = hexToColor3("#8A7048");
+    flatMat.specularColor = hexToColor3("#4A7080").scale(0.18);
+    flatMat.specularPower = 24;
+    for (const [lz, lw, ld] of [
+      [-6.2, 2.6, 1.4], [9.6, 3.2, 1.7], [2.4, 1.9, 1.0],
+    ] as const) {
+      const lobe = MeshBuilder.CreateSphere(
+        `mudflat-${lz}`,
+        { diameter: 1, segments: 10 },
+        this.scene
+      );
+      lobe.scaling.set(ld, 0.07, lw / 2);
+      lobe.position.set(-10.55, 0.045, lz);
+      lobe.material = flatMat;
+      lobe.parent = this.envRoot;
+      lobe.isPickable = false;
+      lobe.receiveShadows = true;
+      // sandbar highlight rim on the water side
+      const bar = MeshBuilder.CreateSphere(
+        `sandbar-${lz}`,
+        { diameter: 1, segments: 8 },
+        this.scene
+      );
+      bar.scaling.set(ld * 0.55, 0.05, lw * 0.3);
+      bar.position.set(-11.0, 0.055, lz + 0.3);
+      const barMat = new StandardMaterial(`sandbarMat-${lz}`, this.scene);
+      barMat.diffuseColor = hexToColor3("#C9B285");
+      barMat.specularColor = Color3.Black();
+      bar.material = barMat;
+      bar.parent = this.envRoot;
+      bar.isPickable = false;
+    }
 
     // Dark silt break at waterline (Materials: wet clay grammar)
     const silt = MeshBuilder.CreateBox(
@@ -717,29 +940,6 @@ export class SettlementView {
     wetLine2.material = wetLine2Mat;
     wetLine2.parent = this.envRoot;
     wetLine2.isPickable = false;
-
-    if (this.quality !== "low") {
-      const duneMat = new StandardMaterial("duneMat", this.scene);
-      duneMat.diffuseColor = hexToColor3(STYLE.sandDeep);
-      duneMat.specularColor = Color3.Black();
-      for (const [x, z, sx, sz] of [
-        [7, -7.5, 2.8, 1.6],
-        [11, 3.5, 2.4, 1.4],
-        [9, 8.5, 2.6, 1.5],
-        [4, -9, 2.0, 1.2],
-      ] as const) {
-        const d = MeshBuilder.CreateBox(
-          `dune-${x}-${z}`,
-          { width: sx, height: 0.28, depth: sz },
-          this.scene
-        );
-        d.position.set(x, 0.1, z);
-        d.material = duneMat;
-        d.parent = this.envRoot;
-        d.isPickable = false;
-        d.receiveShadows = true;
-      }
-    }
 
     // Deep Nile: near-black channel (Materials/Ground — not matte candy teal)
     const river = MeshBuilder.CreateBox(
@@ -791,28 +991,6 @@ export class SettlementView {
     shallow.material = shMat;
     shallow.parent = this.envRoot;
     shallow.isPickable = false;
-
-    // Wet churn foam — silt-grey/cream, lit (not pure-albedo candy chunks)
-    const flMat = new StandardMaterial("foamLineMat", this.scene);
-    flMat.diffuseColor = hexToColor3("#B8C4C0");
-    flMat.emissiveColor = hexToColor3("#8A9890").scale(0.12);
-    flMat.specularColor = hexToColor3("#C0D0D0").scale(0.2);
-    flMat.alpha = 0.72;
-    flMat.zOffset = -1;
-    for (let i = 0; i < 36; i++) {
-      const blob = MeshBuilder.CreateSphere(
-        `foamBlob-${i}`,
-        { diameter: 0.22 + (i % 5) * 0.08, segments: 6 },
-        this.scene
-      );
-      const along = -15 + i * 0.95 + (i % 3) * 0.12;
-      // Foam lives in the water — on the bank it reads as white pills
-      blob.position.set(-10.65 - (i % 3) * 0.28, 0.06 + (i % 4) * 0.02, along);
-      blob.scaling.set(1.4 + (i % 4) * 0.35, 0.22 + (i % 3) * 0.08, 0.7 + (i % 2) * 0.35);
-      blob.material = flMat;
-      blob.parent = this.envRoot;
-      blob.isPickable = false;
-    }
 
     const foamMat = new StandardMaterial("foamMat", this.scene);
     foamMat.diffuseColor = hexToColor3("#A8B8B4");
@@ -923,6 +1101,7 @@ export class SettlementView {
 
     this.buildDustField();
     this.buildHazePlanes();
+    this.buildNaturalFeatures();
 
     // Pier from bank into river toward harbor pad
     const pierLen = arch.layout.pierLength ?? 3.0;
@@ -1134,24 +1313,10 @@ export class SettlementView {
     const mm = new StandardMaterial("bankMistMat", this.scene);
     mm.diffuseColor = hexToColor3("#C8D4D8");
     mm.emissiveColor = hexToColor3("#A8BCC4").scale(0.2);
-    mm.alpha = 0.15; // subtle — must never read as pancakes in hero close-ups
+    mm.alpha = 0.10; // subtle — must never read as pancakes in hero close-ups
+    this.bankMistMat = mm;
     mm.disableLighting = true;
     mm.backFaceCulling = false;
-    // Backbone ribbon along the waterline — skip the pier reach (z 4..10)
-    // so the harbor hero stays crystal clear in close-ups
-    for (let i = 0; i < 8; i++) {
-      const rz = -12 + i * 3.4;
-      if (rz > 3.5 && rz < 10) continue;
-      const ribbon = MeshBuilder.CreateBox(
-        `bankRibbon-${i}`,
-        { width: 3.0, height: 0.4 + (i % 2) * 0.1, depth: 2.6 },
-        this.scene
-      );
-      ribbon.position.set(-12.0 + (i % 2) * 0.4, 0.5 + (i % 3) * 0.1, rz);
-      ribbon.material = mm;
-      ribbon.parent = this.envRoot;
-      ribbon.isPickable = false;
-    }
     // Small soft fill spheres over open water only (never over bank/pier)
     for (let i = 0; i < 10; i++) {
       const mz = -13 + i * 2.8;
@@ -1162,45 +1327,10 @@ export class SettlementView {
         this.scene
       );
       mist.position.set(-12.4 + (i % 3) * 0.4, 0.6 + (i % 4) * 0.08, mz);
-      mist.scaling.set(1.5, 0.26, 1.05);
+      mist.scaling.set(2.5, 0.2, 1.6); // wide+flat: air, not pancake facets
       mist.material = mm;
       mist.parent = this.envRoot;
       mist.isPickable = false;
-    }
-    // Upper thin haze veil over bank (reads as soft air volume at mid-iso)
-    const veilMat = new StandardMaterial("bankVeilMat", this.scene);
-    veilMat.diffuseColor = hexToColor3("#D0D8D8");
-    veilMat.emissiveColor = hexToColor3("#B8C8C8").scale(0.15);
-    veilMat.alpha = 0.07; // fog minimal (03 director law)
-    veilMat.disableLighting = true;
-    veilMat.backFaceCulling = false;
-    const veil = MeshBuilder.CreateBox(
-      "bankVeil",
-      { width: 5.5, height: 1.2, depth: 30 },
-      this.scene
-    );
-    veil.position.set(-11.2, 1.1, 1.5);
-    veil.material = veilMat;
-    veil.parent = this.envRoot;
-    veil.isPickable = false;
-
-    // Very light heat wash only (not fog soup volumes over the campus)
-    if (this.quality !== "low") {
-      const heatMat = new StandardMaterial("heatHazeMat", this.scene);
-      heatMat.diffuseColor = hexToColor3("#D8C8A8");
-      heatMat.emissiveColor = hexToColor3("#C8B898").scale(0.1);
-      heatMat.alpha = 0.06;
-      heatMat.disableLighting = true;
-      heatMat.backFaceCulling = false;
-      const heat = MeshBuilder.CreateGround(
-        "heatHazeFar",
-        { width: 40, height: 36 },
-        this.scene
-      );
-      heat.position.set(10, 0.5, 6);
-      heat.material = heatMat;
-      heat.parent = this.envRoot;
-      heat.isPickable = false;
     }
   }
 
@@ -1216,14 +1346,17 @@ export class SettlementView {
 
     for (const def of SETTLEMENT_PLOTS) {
       const pos = this.worldPos(def);
-      // Near-invisible sand plinths — category readable via icon only (kill candy pads)
+      // Solid packed-sand plinth in the ground family — category reads via
+      // the carved token; butter-yellow translucent slabs are toy-cheap
       const mat = new StandardMaterial(`padMat-${def.id}`, this.scene);
-      const baseSand = hexToColor3(STYLE.sandLight);
       const tint = hexToColor3(def.tint);
-      mat.diffuseColor = Color3.Lerp(baseSand, hexToColor3(STYLE.sandDeep), 0.2);
+      mat.diffuseColor = Color3.Lerp(
+        hexToColor3("#C9B285"),
+        tint,
+        0.12
+      );
       mat.specularColor = Color3.Black();
       mat.emissiveColor = Color3.Black();
-      mat.alpha = 0.35;
       this.padMats.set(def.id, mat);
 
       const isHarbor = def.id === "special-harbor";
@@ -1242,7 +1375,7 @@ export class SettlementView {
       pad.parent = this.root;
       pad.isPickable = !def.starterKind;
       pad.receiveShadows = true;
-      pad.visibility = def.starterKind ? 0 : 0.4;
+      pad.visibility = def.starterKind ? 0 : 1;
       pad.metadata = {
         plotId: def.id,
         category: def.category,
@@ -1265,13 +1398,39 @@ export class SettlementView {
         );
         if (icon) this.padIcons.set(def.id, icon);
 
-        // Solid packed-earth footprint only — NEVER wire/outline ghosts (GOAL-GRAPHICS-READY)
+        // Started-foundation read: low perimeter walls + corner brick
+        // courses — a building site, not a hovering block
         const ghost = MeshBuilder.CreateBox(
           `ghost-${def.id}`,
-          { width: 1.5, height: 0.28, depth: 1.3 },
+          { width: 1.5, height: 0.1, depth: 1.3 },
           this.scene
         );
-        ghost.position.set(pos.x, 0.14, pos.z);
+        ghost.position.set(pos.x, 0.05, pos.z);
+        for (const [fw, fd, fx, fz] of [
+          [1.5, 0.16, 0, -0.57], [1.5, 0.16, 0, 0.57],
+          [0.16, 1.3, -0.67, 0], [0.16, 1.3, 0.67, 0],
+        ] as const) {
+          const wall = MeshBuilder.CreateBox(
+            `ghostWall-${def.id}-${fx}-${fz}`,
+            { width: fw, height: 0.14, depth: fd },
+            this.scene
+          );
+          wall.position.set(pos.x + fx, 0.17, pos.z + fz);
+          wall.parent = this.root;
+          wall.isPickable = false;
+          wall.receiveShadows = true;
+          this.padGhosts.set(`${def.id}-w${fx}${fz}`, wall);
+        }
+        const corner = MeshBuilder.CreateBox(
+          `ghostCorner-${def.id}`,
+          { width: 0.4, height: 0.12, depth: 0.24 },
+          this.scene
+        );
+        corner.position.set(pos.x - 0.45, 0.3, pos.z - 0.45);
+        corner.rotation.y = 0.12;
+        corner.parent = this.root;
+        corner.isPickable = false;
+        this.padGhosts.set(`${def.id}-corner`, corner);
         const gm = new StandardMaterial(`ghostMat-${def.id}`, this.scene);
         gm.diffuseColor = hexToColor3(STYLE.mudbrick);
         gm.emissiveColor = hexToColor3(STYLE.mudbrick).scale(0.04);
@@ -1283,6 +1442,11 @@ export class SettlementView {
         ghost.isPickable = false;
         ghost.receiveShadows = true;
         this.padGhosts.set(def.id, ghost);
+        for (const [gk, gmesh] of this.padGhosts) {
+          if (gk.startsWith(`${def.id}-`) && !gmesh.material) {
+            gmesh.material = gm;
+          }
+        }
       }
 
       pad.actionManager = new ActionManager(this.scene);
@@ -1390,39 +1554,112 @@ export class SettlementView {
     const w = this.plotWorldArch(plotId);
     root.position.set(w.x, 0, w.z);
 
-    // Solid timber scaffold posts (not wireframe outline — GOAL-GRAPHICS-READY)
+    // Real timber worksite: jittered posts, ledger poles, diagonals,
+    // half-risen mudbrick courses, materials pile (not an abstract cube)
     const mat = new StandardMaterial("scaffoldMat", this.scene);
-    mat.diffuseColor = hexToColor3("#8B7355");
+    mat.diffuseColor = hexToColor3("#7A5B3A");
     mat.specularColor = Color3.Black();
-    mat.wireframe = false;
-    for (const [x, z] of [
-      [-0.65, -0.65],
-      [0.65, -0.65],
-      [-0.65, 0.65],
-      [0.65, 0.65],
-    ] as const) {
+    const matDk = new StandardMaterial("scaffoldMatDk", this.scene);
+    matDk.diffuseColor = hexToColor3("#5C4226");
+    matDk.specularColor = Color3.Black();
+    const brickM = new StandardMaterial("scaffoldBrick", this.scene);
+    brickM.diffuseColor = hexToColor3("#A96B48");
+    brickM.specularColor = Color3.Black();
+    const posts: Array<[number, number, number]> = [
+      [-0.75, -0.7, 1.25], [0.72, -0.75, 1.15], [-0.7, 0.72, 1.2],
+      [0.75, 0.7, 1.3],
+    ];
+    for (const [x, z, ph] of posts) {
       const post = MeshBuilder.CreateBox(
         `scaffoldPost-${x}-${z}`,
-        { width: 0.14, height: 1.2, depth: 0.14 },
+        { width: 0.12, height: ph, depth: 0.12 },
         this.scene
       );
-      post.position.set(x, 0.65, z);
-      post.material = mat;
+      post.position.set(x, ph / 2, z);
+      post.rotation.set((x + z) * 0.03, 0, (x - z) * 0.03);
+      post.material = matDk;
       post.parent = root;
       post.isPickable = true;
       post.metadata = { construction: true, plotId };
     }
-    const beam = MeshBuilder.CreateBox(
-      "scaffoldBeam",
-      { width: 1.4, height: 0.12, depth: 1.4 },
+    // ledger poles at two lifts on all four sides
+    for (const y of [0.55, 1.05]) {
+      for (const [w2, d2, px, pz] of [
+        [1.6, 0.08, 0, -0.73], [1.6, 0.08, 0, 0.73],
+        [0.08, 1.6, -0.73, 0], [0.08, 1.6, 0.73, 0],
+      ] as const) {
+        const pole = MeshBuilder.CreateBox(
+          `scaffoldPole-${y}-${px}-${pz}`,
+          { width: w2, height: 0.07, depth: d2 },
+          this.scene
+        );
+        pole.position.set(px, y, pz);
+        pole.material = mat;
+        pole.parent = root;
+        pole.isPickable = false;
+      }
+    }
+    // diagonal brace + leaning plank ramp
+    const brace = MeshBuilder.CreateBox(
+      "scaffoldBrace",
+      { width: 0.08, height: 1.5, depth: 0.08 },
       this.scene
     );
-    beam.position.y = 1.25;
-    beam.material = mat;
-    beam.parent = root;
-    beam.isPickable = true;
-    beam.metadata = { construction: true, plotId };
-    const frame = beam;
+    brace.position.set(-0.2, 0.62, -0.76);
+    brace.rotation.z = 0.6;
+    brace.material = mat;
+    brace.parent = root;
+    brace.isPickable = false;
+    const ramp = MeshBuilder.CreateBox(
+      "scaffoldRamp",
+      { width: 0.42, height: 0.05, depth: 1.3 },
+      this.scene
+    );
+    ramp.position.set(0.45, 0.32, -0.9);
+    ramp.rotation.x = -0.45;
+    ramp.material = mat;
+    ramp.parent = root;
+    ramp.isPickable = false;
+    // half-risen wall courses inside the frame
+    for (let c = 0; c < 3; c++) {
+      const course = MeshBuilder.CreateBox(
+        `scaffoldCourse-${c}`,
+        { width: 1.3 - c * 0.05, height: 0.16, depth: 1.15 - c * 0.05 },
+        this.scene
+      );
+      course.position.y = 0.1 + c * 0.16;
+      course.material = brickM;
+      course.parent = root;
+      course.isPickable = true;
+      course.metadata = { construction: true, plotId };
+    }
+    // brick pile + timber stack at the corner
+    for (let bIdx = 0; bIdx < 4; bIdx++) {
+      const pileBrick = MeshBuilder.CreateBox(
+        `scaffoldPile-${bIdx}`,
+        { width: 0.22, height: 0.1, depth: 0.13 },
+        this.scene
+      );
+      pileBrick.position.set(
+        1.05 + (bIdx % 2) * 0.24,
+        0.05 + Math.floor(bIdx / 2) * 0.1,
+        1.0
+      );
+      pileBrick.rotation.y = bIdx * 0.25;
+      pileBrick.material = brickM;
+      pileBrick.parent = root;
+      pileBrick.isPickable = false;
+    }
+    const timber = MeshBuilder.CreateBox(
+      "scaffoldTimber",
+      { width: 0.1, height: 0.18, depth: 1.1 },
+      this.scene
+    );
+    timber.position.set(-1.05, 0.09, 0.9);
+    timber.rotation.y = 0.3;
+    timber.material = matDk;
+    timber.parent = root;
+    timber.isPickable = false;
 
     // Larger invisible hit volume so the site is easy to click
     const hit = MeshBuilder.CreateBox(
@@ -1475,6 +1712,7 @@ export class SettlementView {
     this.updateSelectRing();
   }
 
+  private bankMistMat: StandardMaterial | null = null;
   private nightWindows: Mesh[] = [];
   private nightWinMat: StandardMaterial | null = null;
 
@@ -1706,85 +1944,115 @@ export class SettlementView {
     const root = new TransformNode(`worker-${i}`, this.scene);
     root.parent = this.root;
     // Tiny people vs buildings (door-relative) — never dominate board
-    root.scaling.setAll(0.42);
-    // Thin human silhouette: torso + head + arms + legs (not barrel/silo)
-    const linen = hexToColor3("#FFF8EC");
-    const skin = hexToColor3("#C9956C");
-    const accent = hexToColor3(i % 2 === 0 ? STYLE.sealAccent : STYLE.riverDeep);
+    root.scaling.setAll(this.boardApprovalMode ? 0.36 : 0.42);
+    // Sun-lit like the buildings (near-zero emissive) — variety per worker
+    const skinTones = ["#C9956C", "#B07E52", "#9A6A44", "#D4A276"];
+    const linens = ["#F2E8D2", "#E8DCC0", "#EFE2C4"];
+    const kilts = ["#8E3B2C", "#1E4D6B", "#B98A2E", "#6A7A44"];
+    const skin = hexToColor3(skinTones[i % skinTones.length]!);
+    const linen = hexToColor3(linens[(i * 7) % linens.length]!);
+    const accent = hexToColor3(kilts[(i * 3) % kilts.length]!);
+    const mat = (name: string, c: Color3) => {
+      const m = new StandardMaterial(name, this.scene);
+      m.diffuseColor = c;
+      m.emissiveColor = c.scale(0.06);
+      m.specularColor = Color3.Black();
+      return m;
+    };
+    const linenMat = mat(`wlin-${i}`, linen);
+    const skinMat = mat(`wskin-${i}`, skin);
+    const kiltMat = mat(`wkilt-${i}`, accent);
 
+    const add = (m: Mesh) => {
+      m.parent = root;
+      m.isPickable = false;
+    };
     const torso = MeshBuilder.CreateBox(
       `wtorso-${i}`,
-      { width: 0.38, height: 0.55, depth: 0.22 },
+      { width: 0.36, height: 0.5, depth: 0.2 },
       this.scene
     );
-    torso.position.y = 0.95;
-    const tm = new StandardMaterial(`wtm-${i}`, this.scene);
-    tm.diffuseColor = linen;
-    tm.emissiveColor = linen.scale(0.4);
-    tm.specularColor = Color3.Black();
-    torso.material = tm;
-    torso.parent = root;
-    torso.isPickable = false;
-
-    const legs = MeshBuilder.CreateBox(
-      `wlegs-${i}`,
-      { width: 0.32, height: 0.55, depth: 0.18 },
+    torso.position.y = 1.0;
+    torso.material = linenMat;
+    add(torso);
+    // kilt: slightly flared skirt block below the torso
+    const kilt = MeshBuilder.CreateBox(
+      `wkilt-${i}`,
+      { width: 0.4, height: 0.28, depth: 0.24 },
       this.scene
     );
-    legs.position.y = 0.4;
-    const lm = new StandardMaterial(`wlm-${i}`, this.scene);
-    lm.diffuseColor = hexToColor3("#2A2118");
-    lm.emissiveColor = hexToColor3("#2A2118").scale(0.15);
-    lm.specularColor = Color3.Black();
-    legs.material = lm;
-    legs.parent = root;
-    legs.isPickable = false;
-
+    kilt.position.y = 0.68;
+    kilt.material = kiltMat;
+    add(kilt);
+    // A-stance legs: two separate legs, slight outward angle
+    for (const side of [-1, 1]) {
+      const leg = MeshBuilder.CreateBox(
+        `wleg-${i}-${side}`,
+        { width: 0.12, height: 0.5, depth: 0.14 },
+        this.scene
+      );
+      leg.position.set(side * 0.1, 0.29, 0);
+      leg.rotation.z = side * 0.07;
+      leg.material = skinMat;
+      add(leg);
+    }
     const head = MeshBuilder.CreateSphere(
       `whead-${i}`,
-      { diameter: 0.28, segments: 6 },
+      { diameter: 0.26, segments: 6 },
       this.scene
     );
     head.position.y = 1.4;
-    const hm = new StandardMaterial(`whm-${i}`, this.scene);
-    hm.diffuseColor = skin;
-    hm.emissiveColor = skin.scale(0.2);
-    hm.specularColor = Color3.Black();
-    head.material = hm;
-    head.parent = root;
-    head.isPickable = false;
-
-    // Arms out slightly — human read
+    head.material = skinMat;
+    add(head);
+    // headcloth: small linen cap + back drape (nemes read at tiny scale)
+    const cap = MeshBuilder.CreateBox(
+      `wcap-${i}`,
+      { width: 0.3, height: 0.09, depth: 0.3 },
+      this.scene
+    );
+    cap.position.y = 1.5;
+    cap.material = i % 3 === 0 ? kiltMat : linenMat;
+    add(cap);
+    const drape = MeshBuilder.CreateBox(
+      `wdrape-${i}`,
+      { width: 0.26, height: 0.22, depth: 0.06 },
+      this.scene
+    );
+    drape.position.set(0, 1.38, 0.16);
+    drape.material = cap.material;
+    add(drape);
+    // arms: skin, slight bend outward
     for (const side of [-1, 1]) {
       const arm = MeshBuilder.CreateBox(
         `warm-${i}-${side}`,
-        { width: 0.1, height: 0.45, depth: 0.1 },
+        { width: 0.09, height: 0.42, depth: 0.09 },
         this.scene
       );
-      arm.position.set(side * 0.28, 0.95, 0);
-      arm.rotation.z = side * 0.25;
-      const am = new StandardMaterial(`wam-${i}-${side}`, this.scene);
-      am.diffuseColor = linen;
-      am.emissiveColor = linen.scale(0.35);
-      am.specularColor = Color3.Black();
-      arm.material = am;
-      arm.parent = root;
-      arm.isPickable = false;
+      arm.position.set(side * 0.26, 1.0, 0);
+      arm.rotation.z = side * 0.22;
+      arm.material = skinMat;
+      add(arm);
     }
-
-    const sash = MeshBuilder.CreateBox(
-      `wsash-${i}`,
-      { width: 0.42, height: 0.1, depth: 0.26 },
-      this.scene
-    );
-    sash.position.y = 0.78;
-    const sashMat = new StandardMaterial(`wsm-${i}`, this.scene);
-    sashMat.diffuseColor = accent;
-    sashMat.emissiveColor = accent.scale(0.4);
-    sashMat.specularColor = Color3.Black();
-    sash.material = sashMat;
-    sash.parent = root;
-    sash.isPickable = false;
+    // every third worker carries a basket/jar on the head or shoulder
+    if (i % 3 === 1) {
+      const load = MeshBuilder.CreateCylinder(
+        `wload-${i}`,
+        { height: 0.18, diameterBottom: 0.2, diameterTop: 0.26, tessellation: 7 },
+        this.scene
+      );
+      load.position.y = 1.64;
+      load.material = mat(`wloadm-${i}`, hexToColor3("#B39562"));
+      add(load);
+    } else if (i % 3 === 2) {
+      const jar = MeshBuilder.CreateCylinder(
+        `wjar-${i}`,
+        { height: 0.22, diameterBottom: 0.14, diameterTop: 0.1, tessellation: 7 },
+        this.scene
+      );
+      jar.position.set(0.3, 1.28, 0);
+      jar.material = mat(`wjarm-${i}`, hexToColor3("#A05A34"));
+      add(jar);
+    }
 
     if (this.shadowGen) this.shadowGen.addShadowCaster(torso, false);
     // No fake foot shadow boxes (02.8 hard fail)

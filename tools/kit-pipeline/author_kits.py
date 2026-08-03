@@ -16,7 +16,9 @@ OUT = "/tmp/claude-1000/-home-eric/f840123e-860a-4c45-add6-0b16a98ff524/scratchp
 os.makedirs(OUT, exist_ok=True)
 
 ALL = ["great_house", "market", "emmer_field", "mudbrick_yard", "harbor",
-       "river_clay_pit", "marsh_reed_bed"]
+       "river_clay_pit", "marsh_reed_bed", "training_grounds", "shrine",
+       "ration_house", "luxury_material", "luxury_workshop", "vessel_shop",
+       "reed_basket_shop", "warehouse"]
 KINDS = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else ALL
 
 # ---------------------------------------------------------------- materials
@@ -37,10 +39,23 @@ def M(name, hexcol, rough=0.92, metal=0.0, emit=None, emit_str=1.0):
         return _mats[name]
     m = bpy.data.materials.new(name)
     m.use_nodes = True
-    bsdf = m.node_tree.nodes["Principled BSDF"]
-    bsdf.inputs["Base Color"].default_value = srgb(hexcol)
+    nt = m.node_tree
+    bsdf = nt.nodes["Principled BSDF"]
     bsdf.inputs["Roughness"].default_value = rough
     bsdf.inputs["Metallic"].default_value = metal
+    # Base color × COLOR_0 vertex jitter (painted-variation read in Babylon).
+    # Wiring the attribute makes the glTF exporter emit COLOR_0.
+    col = nt.nodes.new("ShaderNodeRGB")
+    col.outputs[0].default_value = srgb(hexcol)
+    attr = nt.nodes.new("ShaderNodeVertexColor")
+    attr.layer_name = "Col"
+    mix = nt.nodes.new("ShaderNodeMix")
+    mix.data_type = "RGBA"
+    mix.blend_type = "MULTIPLY"
+    mix.inputs["Factor"].default_value = 1.0
+    nt.links.new(col.outputs[0], mix.inputs[6])
+    nt.links.new(attr.outputs["Color"], mix.inputs[7])
+    nt.links.new(mix.outputs[2], bsdf.inputs["Base Color"])
     if emit:
         bsdf.inputs["Emission Color"].default_value = srgb(emit)
         bsdf.inputs["Emission Strength"].default_value = emit_str
@@ -93,6 +108,9 @@ def palette():
                    emit="#FF7A20", emit_str=2.5),
         "water": M("channel_water", "#4E5E48", rough=0.35),
         "grey": M("clay_grey", "#847A6C"),
+        # luxury goods
+        "copper": M("copper_ingot", "#B4652F", rough=0.5, metal=0.45),
+        "gem": M("gem_violet", "#7B4E93", rough=0.45),
     }
 
 
@@ -726,6 +744,637 @@ def build_marsh_reed_bed(P):
     basket("mr", 1.2, -1.3, 0.1, P, r=0.1, fill="crop_gr")
 
 
+# ---------------------------------------------------------------- TRAINING GROUNDS
+def build_training_grounds(P):
+    """Board 05: open packed-earth yard, low mud wall on two sides with blue
+    band, archery targets on tripods, training dummies, spear rack, shade
+    awning, water jars. Low silhouette, tallest ~1.2."""
+    base = box("tg_earth_base", 3.3, 3.3, 0.08, (0, 0, 0), P["earth"])
+    bevel(base, 0.02)
+    # worn yard patch (subtle tonal break in the open ground)
+    box("tg_sand_worn", 1.7, 1.5, 0.008, (-0.1, -0.25, 0.08), P["sand"])
+
+    # low mudbrick wall: back (+Y) and left (-X), with blue painted band + cap
+    box("tg_mud_wallB", 3.2, 0.2, 0.36, (0, 1.52, 0.08), P["mud"])
+    box("tg_blue_bandB", 3.22, 0.04, 0.055, (0, 1.43, 0.22), P["blue"])
+    box("tg_mud_capB", 3.26, 0.24, 0.05, (0, 1.52, 0.44), P["mud_dk"])
+    box("tg_mud_wallL", 0.2, 3.15, 0.355, (-1.52, -0.03, 0.08), P["mud"])
+    box("tg_blue_bandL", 0.04, 3.1, 0.055, (-1.43, -0.05, 0.22), P["blue"])
+    # cap stops short of the corner so it never z-fights the back cap
+    box("tg_mud_capL", 0.24, 2.98, 0.05, (-1.52, -0.14, 0.435), P["mud_dk"])
+
+    # 3 archery targets: straw disc on splayed tripod, facing the yard (-Y)
+    for tx in (-0.72, 0.02, 0.76):
+        ty = 1.0
+        zc = 0.42  # disc center height
+        # tripod: two splayed front legs + one raked back leg
+        for s in (-1, 1):
+            box("tg_wood_leg", 0.04, 0.04, 0.6, (tx + s * 0.11, ty + 0.02, 0.05),
+                P["wood_dk"], ry=math.radians(s * 12))
+        box("tg_wood_legback", 0.04, 0.04, 0.6, (tx, ty + 0.14, 0.05),
+            P["wood_dk"], rx=math.radians(-22))
+        # straw disc + concentric painted rings (loc z = center - h/2 for rx=90)
+        cyl("tg_thatch_disc", 0.2, 0.055, (tx, ty, zc - 0.0275), P["thatch"],
+            seg=14, rx=math.radians(90))
+        cyl("tg_ringmark", 0.125, 0.022, (tx, ty - 0.02, zc - 0.011),
+            P["cl_red"], seg=12, rx=math.radians(90))
+        cyl("tg_ringmark_c", 0.05, 0.02, (tx, ty - 0.032, zc - 0.01),
+            P["linen"], seg=9, rx=math.radians(90))
+
+    # round shields leaning on the back wall (board 05 shield cluster)
+    for sx, mm in ((-1.15, "cl_red"), (1.25, "blue")):
+        cyl("tg_wood_shield", 0.17, 0.045, (sx, 1.34, 0.125), P["wood"],
+            seg=12, rx=math.radians(72))
+        cyl("tg_boss", 0.07, 0.02, (sx, 1.285, 0.15), P[mm], seg=9,
+            rx=math.radians(72))
+
+    # 2 training dummies: post + crossbar + wrapped linen torso + rope belt
+    for dx, dy, rr in ((-0.85, -0.2, 0.25), (-0.55, -1.0, -0.2)):
+        cyl("tg_wood_dpost", 0.045, 0.95, (dx, dy, 0.08), P["wood_dk"], seg=8)
+        box("tg_wood_dbar", 0.5, 0.055, 0.055, (dx, dy, 0.68), P["wood"],
+            rz=rr)
+        cyl("tg_linen_torso", 0.105, 0.36, (dx, dy, 0.42), P["linen"], seg=9)
+        torus("tg_rope_belt", 0.105, 0.02, (dx, dy, 0.53), P["rope"])
+        sphere("tg_linen_head", 0.07, (dx, dy, 0.92), P["linen"], seg=7)
+
+    # spear rack against the left wall: posts + rail + leaning spears
+    rx0, ry0 = -1.28, 0.35
+    for py in (ry0 - 0.5, ry0 + 0.5):
+        box("tg_wood_rackpost", 0.05, 0.05, 0.72, (rx0, py, 0.08), P["wood_dk"])
+    box("tg_wood_rackrail", 0.06, 1.1, 0.05, (rx0, ry0, 0.75), P["wood"])
+    for i in range(7):
+        py = ry0 - 0.42 + i * 0.14
+        cyl("tg_wood_spear", 0.013, 1.02, (rx0 + 0.09, py, 0.06), P["wood"],
+            seg=6, ry=math.radians(-9))
+        box("tg_grey_tip", 0.03, 0.03, 0.09, (rx0 + 0.005, py, 1.06),
+            P["grey"], ry=math.radians(-9))
+
+    # shade awning front-right: 4 poles + tilted mat, jars beneath
+    ax, ay = 0.95, -0.95
+    for px, py in ((ax - 0.5, ay - 0.42), (ax + 0.5, ay - 0.42),
+                   (ax - 0.5, ay + 0.42), (ax + 0.5, ay + 0.42)):
+        cyl("tg_wood_awnpole", 0.03, 0.95 + (0.14 if py > ay else 0),
+            (px, py, 0.08), P["wood_dk"], seg=7)
+    box("tg_matting_shade", 1.25, 1.05, 0.045, (ax, ay, 1.06), P["thatch"],
+        rx=math.radians(-8))
+    amphora("tg_j1", ax - 0.25, ay + 0.1, 0.08, P, s=1.1)
+    amphora("tg_j2", ax + 0.05, ay - 0.12, 0.08, P, s=0.85)
+    basket("tg", ax + 0.32, ay + 0.18, 0.08, P, r=0.1, fill="crop_g")
+
+    # banner pole near the right edge (artboard standard)
+    cyl("tg_wood_banpole", 0.028, 1.15, (1.45, 0.4, 0.08), P["wood_dk"], seg=7)
+    box("tg_linen_banner", 0.05, 0.3, 0.42, (1.45, 0.42, 0.72), P["linen"])
+    box("tg_cl_emblem", 0.055, 0.16, 0.14, (1.45, 0.42, 0.85), P["cl_red"])
+
+    # floor props: practice mat + spare bundle + water jar row by back wall
+    box("tg_matting_floor", 0.75, 0.55, 0.02, (0.45, 0.15, 0.08), P["thatch_dk"])
+    cyl("tg_thatch_bundle", 0.07, 0.5, (1.15, 1.28, 0.145), P["thatch"],
+        seg=7, ry=math.radians(90))
+    amphora("tg_j3", -1.25, -1.2, 0.08, P, s=0.95)
+
+
+# ---------------------------------------------------------------- SHRINE
+def build_shrine(P):
+    """Board 06: stepped stone platform, battered white naos with cavetto
+    cornice, gold-trimmed dark doorway, gold dome crest (glows at night),
+    obelisks with gold tips, offering bowls, rush bundles."""
+    # stepped platform
+    b1 = box("sh_stone_plat1", 2.6, 2.6, 0.15, (0, 0, 0), P["stone"])
+    bevel(b1, 0.02)
+    b2 = box("sh_stone_plat2", 2.3, 2.3, 0.14, (0, 0, 0.15), P["stone_w"])
+    bevel(b2, 0.02)
+    box("sh_stone_plat3", 2.0, 2.0, 0.12, (0, 0, 0.29), P["stone"])
+    top = 0.41
+    # front stairs to platform (front = -Y)
+    stairs("sh_stone_stair", 4, 0.92, 0.16, 0.103, (0, -1.95, 0),
+           P["stone_w"], along="y", sign=1)
+
+    # blue wave band on the platform front (board 06 base trim)
+    box("sh_blue_platband", 2.05, 0.04, 0.05, (0, -1.16, 0.2), P["blue"])
+
+    # naos: battered white-stone chapel
+    naos = frustum("sh_stone_naos", 1.7, 1.45, 1.48, 1.24, 1.05,
+                   (0, 0.18, top), P["stone_w"])
+    bevel(naos, 0.02)
+    # blue painted frieze band under the cornice
+    box("sh_blue_frieze", 1.56, 1.31, 0.1, (0, 0.18, top + 0.9), P["blue"])
+    # cavetto cornice: strong outward flare + cap slab tucked inside the flare
+    frustum("sh_stone_cavetto", 1.52, 1.28, 1.86, 1.6, 0.18,
+            (0, 0.18, top + 1.05), P["stone"])
+    box("sh_stone_cap", 1.78, 1.52, 0.06, (0, 0.18, top + 1.23), P["stone_w"])
+    # gold dome crest — 'gold' mesh glows at night
+    cyl("sh_gold_crestring", 0.21, 0.07, (0, 0.18, top + 1.29), P["gold"], seg=12)
+    sphere("sh_gold_crest", 0.19, (0, 0.18, top + 1.32), P["gold"], seg=10)
+
+    # doorway: dark recess + gold jambs/lintel on the front face
+    fy = -0.55
+    box("sh_door_recess", 0.46, 0.16, 0.72, (0, fy + 0.03, top + 0.05), P["dark"])
+    box("sh_gold_jambL", 0.07, 0.09, 0.84, (-0.3, fy, top + 0.02), P["gold"])
+    box("sh_gold_jambR", 0.07, 0.09, 0.84, (0.3, fy, top + 0.02), P["gold"])
+    box("sh_gold_lintel", 0.7, 0.09, 0.09, (0, fy, top + 0.86), P["gold"])
+    # offering mat before the door
+    box("sh_matting_door", 0.52, 0.4, 0.02, (0, -0.98, top), P["thatch"])
+
+    # flanking obelisks with gold pyramidions
+    for sx in (-1, 1):
+        ox, oy = sx * 0.78, -0.72
+        box("sh_stone_obase", 0.24, 0.24, 0.08, (ox, oy, top), P["stone"])
+        frustum("sh_stone_obelisk", 0.17, 0.17, 0.1, 0.1, 0.72,
+                (ox, oy, top + 0.08), P["stone_w"])
+        frustum("sh_gold_otip", 0.11, 0.11, 0.015, 0.015, 0.14,
+                (ox, oy, top + 0.8), P["gold"])
+
+    # offering bowls + incense stand on steps and platform
+    cyl("sh_pot_bowl", 0.1, 0.07, (0.55, -1.05, top), P["pot"], seg=9,
+        rtop=0.12)
+    cyl("sh_crop_offer", 0.085, 0.035, (0.55, -1.05, top + 0.055), P["crop_g"],
+        seg=9)
+    cyl("sh_pot_bowl2", 0.08, 0.06, (-0.6, -1.55, 0.15), P["pot"], seg=9,
+        rtop=0.095)
+    cyl("sh_char_incense", 0.045, 0.2, (0.75, -1.5, 0.15), P["char"], seg=7,
+        rtop=0.06)
+    # cut rush bundles laid on the platform edge (board 06 left side)
+    for i in range(2):
+        cyl(f"sh_crop_rush{i}", 0.055, 0.75, (-0.85 + i * 0.1, 0.85 - i * 0.22,
+            0.29 + 0.055 - 0.375), P["crop_gr"], seg=6, ry=math.radians(90),
+            rz=math.radians(18))
+    # small side stone: stela against naos flank
+    box("sh_stone_stela", 0.08, 0.3, 0.4, (0.82, 0.35, top), P["stone"])
+
+
+# ---------------------------------------------------------------- RATION HOUSE
+def build_ration_house(P):
+    """Board 09: mudbrick bakehouse hall + granary annex with beehive silos,
+    arched oven mouth, serving counter with awning, bread, sacks, baskets."""
+    base = box("rh_dirt_apron", 2.8, 2.7, 0.07, (0, 0, 0), P["dirt"])
+    bevel(base, 0.02)
+
+    # main hall (battered, board-09 sloped mass)
+    hall = frustum("rh_mud_hall", 1.75, 1.55, 1.55, 1.35, 1.05,
+                   (-0.42, 0.18, 0.07), P["mud_tan"])
+    bevel(hall, 0.025)
+    box("rh_stone_string", 1.72, 1.52, 0.06, (-0.42, 0.18, 0.78), P["stone"])
+    box("rh_mud_parapet", 1.6, 1.4, 0.08, (-0.42, 0.18, 1.12), P["mud_dk"])
+    box("rh_mud_roof", 1.48, 1.28, 0.06, (-0.42, 0.18, 1.12), P["mud"])
+    # chimney stub back corner (board 09)
+    box("rh_mud_chimney", 0.2, 0.2, 0.32, (-1.0, 0.7, 1.12), P["mud_tan"])
+    box("rh_dark_chimtop", 0.12, 0.12, 0.05, (-1.0, 0.7, 1.44), P["dark"])
+    # roof drying: mat + grain rows + rolled bundle
+    box("rh_matting_roof", 0.6, 0.5, 0.03, (-0.42, 0.1, 1.18), P["thatch"])
+    for i in range(3):
+        box("rh_crop_dryrow", 0.5, 0.1, 0.045, (-0.42, -0.28 + i * 0.16, 1.2),
+            P["crop_g"], rz=0.08 * (i - 1))
+    cyl("rh_thatch_roll", 0.055, 0.45, (-0.42, 0.52, 1.18 + 0.055 - 0.225),
+        P["thatch_dk"], seg=8, ry=math.radians(90))
+
+    # arched oven mouth on the front face (pot arch ring + dark throat +
+    # warm cloth-orange inset suggesting the fire, no emissive)
+    fy = -0.62
+    cyl("rh_pot_ovenarch", 0.34, 0.1, (-0.42, fy - 0.03, 0.36 - 0.05), P["pot"],
+        seg=16, rx=math.radians(90))
+    cyl("rh_dark_oventhroat", 0.24, 0.08, (-0.42, fy - 0.07, 0.36 - 0.04),
+        P["dark"], seg=14, rx=math.radians(90))
+    cyl("rh_cl_ovenwarm", 0.13, 0.03, (-0.42, fy - 0.115, 0.3 - 0.015),
+        P["cl_org"], seg=10, rx=math.radians(90))
+    box("rh_stone_ovenshelf", 0.66, 0.26, 0.1, (-0.42, fy - 0.14, 0.07),
+        P["stone"])
+    sphere("rh_linen_bread", 0.06, (-0.56, fy - 0.16, 0.17), P["linen"], seg=7)
+    sphere("rh_linen_bread2", 0.05, (-0.28, fy - 0.18, 0.17), P["linen"], seg=7)
+
+    # ladder leaning on the front face, right of the oven (board 09)
+    for s in (-1, 1):
+        cyl("rh_wood_ladrail", 0.02, 1.1, (0.22 + s * 0.1, -0.74, 0.07),
+            P["wood_dk"], seg=6, rx=math.radians(-11))
+    for i in range(4):
+        box("rh_wood_ladrung", 0.24, 0.035, 0.035,
+            (0.22, -0.7 + i * 0.05, 0.3 + i * 0.24), P["wood"])
+
+    # granary annex + beehive silos (cyl taper + sphere cap)
+    frustum("rh_mud_annex", 1.0, 1.2, 0.9, 1.1, 0.58, (0.85, 0.6, 0.07),
+            P["mud"])
+    box("rh_mud_annexroof", 0.92, 1.12, 0.06, (0.85, 0.6, 0.65), P["mud_dk"])
+    silos = ((1.02, 0.15, 1.0), (0.68, -0.42, 0.86), (1.08, -0.82, 0.72))
+    for i, (sx, sy, s) in enumerate(silos):
+        cyl(f"rh_mud_silo{i}", 0.27 * s, 0.52 * s, (sx, sy, 0.07), P["mud_tan"],
+            seg=12, rtop=0.2 * s)
+        sphere(f"rh_mud_silocap{i}", 0.2 * s, (sx, sy, 0.07 + 0.52 * s - 0.16 * s),
+               P["mud_tan"], seg=10)
+        box(f"rh_dark_silohatch{i}", 0.075 * s, 0.05, 0.085 * s,
+            (sx, sy - 0.245 * s, 0.3 * s), P["dark"])
+        cyl(f"rh_mud_silobase{i}", 0.3 * s, 0.07, (sx, sy, 0.07), P["mud_dk"],
+            seg=12)
+
+    # serving counter with awning (front-left, fully on the apron)
+    cx, cy = -0.95, -0.88
+    box("rh_mud_counter", 0.8, 0.4, 0.46, (cx, cy, 0.07), P["mud_dk"])
+    box("rh_linen_countertop", 0.86, 0.46, 0.04, (cx, cy, 0.53), P["linen"])
+    box("rh_wood_breadboard", 0.34, 0.22, 0.03, (cx - 0.18, cy - 0.02, 0.57),
+        P["wood"])
+    sphere("rh_crop_loaf", 0.05, (cx - 0.24, cy - 0.04, 0.6), P["crop_g"], seg=7)
+    sphere("rh_crop_loaf2", 0.045, (cx - 0.1, cy + 0.02, 0.6), P["crop_g"], seg=7)
+    basket("rh_c", cx + 0.24, cy + 0.04, 0.57, P, r=0.09, fill="crop_g")
+    box("rh_cloth_awn", 0.95, 0.52, 0.04, (cx, cy - 0.22, 0.96), P["cl_org"],
+        rx=math.radians(-24))
+    for sxp in (cx - 0.42, cx + 0.42):
+        cyl("rh_wood_awnpole", 0.025, 0.9, (sxp, cy - 0.42, 0.07),
+            P["wood_dk"], seg=7)
+
+    # ground props: sacks, jars, baskets (board 09 foreground)
+    for i, (px, py, rr) in enumerate(((0.35, -1.05, 0.4), (0.62, -1.18, -0.2))):
+        s = box(f"rh_linen_sack{i}", 0.24, 0.2, 0.2, (px, py, 0.07), P["linen"],
+                rz=rr)
+        bevel(s, 0.04)
+    basket("rh_g1", 0.1, -1.15, 0.07, P, r=0.13, fill="crop_g")
+    basket("rh_g2", -0.15, -1.28, 0.07, P, r=0.1, fill="linen")
+    amphora("rh_j1", 1.25, -0.35, 0.07, P, s=1.15)
+    amphora("rh_j2", 1.3, -0.02, 0.07, P, s=0.9)
+
+
+# ---------------------------------------------------------------- LUXURY MATERIAL
+def build_luxury_material(P):
+    """Board 07 raw side: stone/ingot yard — heavy rack, white-stone block
+    stacks, copper ingot piles, gem crate, rope-bound bundles, canopy,
+    workbench."""
+    base = box("lm_dirt_base", 2.8, 2.8, 0.08, (0, 0, 0), P["dirt"])
+    bevel(base, 0.02)
+    box("lm_stone_pad", 1.5, 1.2, 0.05, (-0.45, -0.35, 0.08), P["stone"])
+
+    # heavy material rack along the back wall
+    ry0 = 1.05
+    for px in (-1.05, -0.35, 0.35, 1.05):
+        box("lm_wood_rackpost", 0.07, 0.07, 1.1, (px, ry0, 0.08), P["wood_dk"])
+    for zz in (0.42, 0.78):
+        box("lm_wood_shelf", 2.35, 0.5, 0.055, (0, ry0, zz), P["wood"])
+    box("lm_wood_racktop", 2.45, 0.56, 0.05, (0, ry0, 1.14), P["wood_dk"])
+    # shelf goods: stone blocks, copper ingots, bundle
+    for i in range(3):
+        box("lm_stone_shelfblock", 0.32, 0.24, 0.2, (-0.85 + i * 0.36, ry0, 0.475),
+            P["stone_w"], rz=0.06 * (i - 1))
+    for i in range(4):
+        box("lm_copper_shelfingot", 0.2, 0.1, 0.07, (0.45 + (i % 2) * 0.26, ry0
+            - 0.06 + (i // 2) * 0.14, 0.475), P["copper"], rz=0.1 * (i % 2))
+    cyl("lm_thatch_shelfbundle", 0.08, 0.6, (-0.6, ry0, 0.835 + 0.08 - 0.3),
+        P["thatch"], seg=7, ry=math.radians(90))
+    box("lm_grey_shelfslab", 0.5, 0.3, 0.1, (0.55, ry0, 0.835), P["grey"])
+
+    # white-stone block stacks (left, 2 courses + offset cap)
+    sx0, sy0 = -1.0, -0.15
+    for c, n in ((0, 2), (1, 2)):
+        for i in range(n):
+            box("lm_stone_block", 0.52, 0.36, 0.26,
+                (sx0 + (i - 0.5) * 0.56, sy0, 0.08 + c * 0.26), P["stone_w"],
+                rz=0.04 * (c + i))
+    box("lm_stone_blockcap", 0.5, 0.34, 0.24, (sx0 - 0.1, sy0 + 0.05, 0.6),
+        P["stone_w"], rz=0.12)
+
+    # copper ingot piles: crosswise courses (front-center)
+    def ingot_pile(px, py, courses):
+        for c in range(courses):
+            n = courses - c
+            for i in range(n):
+                if c % 2 == 0:
+                    box("lm_copper_pile", 0.3, 0.13, 0.085,
+                        (px + (i - (n - 1) / 2) * 0.15, py, 0.08 + c * 0.085),
+                        P["copper"], rz=math.radians(90))
+                else:
+                    box("lm_copper_pile", 0.3, 0.13, 0.085,
+                        (px, py + (i - (n - 1) / 2) * 0.15, 0.08 + c * 0.085),
+                        P["copper"])
+    ingot_pile(-0.12, -0.95, 4)
+    ingot_pile(0.38, -1.12, 2)
+
+    # gem crate: wood crate + violet gem fill + loose gems
+    gx, gy = 0.85, -0.55
+    box("lm_wood_crate", 0.4, 0.4, 0.24, (gx, gy, 0.08), P["wood"])
+    box("lm_wood_craterim", 0.44, 0.44, 0.05, (gx, gy, 0.3), P["wood_dk"])
+    box("lm_gem_fill", 0.32, 0.32, 0.06, (gx, gy, 0.3), P["gem"])
+    sphere("lm_gem_loose", 0.045, (gx - 0.07, gy + 0.05, 0.36), P["gem"], seg=6)
+    sphere("lm_gem_loose2", 0.04, (gx + 0.08, gy - 0.06, 0.36), P["gem"], seg=6)
+
+    # rope-bound upright bundles (right side)
+    for i, (px, py, s) in enumerate(((1.15, 0.15, 1.0), (0.95, 0.42, 0.85))):
+        cyl(f"lm_thatch_bund{i}", 0.12 * s, 0.55 * s, (px, py, 0.08),
+            P["thatch"], seg=8)
+        cyl(f"lm_rope_bind{i}", 0.13 * s, 0.05, (px, py, 0.08 + 0.3 * s),
+            P["rope"], seg=8)
+        cyl(f"lm_rope_bind{i}b", 0.13 * s, 0.05, (px, py, 0.08 + 0.12 * s),
+            P["rope"], seg=8)
+
+    # shade canopy over the crate corner
+    for px, py in ((0.55, -1.2), (1.25, -1.2), (0.55, -0.15), (1.25, -0.15)):
+        cyl("lm_wood_canpole", 0.028, 0.9 + (0.1 if py > -0.6 else 0),
+            (px, py, 0.08), P["wood_dk"], seg=7)
+    box("lm_matting_canopy", 0.95, 1.3, 0.045, (0.9, -0.68, 1.0), P["thatch"],
+        rx=math.radians(-6))
+    box("lm_wood_canfascia", 0.98, 0.06, 0.055, (0.9, -1.31, 0.94),
+        P["wood_dk"], rx=math.radians(-6))
+
+    # low workbench + tools + stone chunks
+    wx, wy = -0.5, -1.05
+    box("lm_wood_bench", 0.7, 0.34, 0.32, (wx, wy, 0.08), P["wood"])
+    box("lm_wood_benchtop", 0.76, 0.4, 0.04, (wx, wy, 0.4), P["wood_dk"])
+    box("lm_char_chisel", 0.16, 0.03, 0.025, (wx - 0.15, wy + 0.04, 0.44),
+        P["char"], rz=0.4)
+    box("lm_wood_mallet", 0.09, 0.05, 0.06, (wx + 0.12, wy - 0.05, 0.44),
+        P["wood_dk"])
+    sphere("lm_grey_chunk", 0.07, (wx + 0.24, wy + 0.08, 0.44), P["grey"], seg=6)
+    basket("lm", -1.15, -1.05, 0.08, P, r=0.11, fill="grey")
+
+
+# ---------------------------------------------------------------- LUXURY WORKSHOP
+def build_luxury_workshop(P):
+    """Board 07 craft side: mudbrick body with wide open front, interior
+    bench + tools, hearth ('hearth_glow' night ember), gold display shelf
+    ('gold_display'), striped awning, chimney."""
+    hearth_glow = M("hearth_glow", "#E86A18", rough=0.6, emit="#FF7A20",
+                    emit_str=2.5)
+    gold_disp = M("gold_display", "#D4A438", rough=0.45, metal=0.6)
+
+    base = box("lw_dirt_base", 2.7, 2.6, 0.08, (0, 0, 0), P["dirt"])
+    bevel(base, 0.02)
+    box("lw_stone_floor", 2.1, 1.6, 0.05, (0, -0.3, 0.08), P["stone"])
+
+    # shallow U body pushed back so the craft yard stays visible in-game
+    bk = frustum("lw_mud_back", 2.3, 0.38, 2.18, 0.3, 1.18, (0, 0.95, 0.08),
+                 P["mud"])
+    bevel(bk, 0.02)
+    for sx in (-1, 1):
+        w = frustum("lw_mud_side", 0.38, 1.4, 0.3, 1.3, 1.18,
+                    (sx * 0.96, 0.42, 0.08), P["mud"])
+        bevel(w, 0.02)
+        # stone corner pier at the open front (board 07 trim)
+        box("lw_stone_pier", 0.22, 0.22, 1.26, (sx * 1.0, -0.24, 0.08),
+            P["stone"])
+    # roof slab + cornice + parapet (covers the body only, not the yard)
+    box("lw_stone_cornice", 2.42, 1.62, 0.07, (0, 0.42, 1.26), P["stone_w"])
+    roof = box("lw_mud_roofslab", 2.3, 1.52, 0.12, (0, 0.42, 1.33), P["mud_tan"])
+    bevel(roof, 0.03)
+    box("lw_mud_parapet", 2.34, 0.14, 0.1, (0, 1.08, 1.45), P["mud_dk"])
+    # chimney rising off the back roof (board 07 flared stack)
+    cyl("lw_pot_chimney", 0.11, 0.6, (0.72, 0.85, 1.4), P["pot"], seg=9,
+        rtop=0.08)
+    cyl("lw_pot_chimflare", 0.08, 0.16, (0.72, 0.85, 2.0), P["pot"], seg=9,
+        rtop=0.14)
+
+    # workbench in the open yard, tools + dye bowl on top
+    bx0, by0 = -0.42, -0.62
+    box("lw_wood_bench", 0.85, 0.4, 0.42, (bx0, by0, 0.13), P["wood"])
+    box("lw_wood_benchtop", 0.92, 0.46, 0.04, (bx0, by0, 0.55), P["wood_dk"])
+    box("lw_char_tool", 0.18, 0.03, 0.03, (bx0 - 0.2, by0, 0.59), P["char"],
+        rz=0.5)
+    cyl("lw_pot_dyebowl", 0.07, 0.06, (bx0 + 0.15, by0 + 0.05, 0.59), P["pot"],
+        seg=9, rtop=0.085)
+    cyl("lw_gem_dye", 0.055, 0.02, (bx0 + 0.15, by0 + 0.05, 0.64), P["gem"],
+        seg=8)
+
+    # hearth kiln in the yard front-right, ember mouth faces the viewer
+    hx, hy = 0.62, -0.55
+    frustum("lw_brick_hearth", 0.55, 0.5, 0.4, 0.36, 0.55, (hx, hy, 0.13),
+            P["brick"])
+    box("lw_char_hearthtop", 0.32, 0.28, 0.06, (hx, hy, 0.68), P["char"])
+    box("lw_dark_hearthmouth", 0.24, 0.07, 0.22, (hx, hy - 0.27, 0.2), P["dark"])
+    box("lw_hearth_glow", 0.17, 0.05, 0.14, (hx, hy - 0.295, 0.22), hearth_glow)
+
+    # gold display shelf just inside the opening (glows at night)
+    dy = 0.08
+    for px in (-0.85, -0.05):
+        box("lw_wood_disppost", 0.06, 0.06, 1.0, (px, dy, 0.13), P["wood_dk"])
+    for zz in (0.5, 0.85):
+        box("lw_wood_dispshelf", 0.95, 0.2, 0.04, (-0.45, dy, zz), P["wood"])
+    box("lw_gold_ditem1", 0.16, 0.11, 0.12, (-0.72, dy, 0.54), gold_disp)
+    cyl("lw_gold_ditem2", 0.05, 0.15, (-0.42, dy, 0.54), gold_disp, seg=8)
+    sphere("lw_gold_ditem3", 0.05, (-0.18, dy, 0.54), gold_disp, seg=7)
+    box("lw_gold_ditem4", 0.2, 0.11, 0.07, (-0.6, dy, 0.89), gold_disp)
+    sphere("lw_gold_ditem5", 0.045, (-0.25, dy, 0.89), gold_disp, seg=7)
+
+    # striped cloth awning sloping off the roof edge over the yard
+    box("lw_cloth_awn", 1.95, 0.72, 0.04, (0, -0.62, 1.2), P["cl_yel"],
+        rx=math.radians(-17))
+    box("lw_blue_awnstripe", 1.96, 0.2, 0.045, (0, -0.85, 1.13),
+        P["blue"], rx=math.radians(-17))
+    for sx in (-0.85, 0.85):
+        cyl("lw_wood_awnpole", 0.026, 1.06, (sx, -0.95, 0.08), P["wood_dk"],
+            seg=7)
+
+    # yard props: big dye pot, gem basket, amphora
+    cyl("lw_pot_bigdye", 0.13, 0.18, (-1.13, -0.85, 0.08), P["pot"], seg=10,
+        rtop=0.15)
+    cyl("lw_gem_dyefill", 0.11, 0.03, (-1.13, -0.85, 0.25), P["gem"], seg=9)
+    basket("lw", 1.05, -1.0, 0.08, P, r=0.11, fill="gem")
+    amphora("lw_a", 1.18, -0.35, 0.08, P, s=0.95)
+
+
+# ---------------------------------------------------------------- VESSEL SHOP
+def build_vessel_shop(P):
+    """Anchors 03 kiln + 02 shopfront: mini stepped pottery kiln with
+    'kiln_glow' ember, hero amphora racks (10 pots), shopfront counter +
+    awning."""
+    kiln_glow = M("kiln_glow", "#E86A18", rough=0.6, emit="#FF7A20",
+                  emit_str=2.5)
+
+    base = box("vs_earth_base", 2.6, 2.6, 0.08, (0, 0, 0), P["earth"])
+    bevel(base, 0.02)
+
+    # stall: small mudbrick shop, back-left
+    st = frustum("vs_mud_stall", 1.35, 1.05, 1.25, 0.95, 0.92,
+                 (-0.55, 0.65, 0.08), P["mud"])
+    bevel(st, 0.02)
+    box("vs_stone_cornice", 1.38, 1.08, 0.06, (-0.55, 0.65, 1.0), P["stone"])
+    box("vs_mud_roof", 1.22, 0.92, 0.06, (-0.55, 0.65, 1.06), P["mud_dk"])
+    box("vs_dark_door", 0.34, 0.09, 0.58, (-0.55, 0.13, 0.12), P["dark"])
+    box("vs_stone_lintel", 0.46, 0.07, 0.07, (-0.55, 0.12, 0.72), P["stone_w"])
+    # display pots on the stall roof
+    amphora("vs_r1", -0.8, 0.55, 1.12, P, s=0.7)
+    amphora("vs_r2", -0.32, 0.72, 1.12, P, s=0.6)
+
+    # mini stepped kiln (board 03 language), back-right
+    kx, ky = 0.78, 0.72
+    z = 0.08
+    for w, d, h in ((0.95, 0.9, 0.36), (0.74, 0.7, 0.3), (0.5, 0.47, 0.26)):
+        f = frustum("vs_brick_kiln", w, d, w * 0.8, d * 0.8, h, (kx, ky, z),
+                    P["brick"])
+        bevel(f, 0.02)
+        z += h
+    box("vs_char_stain", 0.34, 0.33, 0.14, (kx, ky, z - 0.16), P["char"])
+    cyl("vs_mud_crown", 0.14, 0.1, (kx, ky, z), P["mud_dk"], seg=9)
+    box("vs_dark_mouth", 0.26, 0.1, 0.3, (kx, ky - 0.44, 0.08), P["dark"])
+    box("vs_kiln_glow", 0.17, 0.04, 0.15, (kx, ky - 0.5, 0.1), kiln_glow)
+
+    # HERO: amphora rack — open wood frame, pots standing proud on both tiers
+    rx0, ry0 = 0.55, -0.55
+    for px in (rx0 - 0.62, rx0 + 0.62):
+        for py in (ry0 - 0.2, ry0 + 0.2):
+            box("vs_wood_rackpost", 0.06, 0.06, 0.66, (px, py, 0.08),
+                P["wood_dk"])
+    for zz in (0.26, 0.62):
+        box("vs_wood_shelf", 1.38, 0.48, 0.05, (rx0, ry0, zz), P["wood"])
+    for i in range(4):  # lower tier
+        amphora(f"vs_l{i}", rx0 - 0.48 + i * 0.32, ry0 - 0.08, 0.31, P, s=0.8)
+    for i in range(5):  # top tier, fully exposed
+        amphora(f"vs_u{i}", rx0 - 0.52 + i * 0.26, ry0, 0.67, P, s=0.72)
+    # ground pots leaning by the rack
+    amphora("vs_g1", -0.25, -0.85, 0.08, P, s=1.1)
+    amphora("vs_g2", 0.02, -1.0, 0.08, P, s=0.85)
+    amphora("vs_g3", 1.05, -0.95, 0.08, P, s=0.95)
+
+    # shopfront counter + awning (front-left, board 02 language)
+    cx, cy = -0.85, -0.85
+    box("vs_mud_counter", 0.75, 0.4, 0.44, (cx, cy, 0.08), P["mud_dk"])
+    box("vs_cloth_countertop", 0.8, 0.45, 0.04, (cx, cy, 0.52), P["cl_org"])
+    cyl("vs_pot_cup", 0.045, 0.08, (cx - 0.2, cy, 0.56), P["pot"], seg=8)
+    cyl("vs_pot_cup2", 0.04, 0.07, (cx + 0.1, cy + 0.06, 0.56), P["pot"], seg=8)
+    box("vs_cloth_awn", 0.9, 0.5, 0.04, (cx, cy - 0.15, 0.98), P["cl_yel"],
+        rx=math.radians(-24))
+    for sxp in (cx - 0.4, cx + 0.4):
+        cyl("vs_wood_awnpole", 0.024, 0.92, (sxp, cy - 0.35, 0.08),
+            P["wood_dk"], seg=7)
+    # clay basket + mat
+    basket("vs", 1.1, 0.1, 0.08, P, r=0.11, fill="grey")
+    box("vs_matting_floor", 0.6, 0.45, 0.02, (0.05, -0.15, 0.08), P["thatch"])
+
+
+# ---------------------------------------------------------------- REED BASKET SHOP
+def build_reed_basket_shop(P):
+    """Anchors 02 shopfront + 08 reeds: mudbrick stall, hero basket stacks,
+    rush bundle lean, weaving frame, yellow awning. (Mesh names all contain
+    'basket' via kind prefix, so kitLoader's reed-bob stays off.)"""
+    base = box("rb_dirt_base", 2.6, 2.6, 0.08, (0, 0, 0), P["dirt"])
+    bevel(base, 0.02)
+
+    # stall: mudbrick with mat roof
+    st = frustum("rb_mud_stall", 1.55, 1.15, 1.45, 1.05, 0.95,
+                 (-0.35, 0.6, 0.08), P["mud_tan"])
+    bevel(st, 0.02)
+    box("rb_wood_beamF", 1.6, 0.06, 0.06, (-0.35, 0.08, 0.97), P["wood_dk"])
+    box("rb_wood_beamB", 1.6, 0.06, 0.06, (-0.35, 1.12, 0.97), P["wood_dk"])
+    box("rb_thatch_roof", 1.7, 1.3, 0.07, (-0.35, 0.6, 1.03), P["thatch"])
+    box("rb_thatch_ridge", 1.72, 0.18, 0.05, (-0.35, 0.6, 1.1), P["thatch_dk"])
+    box("rb_dark_door", 0.36, 0.09, 0.6, (-0.55, 0.06, 0.12), P["dark"])
+    # counter through the open front
+    box("rb_mud_counter", 0.7, 0.4, 0.44, (0.15, -0.05, 0.08), P["mud_dk"])
+    box("rb_thatch_countertop", 0.76, 0.46, 0.04, (0.15, -0.05, 0.52),
+        P["thatch"])
+    basket("rb_c1", 0.0, -0.08, 0.56, P, r=0.08, fill="crop_g")
+    basket("rb_c2", 0.32, -0.02, 0.56, P, r=0.07, fill="grey")
+
+    # yellow awning off the stall front
+    box("rb_cloth_awn", 1.5, 0.6, 0.04, (-0.35, -0.28, 0.92), P["cl_yel"],
+        rx=math.radians(-20))
+    for sxp in (-0.95, 0.25):
+        cyl("rb_wood_awnpole", 0.026, 0.86, (sxp, -0.52, 0.08), P["wood_dk"],
+            seg=7)
+
+    # HERO: basket stacks, varied radii, 2-3 high
+    def stack(px, py, radii):
+        z = 0.08
+        for i, r in enumerate(radii):
+            h = 0.13 + r * 0.35
+            top = i == len(radii) - 1
+            if top:
+                basket("rb_s", px, py, z, P, r=r, h=h, fill="crop_g")
+            else:  # lower baskets carry the next basket, no fill disc
+                cyl("rb_s_bask", r, h, (px, py, z), P["thatch_dk"], seg=9,
+                    rtop=r * 1.18)
+            z += h + 0.028
+    stack(0.85, -0.75, (0.16, 0.135, 0.11))
+    stack(1.05, -0.3, (0.13, 0.11))
+    stack(0.55, -1.0, (0.12, 0.1))
+    basket("rb_solo", 1.15, -0.85, 0.08, P, r=0.1, fill="crop_gr")
+    # big woven storage basket with rope band
+    cyl("rb_thatch_bigbask", 0.2, 0.34, (1.0, 0.35, 0.08), P["thatch_dk"],
+        seg=10, rtop=0.25)
+    cyl("rb_rope_band", 0.235, 0.05, (1.0, 0.35, 0.3), P["rope"], seg=10)
+
+    # rush bundle lean against the stall's right flank (green + dry)
+    for i, mm in enumerate(("crop_gr", "thatch", "crop_gr")):
+        cyl(f"rb_rush_lean{i}", 0.055, 0.8, (0.52 + i * 0.11, 0.55 - i * 0.04,
+            0.06), P[mm], seg=6, rx=math.radians(14), ry=math.radians(-6))
+
+    # weaving frame: thin lattice loom (left side)
+    wx, wy = -1.05, -0.5
+    for px in (wx - 0.3, wx + 0.3):
+        box("rb_wood_loompost", 0.05, 0.05, 0.85, (px, wy, 0.08), P["wood_dk"])
+    for zz in (0.2, 0.88):
+        box("rb_wood_loomrail", 0.66, 0.045, 0.045, (wx, wy, zz), P["wood"])
+    for i in range(5):
+        box("rb_rope_warp", 0.022, 0.022, 0.63, (wx - 0.22 + i * 0.11, wy, 0.24),
+            P["rope"])
+    for zz in (0.38, 0.52):
+        box("rb_thatch_weft", 0.5, 0.03, 0.05, (wx, wy + 0.01, zz), P["thatch"])
+    # spare bundle at the loom's foot
+    cyl("rb_thatch_spare", 0.06, 0.5, (wx, wy - 0.3, 0.08 + 0.06 - 0.25),
+        P["thatch"], seg=7, ry=math.radians(90), rz=math.radians(12))
+
+
+# ---------------------------------------------------------------- WAREHOUSE
+def build_warehouse(P):
+    """Anchor 04 warehouse mass, standalone: battered mud walls, stone
+    cornice, blue clerestory band, dark door + ramp, roof mats + rolls,
+    crates + sealed jars outside."""
+    base = box("wh_sand_apron", 2.9, 2.7, 0.08, (0, 0, 0), P["sand"])
+    bevel(base, 0.03)
+
+    # main battered mass
+    ware = frustum("wh_mud_ware", 2.35, 1.9, 2.15, 1.72, 1.28, (0, 0.15, 0.08),
+                   P["mud_tan"])
+    bevel(ware, 0.025)
+    # buttress ribs on the front face (harbor-mass language, adds relief)
+    for bxp in (-0.78, 0.78):
+        frustum("wh_mud_buttress", 0.26, 0.14, 0.2, 0.1, 1.1,
+                (bxp, -0.85, 0.08), P["mud"])
+    box("wh_stone_cornice", 2.38, 1.94, 0.09, (0, 0.15, 1.36), P["stone"])
+    box("wh_mud_roof", 2.18, 1.74, 0.07, (0, 0.15, 1.45), P["mud_dk"])
+    # parapet rim strips (not a slab — roof surface stays visible)
+    for s in (-1, 1):
+        box("wh_mud_rimY", 2.2, 0.09, 0.08, (0, 0.15 + s * 0.83, 1.52),
+            P["mud"])
+        # X strips stop short of the corners — no coplanar overlap with rimY
+        box("wh_mud_rimX", 0.09, 1.55, 0.08, (s * 1.06, 0.15, 1.52), P["mud"])
+
+    # blue clerestory band + dark vent slots near the top
+    box("wh_blue_clerestory", 1.95, 0.05, 0.16, (0, -0.79, 1.08), P["blue"])
+    for i in range(3):
+        box("wh_dark_slot", 0.16, 0.05, 0.12, (-0.55 + i * 0.55, -0.8, 1.1),
+            P["dark"])
+    box("wh_blue_clerside", 0.05, 1.5, 0.14, (1.13, 0.15, 1.09), P["blue"])
+
+    # dark door + stone frame + ramp
+    box("wh_dark_doorway", 0.52, 0.1, 0.78, (0, -0.86, 0.14), P["dark"])
+    box("wh_stone_jambL", 0.09, 0.09, 0.88, (-0.34, -0.87, 0.12), P["stone_w"])
+    box("wh_stone_jambR", 0.09, 0.09, 0.88, (0.34, -0.87, 0.12), P["stone_w"])
+    box("wh_stone_dlintel", 0.78, 0.1, 0.1, (0, -0.87, 1.0), P["stone_w"])
+    ramp = box("wh_stone_ramp", 0.58, 0.6, 0.05, (0, -1.05, 0.095), P["stone"],
+               rx=math.radians(8))
+    bevel(ramp, 0.02)
+
+    # roof mats + rolled bundles (on the roof surface, inside the rim)
+    box("wh_matting_roof", 0.7, 0.55, 0.04, (-0.5, 0.3, 1.485), P["thatch"])
+    box("wh_matting_roof2", 0.5, 0.4, 0.04, (0.45, -0.15, 1.485),
+        P["thatch_dk"])
+    for i in range(2):
+        cyl(f"wh_thatch_roll{i}", 0.055, 0.6 - i * 0.12,
+            (0.35 + i * 0.18, 0.5, 1.485 + 0.055 - (0.6 - i * 0.12) / 2),
+            P["thatch_dk"], seg=8, ry=math.radians(90))
+
+    # crates stacked clear of the battered wall, front-left
+    box("wh_wood_crate", 0.34, 0.34, 0.3, (-1.22, -0.95, 0.08), P["wood"])
+    box("wh_wood_crate2", 0.3, 0.3, 0.27, (-1.2, -0.92, 0.38), P["wood_dk"],
+        rz=0.2)
+    box("wh_wood_crate3", 0.32, 0.32, 0.28, (-1.26, -0.55, 0.08), P["wood"],
+        rz=-0.12)
+    # sealed jars (amphorae with linen lids) front-right
+    for i, (px, py, s) in enumerate(((0.95, -0.95, 1.1), (1.2, -0.75, 0.9),
+                                     (1.08, -1.15, 0.8))):
+        amphora(f"wh_j{i}", px, py, 0.08, P, s=s)
+        cyl(f"wh_linen_seal{i}", 0.055 * s, 0.03, (px, py, 0.08 + 0.255 * s),
+            P["linen"], seg=8)
+    # rope coil + lean mat on the flank
+    torus("wh_rope_coil", 0.08, 0.022, (1.25, -0.35, 0.08), P["rope"])
+    box("wh_matting_lean", 0.36, 0.05, 0.55, (-1.22, 0.35, 0.06), P["thatch"],
+        rx=math.radians(12))
+    basket("wh", 1.3, 0.15, 0.08, P, r=0.1, fill="grey")
+
+
 # ---------------------------------------------------------------- export/render
 BUILDERS = {
     "great_house": build_great_house,
@@ -735,6 +1384,14 @@ BUILDERS = {
     "harbor": build_harbor,
     "river_clay_pit": build_river_clay_pit,
     "marsh_reed_bed": build_marsh_reed_bed,
+    "training_grounds": build_training_grounds,
+    "shrine": build_shrine,
+    "ration_house": build_ration_house,
+    "luxury_material": build_luxury_material,
+    "luxury_workshop": build_luxury_workshop,
+    "vessel_shop": build_vessel_shop,
+    "reed_basket_shop": build_reed_basket_shop,
+    "warehouse": build_warehouse,
 }
 
 
@@ -763,7 +1420,8 @@ def add_preview_rig(size=4.2):
     cam_data.ortho_scale = size * 1.35
     cam = bpy.data.objects.new("cam", cam_data)
     sc.collection.objects.link(cam)
-    az, el, d = math.radians(-38), math.radians(40), size * 4
+    # az 142° views the post-bake +Y side = the authored -Y front facade
+    az, el, d = math.radians(142), math.radians(40), size * 4
     center = (0, 0, 0.7)
     cam.location = (center[0] + d * math.cos(el) * math.sin(az),
                     center[1] - d * math.cos(el) * math.cos(az),
@@ -805,7 +1463,9 @@ def merge_by_material(kind):
         if len(group) > 1:
             bpy.ops.object.join()
         joined = bpy.context.view_layer.objects.active
-        joined.name = f"{kind}_{mat}"
+        # 'reed' in a node name green-tints + implies bob in kitLoader keyword
+        # logic; reed_basket_shop meshes must not inherit it from the kind.
+        joined.name = f"{kind.replace('reed_', 'rush_')}_{mat}"
         merged.append(joined)
     # Babylon axis chain lands Blender -Y on +Z (fronts faced away in game).
     # Rotate the whole kit 180° about Z and bake so facades hit Babylon -Z.
@@ -816,7 +1476,40 @@ def merge_by_material(kind):
         o.select_set(True)
     bpy.context.view_layer.objects.active = merged[0]
     bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
+    paint_variation(merged)
     return merged
+
+
+def paint_variation(objs, seed=5):
+    """Hand-painted read on flat-color kits: per-face value jitter baked into
+    COLOR_0 vertex colors (Babylon multiplies them into base color), plus a
+    subtle top-light / bottom-dirt vertical grade. Kills the MS-Paint flatness
+    without textures."""
+    import random
+    rnd = random.Random(seed)
+    for o in objs:
+        me = o.data
+        if not me.polygons:
+            continue
+        lo = min(v.co.z for v in me.vertices)
+        hi = max(v.co.z for v in me.vertices)
+        span = max(0.35, hi - lo)
+        attr = me.color_attributes.new(name="Col", type="BYTE_COLOR",
+                                       domain="CORNER")
+        name = o.name.lower()
+        # cloth/ember/gold keep tighter jitter so accents stay clean
+        tight = any(k in name for k in ("cloth", "gold", "ember", "glow",
+                                        "water", "linen"))
+        amp = 0.05 if tight else 0.10
+        for poly in me.polygons:
+            f = 1.0 + rnd.uniform(-amp, amp)
+            # faces near ground pick up dirt; high faces bleach in the sun
+            zc = sum(me.vertices[v].co.z for v in poly.vertices) / len(poly.vertices)
+            t = (zc - lo) / span
+            grade = 0.94 + 0.10 * min(1.0, max(0.0, t))
+            v = f * grade
+            for li in poly.loop_indices:
+                attr.data[li].color = (v, v, v, 1.0)
 
 
 for kind in KINDS:
