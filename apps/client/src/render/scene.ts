@@ -612,6 +612,15 @@ export class SettlementView {
       }
       const crownY = h * 0.98;
       const crownZ = lean * h * 0.42;
+      const core = MeshBuilder.CreatePolyhedron(
+        "palmCore",
+        { type: 3, size: 0.09 },
+        this.scene
+      );
+      core.position.set(0, crownY + 0.02, crownZ);
+      core.material = trunkMat;
+      core.parent = root;
+      core.isPickable = false;
       for (let ring = 0; ring < 2; ring++) {
         const count = ring === 0 ? 5 : 6;
         for (let f = 0; f < count; f++) {
@@ -879,8 +888,9 @@ export class SettlementView {
     const grit = this.makeSandTexture(pal.sand);
     if (grit) {
       mat.diffuseTexture = grit;
-      grit.uScale = 2.6;
-      grit.vScale = 2.3;
+      grit.uScale = 4.2;
+      grit.vScale = 3.8;
+      grit.anisotropicFilteringLevel = 8;
     } else {
       mat.diffuseColor = hexToColor3(pal.sand);
     }
@@ -912,7 +922,7 @@ export class SettlementView {
     flatMat.specularColor = hexToColor3("#4A7080").scale(0.18);
     flatMat.specularPower = 24;
     for (const [lz, lw, ld] of [
-      [-6.2, 2.6, 1.4], [9.6, 3.2, 1.7], [2.4, 1.9, 1.0],
+      [9.6, 2.6, 1.4], [2.4, 1.7, 0.9],
     ] as const) {
       const lobe = MeshBuilder.CreateSphere(
         `mudflat-${lz}`,
@@ -1226,6 +1236,7 @@ export class SettlementView {
     // Two first-glance barges on money-shot river (Life craft)
     this.bargeNode = this.makeOneBarge("barge", -13.0, -3.5, 1.15);
     this.bargeNode2 = this.makeOneBarge("barge2", -14.4, 6.2, 1.05);
+    this.makeOneBarge("barge3", -12.4, 12.5, 0.9);
   }
 
   /** Artboard-04 cargo barge: low planked hull, raised prow/stern, deck mat,
@@ -1908,7 +1919,7 @@ export class SettlementView {
     if (this.boardApprovalMode) {
       // Sim count drives density (goal law: workers small + sim count).
       // ~1 visible per 4 in the sim, tiny scale, roads only, capped low.
-      show = Math.min(8, Math.max(1, Math.round(pool / 4)));
+      show = Math.min(12, Math.max(1, Math.round(pool / 3)));
     } else {
       // Soft cap 8 on high; 0 assigned → 0–1 idle near GH
       const softMax = this.quality === "low" ? 4 : this.quality === "med" ? 6 : 8;

@@ -1242,17 +1242,16 @@ def build_luxury_workshop(P):
     box("lw_dark_hearthmouth", 0.24, 0.07, 0.22, (hx, hy - 0.27, 0.2), P["dark"])
     box("lw_hearth_glow", 0.17, 0.05, 0.14, (hx, hy - 0.295, 0.22), hearth_glow)
 
-    # gold display shelf just inside the opening (glows at night)
-    dy = 0.08
+    # gold display: wall-backed shelf low against the rear wall — a tall
+    # freestanding rack read as "gold floating in the sky" from behind
+    # (its thin posts vanish over the roofline at the game camera)
+    dy = 0.62
     for px in (-0.85, -0.05):
-        box("lw_wood_disppost", 0.06, 0.06, 1.0, (px, dy, 0.13), P["wood_dk"])
-    for zz in (0.5, 0.85):
-        box("lw_wood_dispshelf", 0.95, 0.2, 0.04, (-0.45, dy, zz), P["wood"])
+        box("lw_wood_disppost", 0.06, 0.06, 0.62, (px, dy, 0.13), P["wood_dk"])
+    box("lw_wood_dispshelf", 0.95, 0.2, 0.04, (-0.45, dy, 0.5), P["wood"])
     box("lw_gold_ditem1", 0.16, 0.11, 0.12, (-0.72, dy, 0.54), gold_disp)
     cyl("lw_gold_ditem2", 0.05, 0.15, (-0.42, dy, 0.54), gold_disp, seg=8)
     sphere("lw_gold_ditem3", 0.05, (-0.18, dy, 0.54), gold_disp, seg=7)
-    box("lw_gold_ditem4", 0.2, 0.11, 0.07, (-0.6, dy, 0.89), gold_disp)
-    sphere("lw_gold_ditem5", 0.045, (-0.25, dy, 0.89), gold_disp, seg=7)
 
     # striped cloth awning sloping off the roof edge over the yard
     box("lw_cloth_awn", 1.95, 0.72, 0.04, (0, -0.62, 1.2), P["cl_yel"],

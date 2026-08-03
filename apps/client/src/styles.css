@@ -977,7 +977,7 @@ html.dark button.btn-locked svg {
   min-height: 0;
   flex: 1 1 auto;
   /* Gentle snap so a flick settles with whole cards above the fold... */
-  scroll-snap-type: y proximity;
+  scroll-snap-type: none;
   /* ...and snapped cards land clear of the head hairline / bottom fade */
   scroll-padding-block: 0.5rem 64px;
 }

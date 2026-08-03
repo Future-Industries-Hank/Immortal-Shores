@@ -148,6 +148,10 @@ export function showPanel(name: string) {
   // World map gets the wide "set piece" shell; every other panel is a card.
   popup.classList.toggle("map-wide", name === "map");
 
+  // Panels must open at the top — judges saw headers sliced mid-scroll
+  const body = popup.querySelector(".menu-popup-body");
+  if (body) body.scrollTop = 0;
+
   popup.hidden = false;
 }
 
