@@ -170,7 +170,12 @@ export class SettlementView {
       const now = performance.now() * 0.001;
       this.atmosphere.update(now, this.riverMesh);
       this.animateWorkers();
-      animateBuildingKit(this.buildingKits, now, this.atmosphere.nightFactor(now));
+      const nf = this.atmosphere.nightFactor(now);
+      animateBuildingKit(this.buildingKits, now, nf);
+      // Night facade lamps only after dusk
+      for (const w of this.nightWindows) {
+        if (!w.isDisposed()) w.setEnabled(nf > 0.45);
+      }
       this.animateRiverLife(now);
       this.scene.render();
       this.fpsFrames++;
@@ -1208,37 +1213,23 @@ export class SettlementView {
         );
         if (icon) this.padIcons.set(def.id, icon);
 
-        // Solid densified mudbrick half-build (not line wireframe only)
+        // Solid packed-earth footprint only — NEVER wire/outline ghosts (GOAL-GRAPHICS-READY)
         const ghost = MeshBuilder.CreateBox(
           `ghost-${def.id}`,
-          { width: 1.55, height: 0.55, depth: 1.35 },
+          { width: 1.5, height: 0.28, depth: 1.3 },
           this.scene
         );
-        ghost.position.set(pos.x, 0.3, pos.z);
+        ghost.position.set(pos.x, 0.14, pos.z);
         const gm = new StandardMaterial(`ghostMat-${def.id}`, this.scene);
         gm.diffuseColor = hexToColor3(STYLE.mudbrick);
-        gm.emissiveColor = hexToColor3(STYLE.mudbrick).scale(0.05);
-        gm.specularColor = hexToColor3("#3A2A18").scale(0.08);
-        gm.alpha = 0.55;
+        gm.emissiveColor = hexToColor3(STYLE.mudbrick).scale(0.04);
+        gm.specularColor = Color3.Black();
+        gm.alpha = 0.75;
+        gm.wireframe = false;
         ghost.material = gm;
         ghost.parent = this.root;
         ghost.isPickable = false;
         ghost.receiveShadows = true;
-        // Wireframe outline on top of solid mass for kit readability
-        const ghostWire = MeshBuilder.CreateBox(
-          `ghostWire-${def.id}`,
-          { width: 1.62, height: 0.62, depth: 1.42 },
-          this.scene
-        );
-        ghostWire.position.set(pos.x, 0.32, pos.z);
-        const gwm = new StandardMaterial(`ghostWireMat-${def.id}`, this.scene);
-        gwm.diffuseColor = hexToColor3("#5A4030");
-        gwm.emissiveColor = hexToColor3("#4A3020").scale(0.15);
-        gwm.alpha = 0.45;
-        gwm.wireframe = true;
-        ghostWire.material = gwm;
-        ghostWire.parent = this.root;
-        ghostWire.isPickable = false;
         this.padGhosts.set(def.id, ghost);
       }
 
@@ -1347,22 +1338,39 @@ export class SettlementView {
     const w = this.plotWorldArch(plotId);
     root.position.set(w.x, 0, w.z);
 
-    // Visible wireframe frame
-    const frame = MeshBuilder.CreateBox(
-      "scaffold",
-      { width: 1.5, height: 1.2, depth: 1.5 },
+    // Solid timber scaffold posts (not wireframe outline — GOAL-GRAPHICS-READY)
+    const mat = new StandardMaterial("scaffoldMat", this.scene);
+    mat.diffuseColor = hexToColor3("#8B7355");
+    mat.specularColor = Color3.Black();
+    mat.wireframe = false;
+    for (const [x, z] of [
+      [-0.65, -0.65],
+      [0.65, -0.65],
+      [-0.65, 0.65],
+      [0.65, 0.65],
+    ] as const) {
+      const post = MeshBuilder.CreateBox(
+        `scaffoldPost-${x}-${z}`,
+        { width: 0.14, height: 1.2, depth: 0.14 },
+        this.scene
+      );
+      post.position.set(x, 0.65, z);
+      post.material = mat;
+      post.parent = root;
+      post.isPickable = true;
+      post.metadata = { construction: true, plotId };
+    }
+    const beam = MeshBuilder.CreateBox(
+      "scaffoldBeam",
+      { width: 1.4, height: 0.12, depth: 1.4 },
       this.scene
     );
-    frame.position.y = 0.75;
-    const mat = new StandardMaterial("scaffoldMat", this.scene);
-    mat.diffuseColor = hexToColor3("#A89070");
-    mat.alpha = 0.7;
-    mat.wireframe = true;
-    mat.specularColor = Color3.Black();
-    frame.material = mat;
-    frame.parent = root;
-    frame.isPickable = true;
-    frame.metadata = { construction: true, plotId };
+    beam.position.y = 1.25;
+    beam.material = mat;
+    beam.parent = root;
+    beam.isPickable = true;
+    beam.metadata = { construction: true, plotId };
+    const frame = beam;
 
     // Larger invisible hit volume so the site is easy to click
     const hit = MeshBuilder.CreateBox(
@@ -1416,17 +1424,20 @@ export class SettlementView {
   }
 
   private nightWindows: Mesh[] = [];
+  private nightWinMat: StandardMaterial | null = null;
 
-  /** Explicit facade lamps — do not rely on glTF name matching for night craft. */
+  /** Explicit facade lamps — night only (day: glTF solid walls own the facade). */
   private syncNightWindows(settlement: SettlementState) {
     for (const m of this.nightWindows) m.dispose();
     this.nightWindows = [];
     const st = settlement;
-    const winMat = new StandardMaterial("winMat", this.scene);
-    winMat.diffuseColor = hexToColor3("#FFD080");
-    winMat.emissiveColor = hexToColor3("#FFB040").scale(0.95);
-    winMat.specularColor = Color3.Black();
-    winMat.disableLighting = true;
+    if (!this.nightWinMat) {
+      this.nightWinMat = new StandardMaterial("winMat", this.scene);
+      this.nightWinMat.diffuseColor = hexToColor3("#FFD080");
+      this.nightWinMat.emissiveColor = hexToColor3("#FFB040").scale(0.95);
+      this.nightWinMat.specularColor = Color3.Black();
+      this.nightWinMat.disableLighting = true;
+    }
 
     const placeWindows = (plotId: string, count: number, y: number) => {
       const def = getPlot(plotId);
@@ -1439,14 +1450,14 @@ export class SettlementView {
           this.scene
         );
         box.position.set(w.x + (i - (count - 1) / 2) * 0.45, y, w.z - 0.95);
-        box.material = winMat;
+        box.material = this.nightWinMat;
         box.parent = this.root;
         box.isPickable = false;
+        box.setEnabled(false); // day off; enable in render when night
         this.nightWindows.push(box);
       }
     };
 
-    // Always place on civic plots if those buildings exist
     if (st.buildings.some((b) => b.kind === "great_house")) {
       placeWindows("civic-gh", 4, 1.35);
       placeWindows("civic-gh", 3, 1.95);

@@ -43,10 +43,12 @@ export async function preloadBuildingKits(scene: Scene): Promise<KitCache> {
   await Promise.all(
     kinds.map(async (file) => {
       try {
+        // Bump when Blender re-exports solid kits (dev/prod cache bust)
+        const KIT_VER = "solid-ghrdy-3";
         const result = await SceneLoader.ImportMeshAsync(
           null,
           "/models/buildings/",
-          `${file}.glb`,
+          `${file}.glb?v=${KIT_VER}`,
           scene
         );
         const root = new TransformNode(`kitTpl_${file}`, scene);
@@ -122,27 +124,41 @@ export function instantiateBuildingFromKit(
       c.receiveShadows = true;
       c.metadata = { buildingId: b.id, kind: b.kind, plotId: b.plotId };
       if (shadow) shadow.addShadowCaster(c, true);
-      // Material separation for board readability (mud vs stone vs wood vs crop)
+      // Force SOLID materials — never transparent/wire stand-ins
       const mat = c.material as StandardMaterial | null;
       if (mat) {
+        mat.wireframe = false;
+        mat.alpha = 1;
+        mat.transparencyMode = StandardMaterial.MATERIAL_OPAQUE;
         const n = c.name.toLowerCase();
         if (mat.diffuseColor) {
-          if (n.includes("stone") || n.includes("gh_") || n.includes("obelisk") || n.includes("shrine")) {
+          if (n.includes("stone") || n.includes("gh_") || n.includes("obelisk") || n.includes("shrine") || n.includes("pale")) {
             mat.specularColor = new Color3(0.28, 0.26, 0.22);
             mat.specularPower = 36;
-            mat.diffuseColor = Color3.Lerp(mat.diffuseColor, new Color3(0.78, 0.74, 0.66), 0.25);
-          } else if (n.includes("mud") || n.includes("body") || n.includes("stall") || n.includes("brick")) {
+            mat.diffuseColor = Color3.Lerp(mat.diffuseColor, new Color3(0.82, 0.78, 0.7), 0.35);
+          } else if (n.includes("mud") || n.includes("body") || n.includes("stall") || n.includes("brick") || n.includes("pile") || n.includes("yard")) {
             mat.specularColor = new Color3(0.04, 0.03, 0.02);
             mat.specularPower = 8;
-            mat.diffuseColor = Color3.Lerp(mat.diffuseColor, new Color3(0.58, 0.42, 0.28), 0.2);
-          } else if (n.includes("wood") || n.includes("deck") || n.includes("pier") || n.includes("post")) {
+            mat.diffuseColor = Color3.Lerp(mat.diffuseColor, new Color3(0.6, 0.44, 0.3), 0.3);
+          } else if (n.includes("wood") || n.includes("deck") || n.includes("pier") || n.includes("post") || n.includes("crate")) {
             mat.specularColor = new Color3(0.1, 0.07, 0.04);
-            mat.diffuseColor = Color3.Lerp(mat.diffuseColor, new Color3(0.4, 0.28, 0.16), 0.15);
-          } else if (n.includes("crop") || n.includes("reed") || n.includes("field") || n.includes("plant")) {
-            mat.emissiveColor = new Color3(0.04, 0.06, 0.02);
-            mat.diffuseColor = Color3.Lerp(mat.diffuseColor, new Color3(0.35, 0.5, 0.22), 0.2);
+            mat.diffuseColor = Color3.Lerp(mat.diffuseColor, new Color3(0.42, 0.3, 0.18), 0.25);
+          } else if (n.includes("crop") || n.includes("reed") || n.includes("field") || n.includes("plant") || n.includes("soil")) {
+            mat.emissiveColor = new Color3(0.05, 0.07, 0.02);
+            mat.diffuseColor = Color3.Lerp(mat.diffuseColor, new Color3(0.38, 0.52, 0.22), 0.3);
+          } else if (n.includes("gold") || n.includes("lintel") || n.includes("win") || n.includes("glow")) {
+            mat.emissiveColor = new Color3(0.2, 0.12, 0.04);
+            mat.diffuseColor = Color3.Lerp(mat.diffuseColor, new Color3(0.85, 0.68, 0.28), 0.4);
+          } else if (n.includes("roof") || n.includes("canopy") || n.includes("cloth") || n.includes("awn")) {
+            mat.diffuseColor = Color3.Lerp(mat.diffuseColor, new Color3(0.55, 0.4, 0.25), 0.25);
           }
         }
+      }
+      // PBR/glTF materials: force opaque
+      const anyMat = c.material as { alpha?: number; transparencyMode?: number; wireframe?: boolean } | null;
+      if (anyMat) {
+        if (typeof anyMat.alpha === "number") anyMat.alpha = 1;
+        if ("wireframe" in anyMat) anyMat.wireframe = false;
       }
       const name = c.name.toLowerCase();
       // Night craft = windows/hearth/glow only — never flat roof planes
@@ -179,9 +195,8 @@ export function instantiateBuildingFromKit(
     hit.metadata = { buildingId: b.id, kind: b.kind, plotId: b.plotId };
     hit.parent = root;
 
-    // Structure densify overlays (wall relief / cornice / stalls) — board-distance mass
-    // Skip heavy double-stack when glTF already multi-part (reduces wire noise)
-    densifyKitOverlay(scene, root, b.kind, b.id, shadow, true);
+    // REAL solid glTF only — densify overlays are NOT finished art (GOAL-GRAPHICS-READY)
+    // If kit is still boxy, re-author the .glb in Blender; do not stack grey slabs here.
 
     return { root, hit, emissives, anim };
   }
