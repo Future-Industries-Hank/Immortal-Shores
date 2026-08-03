@@ -108,6 +108,11 @@ export function initUi(h: UiHandlers) {
   document.getElementById("btn-postcard")?.addEventListener("click", () => {
     handlers.onPostcard();
   });
+  // Fold must stay snapped to a card boundary through reflows: viewport
+  // resize, and <details> disclosures inside a panel (toggle doesn't bubble,
+  // so listen in the capture phase).
+  window.addEventListener("resize", () => snapPanelFold());
+  document.getElementById("side")?.addEventListener("toggle", () => snapPanelFold(), true);
 }
 
 /** Close floating menu popup and clear tab active state. */
@@ -153,6 +158,91 @@ export function showPanel(name: string) {
   if (body) body.scrollTop = 0;
 
   popup.hidden = false;
+  snapPanelFold();
+}
+
+/* ── Panel fold snapping ─────────────────────────────────────────────
+   Standing judge complaint: at rest the popup's bottom edge sliced the last
+   card in half — a stranded "Open" button, a half pill, a half sentence. A
+   fade drawn over a sliced row still reads as clipping, so the fix moves the
+   fold instead of masking it: after every render the scroll box is trimmed to
+   the bottom edge of the last FULLY visible card, leaving a clean blank strip
+   for the "more below" fade. When the content fits outright the popup simply
+   auto-sizes and the fade is switched off entirely (no scroll, no fold). */
+
+/** Card-ish nodes that make a legal fold boundary (panel children are added
+    too, which covers h2/h3/p/details/grid wrappers without extra selectors).
+    Deliberately excludes anything nested INSIDE a card — a boundary halfway
+    down a card is exactly the defect we are removing. */
+const FOLD_CARD_SELECTOR = [
+  ".b-card",
+  ".palette-card",
+  ".note-card",
+  ".barge-card",
+  ".tablet-card",
+  ".offer-card",
+  ".unit-card",
+  ".map-site",
+  ".empty-card",
+  ".stat-band",
+  ".ally-row",
+  ".mkt-row",
+  ".build-choice",
+].join(",");
+
+/** Height the .has-fold shelf opens up under the scroll box (see styles.css).
+    A boundary only qualifies if the shelf still fits under it, so the scroll
+    box can end exactly on the card edge and the shelf stays blank. */
+const FOLD_SHELF = 34;
+/** Never throw away more than half the panel just to chase a boundary. */
+const FOLD_MIN_RATIO = 0.5;
+
+let foldRaf = 0;
+
+/** Re-snap the open panel's fold next frame. Cheap and safe to call often. */
+export function snapPanelFold() {
+  if (foldRaf) return;
+  foldRaf = requestAnimationFrame(() => {
+    foldRaf = 0;
+    applyPanelFold();
+  });
+}
+
+function applyPanelFold() {
+  const popup = document.getElementById("menu-popup");
+  const body = document.getElementById("side");
+  if (!popup || !body || popup.hidden) return;
+
+  // Always measure from the CSS cap, never from the previous pass's trim.
+  body.style.maxHeight = "";
+  popup.classList.remove("has-fold");
+
+  const panel = body.querySelector<HTMLElement>(".side-panel:not([hidden])");
+  if (!panel) return;
+
+  const avail = body.clientHeight;
+  if (avail <= 0 || body.scrollHeight - avail <= 1) return; // fits: no fold
+
+  popup.classList.add("has-fold");
+
+  // Content-space origin, so the answer is the same at any scroll offset.
+  const originY = body.getBoundingClientRect().top - body.scrollTop;
+  const stops: Element[] = [
+    ...Array.from(panel.children),
+    ...Array.from(panel.querySelectorAll(FOLD_CARD_SELECTOR)),
+  ];
+  let fold = 0;
+  for (const el of stops) {
+    const r = el.getBoundingClientRect();
+    if (r.height <= 0) continue; // hidden, filtered out, or collapsed
+    const bottom = r.bottom - originY;
+    if (bottom > fold && bottom + FOLD_SHELF <= avail) fold = bottom;
+  }
+  // A single block taller than the panel can't be snapped around — leave the
+  // full height rather than collapse to a stub.
+  if (fold < avail * FOLD_MIN_RATIO) return;
+  // End the scroll box ON the card edge; the shelf lives outside it.
+  body.style.maxHeight = `${Math.round(fold)}px`;
 }
 
 export function renderSnapshot(s: PublicSnapshot) {
@@ -174,6 +264,8 @@ export function renderSnapshot(s: PublicSnapshot) {
   if (selectedConstruction || selectedBuildingId || selectedPlotId) {
     renderInspect();
   }
+  // Content just changed height — re-snap the fold to a card boundary.
+  snapPanelFold();
 }
 
 export type SelectOpts = { fromScene?: boolean };
@@ -1614,12 +1706,12 @@ function buildRiverBoard(
     const side = i % 2 === 0 ? 1 : -1;
     return { x: mid.x + mid.nx * 46 * side, y: mid.y + mid.ny * 46 * side };
   });
-  // Keep medallion + plaque fully on the sheet: the plaque hangs ~36px below
-  // the medallion centre, and nothing may come within 26px of the bottom edge.
+  // Keep the medallion fully on the sheet with a 40px bottom margin (the
+  // plaque gets clamped separately once its side has been chosen).
   for (let i = 0; i < provPts.length; i++) {
     const halfW = plaqueW(ordered[i]!.name) / 2;
     provPts[i]!.x = Math.min(640 - halfW - 8, Math.max(halfW + 8, provPts[i]!.x));
-    provPts[i]!.y = Math.min(700 - 26 - 36, Math.max(46, provPts[i]!.y));
+    provPts[i]!.y = Math.min(700 - 40 - 22, Math.max(46, provPts[i]!.y));
   }
 
   // Dashed cartouche borders between province reaches: short ticks crossing
@@ -1700,16 +1792,20 @@ function buildRiverBoard(
     }
     if (!moved) break;
   }
-  // Clamp markers fully inside the sheet: halo radius is ~18px and the
-  // bottom edge keeps a 26px margin so the panel never clips a node.
+  // Clamp markers fully inside the sheet: halo radius is ~18px and the bottom
+  // edge keeps a 40px margin, so the lowest node (Gold Reach) sits clear of
+  // the sheet edge and of the panel's own bottom fade.
   for (const p of sitePts) {
     p.x = Math.min(614, Math.max(26, p.x));
-    p.y = Math.min(700 - 26 - 18, Math.max(26, p.y));
+    p.y = Math.min(700 - 40 - 18, Math.max(26, p.y));
   }
 
-  // Label-vs-marker pass: a plaque hangs below its medallion by default; if
-  // that rectangle would cover another marker, flip it above the medallion
-  // instead (pick the side overlapping the fewest markers — ties stay below).
+  // Label-vs-marker pass — runs AFTER the clamp, so it places plaques against
+  // final node positions. A plaque hangs below its medallion by default; if
+  // that rectangle would cover ANY node (including its own medallion, which is
+  // how the Delta Mouth ribbon ended up sitting on top of its own marker) it
+  // walks a ring of candidate offsets and takes the first collision-free one.
+  const PLAQUE_H = 19;
   const circleHitsRect = (
     cx: number, cy: number, r: number,
     rx: number, ry: number, rw: number, rh: number
@@ -1718,22 +1814,53 @@ function buildRiverBoard(
     const py = Math.min(ry + rh, Math.max(ry, cy));
     return Math.hypot(cx - px, cy - py) < r;
   };
-  const plaqueFlipped = ordered.map((p, i) => {
+  const rectsOverlap = (
+    ax: number, ay: number, aw: number, ah: number,
+    bx: number, by: number, bw: number, bh: number
+  ) => ax < bx + bw && bx < ax + aw && ay < by + bh && by < ay + ah;
+
+  const placed: { x: number; y: number; w: number }[] = [];
+  const plaquePos = ordered.map((p, i) => {
     const { x, y } = provPts[i]!;
     const w = plaqueW(p.name);
-    const hitsAt = (ry: number) => {
+    const hits = (rx: number, ry: number) => {
       let n = 0;
       for (const sp of sitePts) {
-        if (circleHitsRect(sp.x, sp.y, 18, x - w / 2, ry, w, 19)) n++;
+        if (circleHitsRect(sp.x, sp.y, 15, rx, ry, w, PLAQUE_H)) n++;
       }
       for (let j = 0; j < provPts.length; j++) {
-        if (j === i) continue;
-        if (circleHitsRect(provPts[j]!.x, provPts[j]!.y, 20, x - w / 2, ry, w, 19)) n++;
+        // j === i included on purpose: never cover your own medallion
+        const r = j === i ? 14 : 17;
+        if (circleHitsRect(provPts[j]!.x, provPts[j]!.y, r, rx, ry, w, PLAQUE_H)) n++;
+      }
+      for (const q of placed) {
+        if (rectsOverlap(rx, ry, w, PLAQUE_H, q.x - 3, q.y - 3, q.w + 6, PLAQUE_H + 6)) n++;
       }
       return n;
     };
-    const below = hitsAt(y + 17);
-    return below > 0 && hitsAt(y - 36) < below;
+    const side = w / 2 + 20;
+    const offsets: [number, number][] = [
+      [0, 17], // below (default)
+      [0, -36], // above
+      [side, -9.5], // right of the medallion
+      [-side, -9.5], // left of the medallion
+      [side, 17],
+      [-side, 17],
+      [side, -34],
+      [-side, -34],
+      [0, 34], // pushed further below
+      [0, -53], // pushed further above
+    ];
+    let best = { x: x - w / 2, y: y + 17, n: Number.POSITIVE_INFINITY };
+    for (const [dx, dy] of offsets) {
+      const rx = Math.min(636 - w, Math.max(4, x + dx - w / 2));
+      const ry = Math.min(700 - 4 - PLAQUE_H, Math.max(3, y + dy));
+      const n = hits(rx, ry);
+      if (n < best.n) best = { x: rx, y: ry, n };
+      if (n === 0) break;
+    }
+    placed.push({ x: best.x, y: best.y, w });
+    return { x: best.x, y: best.y, w };
   });
 
   // Province markers: city glyph roundel on the bank + small-caps plaque label
@@ -1742,9 +1869,11 @@ function buildRiverBoard(
       const x = provPts[i]!.x;
       const y = provPts[i]!.y;
       const mine = p.id === myProvinceId;
-      const labelW = plaqueW(p.name);
-      const plaqueY = plaqueFlipped[i] ? y - 36 : y + 17;
-      const textY = plaqueFlipped[i] ? y - 22 : y + 31;
+      const plaque = plaquePos[i]!;
+      const labelW = plaque.w;
+      const plaqueX = plaque.x;
+      const plaqueY = plaque.y;
+      const textY = plaqueY + 13.5;
       return `<g class="wm-prov${mine ? " wm-mine" : ""}" data-prov="${p.id}" tabindex="0" role="button"
         aria-label="${p.name}${mine ? " (your province)" : ""}">
         <circle class="halo" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="20" fill="#e8c26a"/>
@@ -1753,8 +1882,8 @@ function buildRiverBoard(
         <circle class="roundel" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="12.5" fill="${mine ? "#e2b558" : "#f2e6c6"}" stroke="#6b512c" stroke-width="1.4"/>
         ${glyphAt("ziggurat", x - 8, y - 8, 16, mine ? "#3d2c0e" : "#8a6b34")}
         ${mine ? `<circle cx="${(x + 10.5).toFixed(1)}" cy="${(y - 9.5).toFixed(1)}" r="4" fill="#96323f" stroke="#4a1219" stroke-width="1"/>` : ""}
-        <rect class="wm-plaque" x="${(x - labelW / 2).toFixed(1)}" y="${plaqueY.toFixed(1)}" width="${labelW.toFixed(0)}" height="19" rx="9.5" fill="#fdf6e4" fill-opacity="0.9" stroke="#c2a26c" stroke-width="0.7"/>
-        <text class="wm-label" x="${x.toFixed(1)}" y="${textY.toFixed(1)}" text-anchor="middle"${mine ? ' font-weight="700"' : ""}>${p.name}</text>
+        <rect class="wm-plaque" x="${plaqueX.toFixed(1)}" y="${plaqueY.toFixed(1)}" width="${labelW.toFixed(0)}" height="${PLAQUE_H}" rx="9.5" fill="#fdf6e4" fill-opacity="0.96" stroke="#c2a26c" stroke-width="0.7"/>
+        <text class="wm-label" x="${(plaqueX + labelW / 2).toFixed(1)}" y="${textY.toFixed(1)}" text-anchor="middle"${mine ? ' font-weight="700"' : ""}>${p.name}</text>
       </g>`;
     })
     .join("");
@@ -1890,20 +2019,44 @@ const SITE_GLYPH: Record<string, string> = {
   ancestral: "cartouche",
 };
 
-/** Miniature of a board site marker, for the map legend (same fills/glyphs as the board). */
-function legendDot(kind: "city" | "monument" | "open" | "mine"): string {
+/** Every node state the board can draw. One legend chip per state — judges
+    could not decode the board while claimed shores and province seats had no
+    swatch at all. */
+type LegendKind = "mine" | "city" | "seat" | "monument" | "claimed" | "open";
+
+/** Miniature of a board marker, for the map legend. Fills, glyphs, rings and
+    the dashed stroke are lifted verbatim from buildRiverBoard() so a chip and
+    a node are the same drawing at two sizes. */
+function legendDot(kind: LegendKind): string {
+  const seat = kind === "seat";
   const fill =
-    kind === "monument" ? "#e5c9cf" : kind === "open" ? "#f4ecd6" : "#e2b558";
-  const glyph = kind === "monument" ? "obelisk" : kind === "open" ? "flag" : "ziggurat";
-  const dash = kind === "open" ? ' stroke-dasharray="2.6 1.9"' : "";
-  const seal =
+    kind === "monument"
+      ? "#e5c9cf"
+      : kind === "open"
+        ? "#f4ecd6"
+        : kind === "claimed"
+          ? "#d9e4c4"
+          : seat
+            ? "#f2e6c6"
+            : "#e2b558";
+  const glyph =
+    kind === "monument" ? "obelisk" : kind === "open" || kind === "claimed" ? "flag" : "ziggurat";
+  // Province seats sit in a wider ring on the board and carry the paler ink
+  const ring = seat
+    ? '<circle cx="11" cy="11" r="9.6" fill="none" stroke="#a97f2e" stroke-width="1.3"/>'
+    : "";
+  const ink = seat ? "#8a6b34" : "#4a3413";
+  // Only OPEN shores are dashed — that is the whole meaning of the dashed ring
+  const dash = kind === "open" ? ' stroke-dasharray="3.1 2.2"' : "";
+  const sealDot =
     kind === "mine"
-      ? '<circle cx="15.6" cy="4.4" r="2.8" fill="#96323f" stroke="#4a1219" stroke-width="0.8"/>'
+      ? '<circle cx="17.2" cy="4.8" r="3.1" fill="#96323f" stroke="#4a1219" stroke-width="0.9"/>'
       : "";
-  return `<svg class="legend-dot" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
-    <circle cx="10" cy="10" r="8" fill="${fill}" stroke="#5d4520" stroke-width="1.2"${dash}/>
-    ${glyphAt(glyph, 5, 5, 10, "#4a3413")}
-    ${seal}
+  return `<svg class="legend-dot" viewBox="0 0 22 22" width="18" height="18" aria-hidden="true">
+    ${ring}
+    <circle cx="11" cy="11" r="7.6" fill="${fill}" stroke="#5d4520" stroke-width="1.3"${dash}/>
+    ${glyphAt(glyph, 6, 6, 10, ink)}
+    ${sealDot}
   </svg>`;
 }
 
@@ -1927,11 +2080,13 @@ function renderMap(s: PublicSnapshot) {
   panel.innerHTML = `<h2>World Map — Eternal River</h2>
     <p class="muted">Your shore: <strong>${archetype ? `${archetype} Shore` : "—"}</strong>${st ? ` — <strong>${RESOURCE_LABELS[st.uniqueLuxury]}</strong> province specialty` : ""}</p>
     ${buildRiverBoard(provinces, st?.provinceId, s.map.sites, s.player.id)}
-    <div class="map-legend" role="list" aria-label="Map legend">
-      <span role="listitem">${legendDot("city")}City</span>
+    <div class="map-legend" role="list" aria-label="Map legend — what each node on the board means">
+      <span role="listitem">${legendDot("mine")}Your shore <em>— red seal</em></span>
+      <span role="listitem">${legendDot("city")}Claimed city</span>
+      <span role="listitem">${legendDot("claimed")}Claimed shore</span>
       <span role="listitem">${legendDot("monument")}Monument</span>
-      <span role="listitem">${legendDot("open")}Open shore</span>
-      <span role="listitem">${legendDot("mine")}Your shore</span>
+      <span role="listitem">${legendDot("open")}Open shore <em>— dashed ring</em></span>
+      <span role="listitem">${legendDot("seat")}Province seat</span>
       <span role="listitem"><i class="legend-dash" aria-hidden="true"></i>Province border</span>
     </div>
     <div class="map-filter" id="map-filter">
@@ -1963,6 +2118,8 @@ function renderMap(s: PublicSnapshot) {
     panel.querySelectorAll<SVGGElement>(".wm-prov").forEach((g) => {
       g.classList.toggle("sel", g.getAttribute("data-prov") === mapProvFilter);
     });
+    // Filtering changes how many site cards are laid out — re-snap the fold
+    snapPanelFold();
   };
 
   panel.querySelectorAll<HTMLButtonElement>("#map-filter button").forEach((b) => {

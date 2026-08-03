@@ -627,12 +627,7 @@ export class SettlementView {
         blob(w.x, w.z, 1.8, 0.2);
       }
     }
-    // pads (fainter)
-    for (const def of SETTLEMENT_PLOTS) {
-      if (def.starterKind) continue;
-      const posP = this.worldPos(def);
-      blob(posP.x, posP.z, 1.3, 0.05);
-    }
+    // No pad blobs — an AO smudge with no caster reads as a render bug
     tex.update(false);
   }
 
@@ -915,13 +910,13 @@ export class SettlementView {
       ctx.fillStyle = `rgb(${br},${bg},${bb})`;
       ctx.fillRect(0, 0, size, size);
       // MACRO: large soft tonal blotches (visible at board distance)
-      for (let k = 0; k < 14; k++) {
+      for (let k = 0; k < 26; k++) {
         const x = Math.random() * size;
         const y = Math.random() * size;
         const r = size * (0.12 + Math.random() * 0.2);
-        const dv = (Math.random() - 0.45) * 26;
+        const dv = (Math.random() - 0.42) * 44;
         const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-        g.addColorStop(0, `rgba(${br + dv},${bg + dv * 0.9},${bb + dv * 0.7},0.5)`);
+        g.addColorStop(0, `rgba(${br + dv},${bg + dv * 0.86},${bb + dv * 0.66},0.72)`);
         g.addColorStop(1, "rgba(0,0,0,0)");
         ctx.fillStyle = g;
         ctx.beginPath();
@@ -1009,13 +1004,29 @@ export class SettlementView {
     wet.position.set(-10.2, 0.018, 1.5);
     const wetMat = new StandardMaterial("wetMat", this.scene);
     wetMat.diffuseColor = hexToColor3("#6A5840");
-    wetMat.specularColor = hexToColor3("#4A7080").scale(0.35);
+    wetMat.specularColor = hexToColor3("#4A7080").scale(0.12);
     wetMat.specularPower = 32;
     wetMat.emissiveColor = hexToColor3("#3A3020").scale(0.08);
     wet.material = wetMat;
     wet.parent = this.envRoot;
     wet.isPickable = false;
     wet.receiveShadows = true;
+
+    // (sun-glint boxes deleted — they photographed as floating decals)
+    const foamLineMat = new StandardMaterial("shoreFoamMat", this.scene);
+    foamLineMat.diffuseColor = hexToColor3("#9AA096");
+    foamLineMat.emissiveColor = Color3.Black();
+    foamLineMat.specularColor = Color3.Black();
+    foamLineMat.alpha = 0.3;
+    const shoreFoam = MeshBuilder.CreateBox(
+      "shoreFoam",
+      { width: 0.28, height: 0.02, depth: 72 },
+      this.scene
+    );
+    shoreFoam.position.set(-10.62, 0.062, 2);
+    shoreFoam.material = foamLineMat;
+    shoreFoam.parent = this.envRoot;
+    shoreFoam.isPickable = false;
 
     // Dark silt break at waterline (Materials: wet clay grammar)
     const silt = MeshBuilder.CreateBox(
@@ -1042,9 +1053,9 @@ export class SettlementView {
     wetLine.position.set(-10.55, 0.06, 1.5);
     const wetLineMat = new StandardMaterial("wetSpecularMat", this.scene);
     wetLineMat.diffuseColor = hexToColor3("#4A6860");
-    wetLineMat.specularColor = hexToColor3("#D0E8F0").scale(1.0);
+    wetLineMat.specularColor = hexToColor3("#8AA0A8").scale(0.25);
     wetLineMat.specularPower = 128;
-    wetLineMat.emissiveColor = hexToColor3("#3A5850").scale(0.18);
+    wetLineMat.emissiveColor = Color3.Black();
     wetLineMat.alpha = 0.4;
     wetLine.material = wetLineMat;
     wetLine.parent = this.envRoot;
@@ -1058,9 +1069,9 @@ export class SettlementView {
     wetLine2.position.set(-10.15, 0.055, 1.5);
     const wetLine2Mat = new StandardMaterial("wetSpecular2Mat", this.scene);
     wetLine2Mat.diffuseColor = hexToColor3("#6A8078");
-    wetLine2Mat.specularColor = hexToColor3("#E0F0F8").scale(0.7);
+    wetLine2Mat.specularColor = hexToColor3("#8AA0A8").scale(0.18);
     wetLine2Mat.specularPower = 64;
-    wetLine2Mat.emissiveColor = hexToColor3("#4A6058").scale(0.1);
+    wetLine2Mat.emissiveColor = Color3.Black();
     wetLine2Mat.alpha = 0.4;
     wetLine2.material = wetLine2Mat;
     wetLine2.parent = this.envRoot;
@@ -1159,7 +1170,7 @@ export class SettlementView {
     );
     bank.position.set(-10.05, 0.05, 1.5);
     const bmat = new StandardMaterial("bankMat", this.scene);
-    bmat.diffuseColor = hexToColor3("#B99C74");
+    bmat.diffuseColor = hexToColor3("#C2AA84");
     bmat.specularColor = Color3.Black();
     bank.material = bmat;
     bank.parent = this.envRoot;
@@ -1174,7 +1185,7 @@ export class SettlementView {
     reedMatDry.diffuseColor = hexToColor3("#8A8452");
     reedMatDry.specularColor = Color3.Black();
     const reedMassMat = new StandardMaterial("reedMassMat", this.scene);
-    reedMassMat.diffuseColor = hexToColor3("#55613A");
+    reedMassMat.diffuseColor = hexToColor3("#4C5733");
     reedMassMat.emissiveColor = hexToColor3("#2A4028").scale(0.08);
     reedMassMat.specularColor = Color3.Black();
     // Solid clumps — translucent boxes read as ghost geometry at close range
@@ -1187,7 +1198,7 @@ export class SettlementView {
       if (bed % 2 === 0) {
         const mass = MeshBuilder.CreatePolyhedron(
           `reedMass-${bed}`,
-          { type: 3, size: 0.3 + (bed % 3) * 0.06 },
+          { type: 3, size: 0.22 + (bed % 3) * 0.05 },
           this.scene
         );
         mass.scaling.set(1.1, 1.25, 0.85);
@@ -1445,6 +1456,7 @@ export class SettlementView {
       pad.isPickable = !def.starterKind;
       pad.receiveShadows = true;
       pad.visibility = def.starterKind ? 0 : 1;
+      pad.position.y = isHarbor ? 0.06 : 0.018; // flush prepared ground
       pad.metadata = {
         plotId: def.id,
         category: def.category,

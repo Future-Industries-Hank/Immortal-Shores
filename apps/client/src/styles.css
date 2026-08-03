@@ -507,8 +507,11 @@ html.dark button.btn-locked svg {
   justify-content: space-between;
   gap: 0.5rem;
   min-height: 2.75rem;
-  padding: 0.25rem 0.75rem;
-  padding-top: max(0.25rem, env(safe-area-inset-top));
+  /* Extra right padding: the DETAIL / TIME micro-labels sit above their chips
+     and were crammed against the screen edge in every desktop capture. */
+  padding: 0.3rem 0.75rem;
+  padding-top: max(0.3rem, env(safe-area-inset-top));
+  padding-right: max(1.15rem, env(safe-area-inset-right));
   background:
     linear-gradient(180deg, rgba(48, 38, 26, 0.94) 0%, rgba(28, 22, 16, 0.92) 55%, rgba(22, 18, 14, 0.95) 100%),
     repeating-linear-gradient(
@@ -659,7 +662,8 @@ html.dark button.btn-locked svg {
 .hud-actions {
   margin-top: 0;
   flex: 0 0 auto;
-  gap: 0.3rem;
+  gap: 0.4rem;
+  padding-inline-end: 0.15rem;
 }
 
 .hud-actions button,
@@ -842,7 +846,10 @@ html.dark button.btn-locked svg {
   box-sizing: border-box;
   width: min(460px, calc(100vw - 16px));
   max-width: calc(100vw - 16px);
-  max-height: min(60vh, 520px);
+  /* Ceiling only. Short panels auto-size and never scroll; taller ones get
+     trimmed back to a card boundary by snapPanelFold(), so a generous cap
+     means MORE whole cards above the fold, not a deeper slice. */
+  max-height: min(72vh, 620px);
   z-index: 20;
   display: flex;
   flex-direction: column;
@@ -884,32 +891,68 @@ html.dark button.btn-locked svg {
 /* Map is a set piece, not a modal card: wide shell, taller cap; the calc()
    arm makes narrow viewports fall back gracefully. */
 .menu-popup.map-wide {
-  width: min(860px, calc(100vw - 24px));
+  width: min(680px, calc(100vw - 24px));
   max-width: calc(100vw - 24px);
-  max-height: min(84vh, 780px);
+  /* Sized so the WHOLE board plus the legend and the filter chips clear the
+     fold at rest — previously the sheet ran ~30% past the panel edge, which is
+     how the Gold Reach node ended up sliced off the bottom. */
+  max-height: min(84vh, 820px);
 }
 
 .menu-popup.map-wide .map-grid {
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
 }
 
-/* Bottom fade + soft "more below" shadow so hard-clipped content reads as
-   scrollable. Tall + strong so a card's buttons are either clearly readable
-   or clearly folded under — never ambiguously sliced. */
-.menu-popup::after {
+/* Scroll affordance, only present when the body actually overflows.
+   snapPanelFold() adds .has-fold and trims the scroll box to end EXACTLY on a
+   card's bottom edge; this padding then opens a 30px shelf BELOW the scroll
+   box, outside it. Nothing from the next card can reach into that strip, so
+   the shelf is genuinely blank — a fade over a sliced row is what kept reading
+   as clipping, and there is no longer a sliced row to fade. Short panels
+   auto-size and get neither scrollbar nor shelf. */
+.menu-popup::after,
+.menu-popup::before {
+  display: none;
+}
+
+.menu-popup.has-fold {
+  padding-bottom: 30px;
+}
+
+.menu-popup.has-fold::after {
   content: "";
+  display: block;
   position: absolute;
   left: 1px;
   right: 1px;
-  bottom: 0;
-  height: 64px;
+  bottom: 1px;
+  height: 30px;
+  z-index: 0;
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--surface-card-2) 0%, transparent) 0%,
-    var(--surface-card-2) 82%
+    color-mix(in srgb, var(--surface-card-2) 60%, transparent) 0%,
+    var(--surface-card-2) 70%
   );
-  box-shadow: 0 -10px 16px -10px rgba(40, 28, 14, 0.45);
+  box-shadow: inset 0 1px 0 var(--hairline);
+  pointer-events: none;
+}
+
+/* Chevron riding on the shelf: names the flat bottom edge as "scroll for
+   more", so it is never mistaken for a cut-off card. */
+.menu-popup.has-fold::before {
+  content: "";
+  display: block;
+  position: absolute;
+  left: 50%;
+  bottom: 9px;
+  width: 18px;
+  height: 12px;
+  z-index: 1;
+  transform: translateX(-50%);
+  background: no-repeat center / 18px 12px
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='12'><path d='M3 3l6 6 6-6' fill='none' stroke='%238a6b34' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  opacity: 0.6;
   pointer-events: none;
 }
 
@@ -972,30 +1015,26 @@ html.dark button.btn-locked svg {
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch; /* momentum scrolling on iOS */
   overscroll-behavior: contain;
+  /* snapPanelFold() writes an inline max-height here to park the fold on a
+     card boundary; this is only the untrimmed fallback. */
   max-height: 100%;
-  padding: 0.65rem 0.8rem 3.6rem; /* bottom padding clears the 48px fade mask */
+  /* The shelf now sits OUTSIDE this box, so no tall bottom padding is needed
+     to clear it — and a slim one keeps "does it actually overflow?" honest, so
+     short panels really do auto-size with no scrollbar and no shelf. */
+  padding: 0.65rem 0.8rem 0.7rem;
   min-height: 0;
   flex: 1 1 auto;
-  /* Gentle snap so a flick settles with whole cards above the fold... */
-  scroll-snap-type: none;
-  /* ...and snapped cards land clear of the head hairline / bottom fade */
-  scroll-padding-block: 0.5rem 64px;
+  /* Scrolled positions land clear of the head hairline / bottom fade */
+  scroll-padding-block: 0.5rem 40px;
 }
 
-/* Section heads join the snap grid and keep clear of the bottom fade, so a
-   head is never left half-cut at the fold when scrolling settles */
+/* Section heads keep clear of the bottom fade when scrolling settles */
 .menu-popup-body .side-panel h3 {
-  scroll-snap-align: start;
-  scroll-margin-block: 0.5rem 64px;
+  scroll-margin-block: 0.5rem 40px;
 }
 
-/* The last section head gets a taller lead-in: at the initial (unscrolled)
-   position the fold then lands on the gap above it, not mid-string */
-.menu-popup-body .side-panel h3:last-of-type {
-  margin-top: 1.4rem;
-}
-
-/* Cards participate in the snap grid — the fold never slices their buttons */
+/* Cards keep clear of the fade when a scroll settles on them. The resting
+   fold is handled by snapPanelFold(), not by scroll snapping. */
 .menu-popup-body .b-card,
 .menu-popup-body .barge-card,
 .menu-popup-body .tablet-card,
@@ -1006,7 +1045,7 @@ html.dark button.btn-locked svg {
 .menu-popup-body .map-site,
 .menu-popup-body .empty-card,
 .menu-popup-body .stat-band {
-  scroll-snap-align: start;
+  scroll-margin-block: 0.5rem 40px;
 }
 
 /* Last card never sits flush against the clipped edge */
@@ -1996,6 +2035,15 @@ html.dark .harbor-empty svg {
 
 /* ── Toast / hint / warnings ─────────────────────────────────────── */
 
+/* Both of these set `display: flex`, an author declaration that outranks the
+   UA sheet's `[hidden] { display: none }` — so `el.hidden = true` is not
+   guaranteed to hide them, and a dismissed toast can keep painting its pill
+   and stale text. Belt-and-braces so exactly one pill can ever be on screen. */
+#toast[hidden],
+.ration-warn[hidden] {
+  display: none !important;
+}
+
 #toast {
   position: absolute;
   left: 50%;
@@ -2004,12 +2052,14 @@ html.dark .harbor-empty svg {
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  background: linear-gradient(180deg, rgba(52, 42, 30, 0.97), rgba(30, 24, 17, 0.97));
+  /* Fully opaque: the resting hint pill sits directly underneath, and at 0.97
+     its dark text bled through and read as a second, clipped toast. */
+  background: linear-gradient(180deg, #34291d, #1e1811);
   color: var(--papyrus);
   border: 1px solid rgba(212, 168, 75, 0.5);
   padding: 0.55rem 0.95rem;
   border-radius: 999px;
-  z-index: 25;
+  z-index: 32;
   font-size: 0.9rem;
   pointer-events: none;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 245, 220, 0.12);
@@ -2059,17 +2109,28 @@ html.dark #toast {
   max-width: min(90%, 28rem);
   text-align: center;
   animation: toast-in 0.25s ease;
+  transition: opacity 0.15s ease;
 }
 
 html.dark .hint {
   color: #f3e6c8;
 }
 
-#viewport:has(.menu-popup:not([hidden])) .hint {
+/* Only ONE floating pill at the bottom of the viewport at a time. The hint
+   and the toast share that anchor, so the hint stands down whenever a toast
+   or a panel is up — otherwise it peeks out from behind the toast and reads
+   as a second, half-clipped toast. */
+#viewport:has(.menu-popup:not([hidden])) .hint,
+#viewport:has(#toast:not([hidden])) .hint {
   opacity: 0;
 }
 
 .hint.hidden {
+  display: none;
+}
+
+/* Empty toasts must not paint a bare pill */
+#toast:empty {
   display: none;
 }
 
@@ -2639,11 +2700,17 @@ html.dark .pad-chip.pad-shop {
   gap: 0.35rem;
 }
 
+/* The board is one indivisible block, so it must fit the panel outright —
+   otherwise snapPanelFold() would have to park the fold above it and hide the
+   map entirely. Height-first + aspect-ratio keeps the sheet proportional and
+   centred instead of letterboxing inside an oversized box. */
 .world-river-map {
-  width: 100%;
-  height: auto;
+  width: auto;
+  height: min(56vh, 540px);
+  max-width: 100%;
+  aspect-ratio: 640 / 700;
   display: block;
-  margin: 0.35rem 0 0.5rem;
+  margin: 0.35rem auto 0.5rem;
   border-radius: var(--radius-md);
   border: var(--border-gold);
   box-shadow: inset 0 0 0 1px rgba(255, 250, 235, 0.4), 0 2px 8px rgba(30, 20, 10, 0.18);
@@ -2918,8 +2985,16 @@ html.dark .site-glyph {
    attributes — do not blanket-resize nested svgs here) */
 .map-legend .legend-dot {
   flex: 0 0 auto;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
+}
+
+/* "— dashed ring" rider on the Open shore chip: explains the only dashed
+   stroke used on a node, so the ring style is decodable without hovering. */
+.map-legend em {
+  font-style: normal;
+  opacity: 0.72;
+  letter-spacing: 0.01em;
 }
 
 .map-legend .legend-dash {
@@ -3033,7 +3108,7 @@ html.dark .site-glyph {
     bottom: 0.4rem;
     width: min(460px, calc(100vw - 12px));
     max-width: calc(100vw - 12px);
-    max-height: min(62vh, 520px);
+    max-height: min(70vh, 560px);
   }
 
   /* Map set piece falls back to a phone-sane card */
@@ -3041,6 +3116,12 @@ html.dark .site-glyph {
     width: min(460px, calc(100vw - 12px));
     max-width: calc(100vw - 12px);
     max-height: min(72vh, 560px);
+  }
+
+  /* Phone board: the whole sheet still has to clear the panel chrome, or the
+     fold would have to be parked above it and the map would vanish. */
+  .world-river-map {
+    height: min(40vh, 330px);
   }
 
   .hint {

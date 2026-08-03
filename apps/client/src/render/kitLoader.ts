@@ -44,7 +44,7 @@ export async function preloadBuildingKits(scene: Scene): Promise<KitCache> {
     kinds.map(async (file) => {
       try {
         // Bump when Blender re-exports solid kits (dev/prod cache bust)
-        const KIT_VER = "overhaul-r1";
+        const KIT_VER = "overhaul-r9";
         const result = await SceneLoader.ImportMeshAsync(
           null,
           "/models/buildings/",
@@ -125,6 +125,9 @@ export function instantiateBuildingFromKit(
       c.setEnabled(true);
       c.isPickable = false;
       c.receiveShadows = true;
+      // COLOR_0 (baked AO) is RGBA — Babylon then flags hasVertexAlpha and
+      // renders the mesh in the transparent pass, so terrain ghosts through.
+      c.hasVertexAlpha = false;
       c.metadata = { buildingId: b.id, kind: b.kind, plotId: b.plotId };
       if (shadow) shadow.addShadowCaster(c, true);
       // Force SOLID materials — never transparent/wire stand-ins

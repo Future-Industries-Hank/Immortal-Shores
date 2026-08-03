@@ -351,8 +351,8 @@ export function roadTierForGhLevel(ghLevel: number): RoadTier {
 }
 
 export const ROAD_COLORS: Record<RoadTier, { fill: string; edge: string }> = {
-  dirt: { fill: "#8B6C4C", edge: "#74573B" },
-  packed: { fill: "#9A7E58", edge: "#7E6446" },
+  dirt: { fill: "#9C8460", edge: "#87704F" },
+  packed: { fill: "#A89168", edge: "#8E7854" },
   stone: { fill: "#C8C0B0", edge: "#9A9284" },
 };
 
