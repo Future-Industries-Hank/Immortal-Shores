@@ -573,7 +573,7 @@ export class SettlementView {
     scrubMat.diffuseColor = hexToColor3("#8A8A52");
     scrubMat.specularColor = Color3.Black();
     const scrubDryMat = new StandardMaterial("scrubDryMat", this.scene);
-    scrubDryMat.diffuseColor = hexToColor3("#AA9A64");
+    scrubDryMat.diffuseColor = hexToColor3("#918655");
     scrubDryMat.specularColor = Color3.Black();
 
     const groundY = (wx: number, wz: number) => {
@@ -726,6 +726,21 @@ export class SettlementView {
         if (inPlots) continue;
       }
       const y0 = groundY(sx, sz);
+      // contact patch anchors the cluster — ortho projection makes floating
+      // unanchored tufts read as gold bars in the sky over featureless sand
+      const patch = MeshBuilder.CreateDisc(
+        `scrubPatch-${i}`,
+        { radius: 0.3 + (i % 3) * 0.08, tessellation: 8 },
+        this.scene
+      );
+      patch.rotation.x = Math.PI / 2;
+      patch.position.set(sx, y0 + 0.012, sz);
+      const pm = new StandardMaterial(`scrubPatchMat-${i}`, this.scene);
+      pm.diffuseColor = hexToColor3("#B39A70");
+      pm.specularColor = Color3.Black();
+      patch.material = pm;
+      patch.parent = this.envRoot;
+      patch.isPickable = false;
       const tufts = 3 + (i % 3);
       for (let t = 0; t < tufts; t++) {
         const th = 0.14 + ((t * 3 + i) % 4) * 0.06;
@@ -1101,14 +1116,14 @@ export class SettlementView {
 
     // Dense reed BEDS — mass silhouettes + stalks (Ground craft, not sparse sticks)
     const reedMat = new StandardMaterial("envReed", this.scene);
-    reedMat.diffuseColor = hexToColor3(STYLE.reedGreen);
+    reedMat.diffuseColor = hexToColor3("#6E7C44"); // olive, not neon
     reedMat.specularColor = Color3.Black();
-    reedMat.emissiveColor = hexToColor3(STYLE.reedGreen).scale(0.04);
+    reedMat.emissiveColor = hexToColor3("#3A4426").scale(0.05);
     const reedMatDry = new StandardMaterial("envReedDry", this.scene);
-    reedMatDry.diffuseColor = hexToColor3("#6A7040");
+    reedMatDry.diffuseColor = hexToColor3("#8A8452");
     reedMatDry.specularColor = Color3.Black();
     const reedMassMat = new StandardMaterial("reedMassMat", this.scene);
-    reedMassMat.diffuseColor = hexToColor3("#3A5A38");
+    reedMassMat.diffuseColor = hexToColor3("#55613A");
     reedMassMat.emissiveColor = hexToColor3("#2A4028").scale(0.08);
     reedMassMat.specularColor = Color3.Black();
     // Solid clumps — translucent boxes read as ghost geometry at close range
@@ -1119,12 +1134,14 @@ export class SettlementView {
       const bx = -10.25 + (bed % 3) * 0.14;
       // Mass clump silhouette (reads at mid-iso without counting stalks)
       if (bed % 2 === 0) {
-        const mass = MeshBuilder.CreateBox(
+        const mass = MeshBuilder.CreatePolyhedron(
           `reedMass-${bed}`,
-          { width: 0.55 + (bed % 3) * 0.12, height: 0.55 + (bed % 2) * 0.15, depth: 0.4 },
+          { type: 3, size: 0.3 + (bed % 3) * 0.06 },
           this.scene
         );
-        mass.position.set(bx, 0.32, bz);
+        mass.scaling.set(1.1, 1.25, 0.85);
+        mass.position.set(bx, 0.3, bz);
+        mass.rotation.y = bed * 0.9;
         mass.material = reedMassMat;
         mass.parent = this.envRoot;
         mass.isPickable = false;
@@ -1134,8 +1151,9 @@ export class SettlementView {
         const r = MeshBuilder.CreateCylinder(
           `envReed-${reedI++}`,
           {
-            height: 0.6 + (s % 4) * 0.2,
-            diameter: 0.08 + (s % 3) * 0.02,
+            height: 0.55 + (s % 4) * 0.16,
+            diameterBottom: 0.07 + (s % 3) * 0.02,
+            diameterTop: 0.015,
             tessellation: 5,
           },
           this.scene

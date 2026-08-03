@@ -92,7 +92,10 @@ export async function preloadBuildingKits(scene: Scene): Promise<KitCache> {
             m.position.z -= cz;
           }
         }
-        root.position = Vector3.Zero();
+        // Park the template far underground AND disabled: some render
+        // paths (reflection RTTs, shadow passes) have historically drawn
+        // template pieces hovering at the origin ("gold in the sky").
+        root.position = new Vector3(0, -60, 0);
         root.setEnabled(false);
         cache.set(file, { root, meshes });
       } catch (e) {

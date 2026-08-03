@@ -23,6 +23,7 @@ export class Atmosphere {
   private hemi: HemisphericLight;
   private ghLight: PointLight;
   private marketLight: PointLight;
+  private quarterLamps: PointLight[] = [];
   private t0 = performance.now() * 0.001;
   /** Full cycle seconds (default ~90s for readable TOD in playtest). */
   cycleSeconds = 90;
@@ -46,6 +47,16 @@ export class Atmosphere {
     this.marketLight.diffuse = hexToColor3("#FFD080");
     this.marketLight.intensity = 0;
     this.marketLight.range = 6;
+    // Quarter lamps: night reads as summed sources, not one radial pool
+    for (const [qx, qz, r] of [
+      [1.2, 6.8, 5], [3.8, -2.6, 5.5], [-6.2, 1.2, 4.5], [5.8, 3.4, 4.5],
+    ] as const) {
+      const lamp = new PointLight(`qLamp-${qx}-${qz}`, new Vector3(qx, 1.6, qz), scene);
+      lamp.diffuse = hexToColor3("#FFB868");
+      lamp.intensity = 0;
+      lamp.range = r;
+      this.quarterLamps.push(lamp);
+    }
     this.scene.fogMode = Scene.FOGMODE_NONE;
     this.scene.fogDensity = 0;
     this.scene.fogColor = hexToColor3("#B8C8D0");
@@ -144,6 +155,10 @@ export class Atmosphere {
     // Night local lamps (window/hearth falloff — not roof flood)
     this.ghLight.intensity = n > 0.55 ? 2.2 * (n - 0.4) : 0;
     this.marketLight.intensity = n > 0.55 ? 1.6 * (n - 0.4) : 0;
+    for (let qi = 0; qi < this.quarterLamps.length; qi++) {
+      const lamp = this.quarterLamps[qi]!;
+      lamp.intensity = n > 0.55 ? (1.1 + (qi % 3) * 0.25) * (n - 0.4) : 0;
+    }
 
     // PRESERVE dark depth water — never lerp toward candy riverLight
     if (river) {
