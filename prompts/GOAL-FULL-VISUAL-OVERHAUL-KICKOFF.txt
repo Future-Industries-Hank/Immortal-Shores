@@ -1,0 +1,38 @@
+/goal — paste as entire session. Full product overhaul. Do not stop.
+
+---
+
+Pull latest main Future-Industries-Hank/Immortal-Shores. Economy frozen.
+Artboard + fixed full-shore POV locked. Inspiration: docs/visual-inspiration/ and /storyboard/
+
+Execute: prompts/GOAL-FULL-VISUAL-OVERHAUL.md
+
+/goal: FULL GRAPHICAL OVERHAUL OF THE ENTIRE GAME.
+
+GH and Market improvements are NOT enough. The rest still looks bad.
+You must raise EVERY surface: all building kinds, fields/pits/reeds, pads,
+river/desert, workers, world map, AND all menus/UI (login, HUD, nav, Tablet Wall,
+Market, build/inspect, tutorial, mobile).
+
+PRIMARY:
+1) BUILDING-STATUS.md — every kind: solid / weak / outline
+2) Blender re-author every weak glTF to match artboard (not JPG import)
+3) Side-by-side board vs game for each kind — Structures ≤ 3 if outline/box
+4) No celebrating until shops, fields, harbor, shrine, training match GH quality
+
+THEN:
+5) Kill black rings / rectangular shadow stamps
+6) Workers small + sim count + no clip; fog minimal; camera fixed full board
+7) Full UI/menu skin — papyrus/ink premium (IXION/Frostpunk craft, not sci-fi theme)
+8) World map polish
+9) Capture full gallery under tools/judge/evidence/full-overhaul/
+10) Independent judge on FULL gallery (not GH crops) until ≥ 8.0 / min ≥ 6
+    Cohesion FAIL if only two heroes look good
+
+AAA craft bar only: Surviving Mars, Aven Colony, IXION, Frostpunk 2, ONI.
+
+FORBIDDEN: stop, review pause, provisional PASS, "GH done so pause",
+progress reports that ignore weak buildings and menus.
+
+Start NOW: inventory all buildings + all UI surfaces, then fix weakest buildings
+and start menu chrome. Loop until GOAL-FULL-VISUAL-OVERHAUL-COMPLETE.md.

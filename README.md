@@ -43,8 +43,9 @@ See [`HOSTING.md`](./HOSTING.md).
 | **2.8** | [`prompts/PROMPT-02.8-DIRECTOR-PLAY-PASS.md`](./prompts/PROMPT-02.8-DIRECTOR-PLAY-PASS.md) | Director play issues (reference) | Nested in 02.9 Step 3 |
 | **2.9** | [`prompts/PROMPT-02.9-APPROVAL-THEN-CRAFT.md`](./prompts/PROMPT-02.9-APPROVAL-THEN-CRAFT.md) | Storyboard → standard view | **DONE** (locked) |
 | **03** | [`prompts/PROMPT-03-APPROVED-GAUNTLET.md`](./prompts/PROMPT-03-APPROVED-GAUNTLET.md) | Boards + AAA quality | Superseded if agent stops early |
-| **/goal** | [`prompts/GOAL-GRAPHICS-READY.md`](./prompts/GOAL-GRAPHICS-READY.md) | **Do not stop until graphics ready** | **RUN THIS** |
-| Kickoff | [`prompts/GOAL-GRAPHICS-READY-KICKOFF.txt`](./prompts/GOAL-GRAPHICS-READY-KICKOFF.txt) | Paste block | Copy-paste |
+| **/goal buildings** | [`prompts/GOAL-GRAPHICS-READY.md`](./prompts/GOAL-GRAPHICS-READY.md) | Solid heroes (GH/Market started) | Partial |
+| **/goal full** | [`prompts/GOAL-FULL-VISUAL-OVERHAUL.md`](./prompts/GOAL-FULL-VISUAL-OVERHAUL.md) | **Whole game + menus → ready** | **RUN THIS** |
+| Kickoff | [`prompts/GOAL-FULL-VISUAL-OVERHAUL-KICKOFF.txt`](./prompts/GOAL-FULL-VISUAL-OVERHAUL-KICKOFF.txt) | Paste block | Copy-paste |
 | Review UI | [`ART-STORYBOARD-REVIEW.html`](./ART-STORYBOARD-REVIEW.html) | Yes/No boards | Open when locking look |
 | Inspiration | [`docs/visual-inspiration/`](./docs/visual-inspiration/) | Style guide JPGs | Generated |
 
@@ -53,20 +54,19 @@ See [`HOSTING.md`](./HOSTING.md).
 Mechanics pre-check: [`CRITICAL-AUDIT-PRE-02.md`](./CRITICAL-AUDIT-PRE-02.md) (green).  
 Do not reopen escrow, plot counts, or GDD rates.
 
-### Planner kickoff — /goal (buildings first, non-stop)
+### Planner kickoff — /goal full overhaul (current)
 
 ```text
 Pull latest main. Economy frozen. Artboard + POV locked.
 
-Execute prompts/GOAL-GRAPHICS-READY.md (or GOAL-GRAPHICS-READY-KICKOFF.txt).
+Execute prompts/GOAL-FULL-VISUAL-OVERHAUL.md
+(or GOAL-FULL-VISUAL-OVERHAUL-KICKOFF.txt).
 
-PRIMARY: solid buildings matching artboard silhouettes — NOT outlines/ghosts/boxes.
-Blender re-author glTF heroes first (GH, Market, fields, shops, harbor).
-SECONDARY only after: shadow stamps, fog, worker scale/count.
-NON-STOP until heroes look solid in browser AND judge ≥ 8.0 / min ≥ 6.
-Forbidden: stop, review pause, lead with fog while buildings are outlines.
+GH+Market alone are NOT enough. Overhaul ALL buildings, env, workers, world map,
+AND all menus/UI. Artboard silhouettes. AAA craft bar (Surviving Mars, Aven,
+IXION, Frostpunk 2, ONI) — not theme copy. NON-STOP until full gallery + judge
+≥ 8.0 / min ≥ 6 and cohesion (whole product, not two heroes).
 ```
-
 ### Future packs (FI)
 
 Phase **1.9 art storyboard** is now mandatory in `fi-game-build` / `FI-PLAYBOOK` before multi-round visual overhaul. Browser titles use specialized skill **`fi-html-game`**.
