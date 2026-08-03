@@ -108,7 +108,7 @@ export class Atmosphere {
     this.sun.intensity = 1.9 - n * 1.0;
     // Sun path: high warm day key -> long low western dusk -> faint moon.
     // Judges: "dusk is the day shot with an orange tint" — direction must move.
-    const dayDir = new Vector3(-0.72, -0.46, 0.4);
+    const dayDir = new Vector3(-0.74, -0.38, 0.4);
     const duskDir = new Vector3(-0.97, -0.2, 0.1);
     const nightDir = new Vector3(-0.45, -0.5, 0.3);
     const dir =

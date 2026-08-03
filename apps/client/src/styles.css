@@ -902,7 +902,7 @@ html.dark button.btn-locked svg {
   left: 1px;
   right: 1px;
   bottom: 0;
-  height: 48px;
+  height: 64px;
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
   background: linear-gradient(
     180deg,
@@ -1427,7 +1427,7 @@ html.dark .chat-search-wrap svg {
 
 .chat-empty svg {
   width: 64px;
-  height: 48px;
+  height: 64px;
   color: var(--gold-deep);
   opacity: 0.65;
 }
@@ -3300,4 +3300,12 @@ html.dark .goals-ring {
 }
 .chat-md em {
   font-style: italic;
+}
+
+/* Inspect modal scrim — panels must never ghost through behind it */
+.popup-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 11, 6, 0.42);
+  z-index: 29;
 }

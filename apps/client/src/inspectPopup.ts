@@ -54,6 +54,21 @@ function costHtml(
   return parts.join(" · ") || "—";
 }
 
+
+function ensureScrim(root: HTMLElement) {
+  let scrim = document.getElementById("popup-scrim");
+  if (!scrim) {
+    scrim = document.createElement("div");
+    scrim.id = "popup-scrim";
+    scrim.className = "popup-scrim";
+    root.parentElement?.insertBefore(scrim, root);
+  }
+  (scrim as HTMLElement).hidden = false;
+  // The modal owns the screen — hide the menu popup underneath
+  const menu = document.getElementById("menu-popup");
+  if (menu) (menu as HTMLElement).hidden = true;
+}
+
 export function renderBuildingPopup(
   root: HTMLElement,
   state: PublicSnapshot,
@@ -65,6 +80,7 @@ export function renderBuildingPopup(
     root.hidden = true;
     return;
   }
+  ensureScrim(root);
   root.hidden = false;
   root.classList.add("popup-open");
 
@@ -295,6 +311,8 @@ export function hidePopup(root: HTMLElement) {
   root.hidden = true;
   root.classList.remove("popup-open");
   root.innerHTML = "";
+  const scrim = document.getElementById("popup-scrim");
+  if (scrim) (scrim as HTMLElement).hidden = true;
 }
 
 /** Generic info + actions popup (build catalog, map sites, barges, etc.). */
@@ -318,6 +336,7 @@ export function renderGenericPopup(
     onClose: () => void;
   }
 ) {
+  ensureScrim(root);
   root.hidden = false;
   root.classList.add("popup-open");
   const glyph = opts.glyphName

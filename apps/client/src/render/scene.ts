@@ -550,6 +550,92 @@ export class SettlementView {
     }
   }
 
+  private aoCarpet: Mesh | null = null;
+  private aoCarpetTex: DynamicTexture | null = null;
+
+  /**
+   * Painted ground-contact shading — the "baked AO" the whole style needs.
+   * A single non-tiled world-space texture over the settlement field gets a
+   * soft dark ellipse under every building/pad/palm + packed-earth wear at
+   * hubs. Repainted whenever the building set changes.
+   */
+  private buildAOCarpet() {
+    const W = 46, H = 38, CX = -2.5, CZ = 3;
+    if (this.aoCarpet?.isDisposed()) {
+      this.aoCarpet = null;
+      this.aoCarpetTex = null;
+    }
+    if (!this.aoCarpet) {
+      this.aoCarpet = MeshBuilder.CreateGround(
+        "aoCarpet",
+        { width: W, height: H },
+        this.scene
+      );
+      this.aoCarpet.position.set(CX, 0.02, CZ);
+      this.aoCarpet.isPickable = false;
+      const tex = new DynamicTexture("aoCarpetTex", 1024, this.scene, true);
+      tex.hasAlpha = true;
+      const mat = new StandardMaterial("aoCarpetMat", this.scene);
+      mat.diffuseTexture = tex;
+      mat.useAlphaFromDiffuseTexture = true;
+      mat.specularColor = Color3.Black();
+      mat.emissiveColor = Color3.Black();
+      mat.backFaceCulling = true;
+      this.aoCarpet.material = mat;
+      this.aoCarpet.parent = this.envRoot ?? this.root;
+      this.aoCarpetTex = tex;
+    }
+    const tex = this.aoCarpetTex;
+    if (!tex) return;
+    const ctx = tex.getContext() as CanvasRenderingContext2D;
+    const S = 1024;
+    ctx.clearRect(0, 0, S, S);
+    const toU = (wx: number) => ((wx - (CX - W / 2)) / W) * S;
+    const toV = (wz: number) => S - ((wz - (CZ - H / 2)) / H) * S;
+    ctx.globalCompositeOperation = "darken";
+    const blob = (wx: number, wz: number, r: number, a: number) => {
+      const g = ctx.createRadialGradient(
+        toU(wx), toV(wz), 0, toU(wx), toV(wz), (r / W) * S
+      );
+      g.addColorStop(0, `rgba(52,36,20,${a})`);
+      g.addColorStop(0.7, `rgba(52,36,20,${a * 0.45})`);
+      g.addColorStop(1, "rgba(52,36,20,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(toU(wx), toV(wz), (r / W) * S, 0, Math.PI * 2);
+      ctx.fill();
+    };
+    // packed-earth wear around hubs (warm, wide, faint)
+    for (const n0 of PATH_NODES.filter((pn) => pn.id.startsWith("hub-"))) {
+      const n = transformPlotPos(n0.x, n0.z, this.mapArch.layout);
+      const g = ctx.createRadialGradient(
+        toU(n.x), toV(n.z), 0, toU(n.x), toV(n.z), (3.4 / W) * S
+      );
+      g.addColorStop(0, "rgba(122,92,58,0.1)");
+      g.addColorStop(1, "rgba(122,92,58,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(toU(n.x), toV(n.z), (3.4 / W) * S, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // building contact shadows
+    const st = this.lastSettlement;
+    if (st) {
+      for (const b of st.buildings) {
+        if (!b.plotId) continue;
+        const w = this.plotWorldArch(b.plotId);
+        blob(w.x, w.z, 1.8, 0.2);
+      }
+    }
+    // pads (fainter)
+    for (const def of SETTLEMENT_PLOTS) {
+      if (def.starterKind) continue;
+      const posP = this.worldPos(def);
+      blob(posP.x, posP.z, 1.3, 0.05);
+    }
+    tex.update(false);
+  }
+
   /** Palms, scrub, rock outcrops, crescent dunes — the desert is a place,
    *  not a tan void. All opaque, all outside the gameplay rect. */
   private buildNaturalFeatures() {
@@ -931,41 +1017,6 @@ export class SettlementView {
     wet.isPickable = false;
     wet.receiveShadows = true;
 
-    // Mudflat lobes — the shoreline is a river edge, not a ruler
-    const flatMat = new StandardMaterial("mudflatMat", this.scene);
-    flatMat.diffuseColor = hexToColor3("#8A7048");
-    flatMat.specularColor = hexToColor3("#4A7080").scale(0.18);
-    flatMat.specularPower = 24;
-    for (const [lz, lw, ld] of [
-      [9.6, 2.6, 1.4], [2.4, 1.7, 0.9],
-    ] as const) {
-      const lobe = MeshBuilder.CreateSphere(
-        `mudflat-${lz}`,
-        { diameter: 1, segments: 10 },
-        this.scene
-      );
-      lobe.scaling.set(ld * 0.8, 0.055, lw / 2.2);
-      lobe.position.set(-10.35, 0.04, lz);
-      lobe.material = flatMat;
-      lobe.parent = this.envRoot;
-      lobe.isPickable = false;
-      lobe.receiveShadows = true;
-      // sandbar highlight rim on the water side
-      const bar = MeshBuilder.CreateSphere(
-        `sandbar-${lz}`,
-        { diameter: 1, segments: 8 },
-        this.scene
-      );
-      bar.scaling.set(ld * 0.5, 0.035, lw * 0.28);
-      bar.position.set(-10.8, 0.028, lz + 0.3);
-      const barMat = new StandardMaterial(`sandbarMat-${lz}`, this.scene);
-      barMat.diffuseColor = hexToColor3("#A38B62"); // wet sand — pale read as glowing pancakes
-      barMat.specularColor = Color3.Black();
-      bar.material = barMat;
-      bar.parent = this.envRoot;
-      bar.isPickable = false;
-    }
-
     // Dark silt break at waterline (Materials: wet clay grammar)
     const silt = MeshBuilder.CreateBox(
       "siltBreak",
@@ -1108,7 +1159,7 @@ export class SettlementView {
     );
     bank.position.set(-10.05, 0.05, 1.5);
     const bmat = new StandardMaterial("bankMat", this.scene);
-    bmat.diffuseColor = hexToColor3("#7A6848");
+    bmat.diffuseColor = hexToColor3("#B99C74");
     bmat.specularColor = Color3.Black();
     bank.material = bmat;
     bank.parent = this.envRoot;
@@ -1702,7 +1753,11 @@ export class SettlementView {
       this.buildFixedPads();
       this.buildRoads(this.roadTier);
     }
+    const occBefore = [...this.occupied].sort().join(",");
     this.syncPads(settlement);
+    if ([...this.occupied].sort().join(",") !== occBefore) {
+      this.buildRoads(this.roadTier);
+    }
     this.syncRoads(settlement.greatHouseLevel);
     const seen = new Set<string>();
     for (const b of settlement.buildings) {
@@ -1727,6 +1782,7 @@ export class SettlementView {
     }
     this.syncWorkers(settlement);
     this.syncNightWindows(settlement);
+    this.buildAOCarpet();
     this.updateSelectRing();
   }
 
@@ -1856,6 +1912,9 @@ export class SettlementView {
       const a0 = getPathNode(aId);
       const b0 = getPathNode(bId);
       if (!a0 || !b0) continue;
+      // No road spurs to empty pads — dead-end stubs read as stray decals
+      const spurPlot = a0.plotId ?? b0.plotId;
+      if (spurPlot && !this.occupied.has(spurPlot)) continue;
       const a = transformPlotPos(a0.x, a0.z, layout);
       const b = transformPlotPos(b0.x, b0.z, layout);
       const dx = b.x - a.x;
