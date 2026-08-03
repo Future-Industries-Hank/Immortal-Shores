@@ -93,13 +93,13 @@ export class Atmosphere {
         ? Color3.Lerp(dayColor, duskColor, n * 2)
         : Color3.Lerp(duskColor, nightColor, (n - 0.5) * 2);
     this.sun.diffuse = sunCol;
-    // Clear colony-board day key + gentle contact (Surviving Mars readability)
-    this.sun.intensity = 1.75 - n * 1.25;
-    const elev = n < 0.35 ? -0.5 : n < 0.7 ? -0.4 : -0.34;
-    this.sun.direction = new Vector3(-0.75, elev, 0.48);
-    this.sun.position = new Vector3(16, 24, -10);
+    // Clear colony-board day key — readable solid buildings (Surviving Mars)
+    this.sun.intensity = 1.9 - n * 1.35;
+    const elev = n < 0.35 ? -0.55 : n < 0.7 ? -0.42 : -0.35;
+    this.sun.direction = new Vector3(-0.7, elev, 0.42);
+    this.sun.position = new Vector3(14, 26, -8);
 
-    this.hemi.intensity = 0.48 - n * 0.3;
+    this.hemi.intensity = 0.52 - n * 0.32;
     this.hemi.diffuse = Color3.Lerp(
       hexToColor3("#F0E8D8"),
       hexToColor3("#1A2840"),

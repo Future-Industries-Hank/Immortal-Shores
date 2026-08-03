@@ -152,8 +152,8 @@ export class SettlementView {
     // One soft real shadow system only (no mesh stamp boxes)
     this.shadowGen = new ShadowGenerator(1024, this.sun);
     this.shadowGen.useBlurExponentialShadowMap = true;
-    this.shadowGen.blurKernel = 48;
-    this.shadowGen.darkness = 0.32;
+    this.shadowGen.blurKernel = 40;
+    this.shadowGen.darkness = 0.38;
     this.shadowGen.bias = 0.0005;
     this.shadowGen.normalBias = 0.02;
 
