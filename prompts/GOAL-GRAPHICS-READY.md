@@ -1,125 +1,123 @@
-# /goal — Graphics ready (DO NOT STOP)
+# /goal — BUILDINGS FIRST (do not stop)
 
-### Immortal Shores · Non-negotiable continuous visual goal  
-### Supersedes any “review pause”, “provisional 8.0”, “honest FAIL then wait”, or round budget
-
----
-
-## /goal
-
-**The settlement must look like a finished, playable product board — not a tech demo.**  
-You may **not** stop, pause for permission, declare provisional PASS, or idle while **any** director issue below remains visible in a real browser session.
-
-**Keep working until every acceptance checkbox is TRUE and an independent judge scores overall ≥ 8.0 with min ≥ 6.0 *and* the director checklist is green.**  
-If the judge says 8 but the checklist fails, the goal is **not** met — fix pixels and continue.
-
-Economy / plots / trust-trade stay frozen. Approved artboard + fixed full-shore POV stay locked.
+### Immortal Shores · The main problem is the buildings  
+### Fog/workers/shadows are secondary — stop leading with them
 
 ---
 
-## You are still FAILING if the director can still see
+## /goal (one sentence)
 
-These are **hard fails**. Do not claim progress while any is true:
+**Every plot building on the settlement board must read as a solid, artboard-quality structure — not an outline, wire ghost, grey slab, or stacked boxes — and you do not stop until a cold viewer agrees and overall craft is ≥ 8/10.**
 
-| # | Still broken (director) | Done looks like |
+---
+
+## What needs the most help (PRIMARY — 80% of effort)
+
+Director and play still show: **outlines / ghost frames / non-buildings where real buildings should be.**  
+Approved artboards exist. glTF files may exist on disk. **The on-screen result still fails the eye.**
+
+### Primary FAIL (must clear before anything else counts as “ready”)
+
+| Priority | What is wrong | Done means |
 |---:|---|---|
-| 1 | **Grey / black shadow boxes or rings** under buildings (esp. fields, pits, reeds) | Clean sand; soft real shadows only; **no** mesh black stamps |
-| 2 | **Outlines / wire / slab stand-ins** instead of solid buildings | Solid glTF massing with roofs, walls, materials — not edges-only or ghost frames |
-| 3 | **Fog soup** / zoom changes atmosphere | Fixed camera, **no wheel zoom**; fog barely there or off at settlement scale |
-| 4 | **People size ≈ buildings** | Workers clearly smaller than doors/buildings |
-| 5 | **Fake crowd** (dozens of agents) | Worker count tracks **sim**; sparse accents only |
-| 6 | **Ghost through buildings** | Paths on roads/pads only |
-| 7 | **Too zoomed; people-focused** | **One fixed board** shows entire shore + all pads |
-| 8 | **Ignores artboard** | Heroes approach `docs/visual-inspiration/` silhouettes (not JPG imports) |
+| **P0** | Buildings look like **outlines, wireframes, hollow frames, or grey boxes** | **Solid** meshes: filled walls, roofs, readable mass, real materials |
+| **P0** | Buildings do **not** match approved artboard silhouettes | Side-by-side: board vs in-game close-up for each hero — same massing language |
+| **P0** | glTF “kit” is still a **thin stand-in** (or procedural fallback) | `kitLoader` shows dense authored glTF; no CreateBox hero; no wireframe as finished art |
+| **P0** | Empty pads / construction sites look more finished than “buildings” | Built plots clearly beat empty pads in richness |
 
-**If any row is still true → goal incomplete → keep looping.**
+### Hero list (rebuild until each passes the eye test)
+
+Against `docs/visual-inspiration/buildings/` (and `/storyboard/buildings/`):
+
+1. **Great House** ← `01-great-house.jpg`  
+2. **Market** ← `02-market.jpg`  
+3. **Emmer field / clay pit / reed bed** ← `08-emmer-field.jpg` (+ analogy)  
+4. **Ration house + mudbrick yard** ← `09` + `03`  
+5. **Harbor + barge** ← `04-harbor-pier-barge.jpg`  
+6. **Shrine, training, luxury, remaining shops** ← rest of boards  
+
+**Per building deliverable (mandatory):**
+
+- [ ] Blender re-author or major densify of the **.glb** (new bytes on disk)  
+- [ ] Playwright **close-up** `tools/judge/evidence/goal-ready/buildings/{kind}.png`  
+- [ ] **Side-by-side** with artboard: 3 sentences — silhouette match / still wrong / next fix  
+- [ ] No outline-only, no pure wireframe, no single-box prim as the whole building  
+
+**Structures score rule for every judge:**  
+If the money-shot or close-up still reads as outline/ghost/box → **Structures ≤ 3**. Ignore prior 7–8 structure scores.
 
 ---
 
-## Non-stop loop (run forever until gate)
+## Secondary (only after heroes are solid)
+
+Do these **after** P0 buildings pass a director-shaped eye check — not instead of buildings:
+
+| Issue | Fix |
+|---|---|
+| Black rings / rectangular shadow stamps | Delete kitLoader rake/box shadows, shadowBlob, worker foot boxes |
+| Fog soup / wheel zoom | Fixed board camera; fog near zero |
+| Workers too big / too many / clip | Small scale; count from sim; road paths only |
+| Camera too tight | Locked full-shore standard view |
+
+If you spend an iteration only on fog or worker density while buildings are still outlines → **that iteration is a process fail**. Re-do with a building glTF change.
+
+---
+
+## Non-stop rule
 
 ```
-while goal_not_met:
-  1. Launch game in real browser (Playwright). Capture STANDARD full board.
-  2. For each FAIL row above: name the pixel evidence.
-  3. Implement code/asset fixes that change those pixels THIS iteration.
-     - Prefer deleting fake shadow meshes over tweaking fog numbers.
-     - Prefer solid glTF / filled materials over outline/wire densify hacks.
-     - Prefer fewer, smaller workers over "life" density hacks.
-  4. Recapture same angles. Diff vs previous still.
-  5. Independent judge scores 10 categories (structure ≤ 3 if boxes/outlines).
-  6. If checklist incomplete OR overall < 8 OR min < 6: go to 1.
-  7. Only then write GOAL-GRAPHICS-READY-COMPLETE.md and stop.
+while true:
+  Capture full board + close-ups of GH, Market, one field, one shop
+  if any P0 building still outline/box/ghost:
+      Blender-fix THAT building (or load path if glTF not showing)
+      commit new glTF / materials
+      recapture
+      continue   # do not judge overall yet
+  Fix any secondary issues still visible
+  Independent judge (Structures honesty rule)
+  if overall >= 8 and min >= 6 and all P0 eye-checks pass:
+      write GOAL-GRAPHICS-READY-COMPLETE.md
+      break
+  else:
+      fix worst buildings first, then other fails
 ```
 
-### Forbidden exits
+### Forbidden
 
-You **must not**:
-
-- Stop because “review pause” / “await director” / “say the word”  
-- Stop because round count hit N  
-- Stop because a judge printed 8.0 while checklist items still fail  
-- Stop to write long docs without a pixel change  
-- Declare COMPLETE with grey boxes, outline buildings, or giant worker crowds  
-
-### Only allowed pause
-
-- **True tool blackout** (cannot run browser or cannot write files) → `VISUAL-BLOCKED.md` with exact fix, then **resume in the same session if possible**  
-- Host kills the session → commit WIP + **next 5 pixel tasks** for the next agent; next agent continues **without** re-priming excuses  
+- Stopping for “review pause” / provisional 8 / round budget  
+- Leading progress reports with fog/mist/HUD while buildings are outlines  
+- Claiming kit complete because `.glb` files exist (must **look** solid in browser)  
+- Importing artboard JPGs as final sprites  
 
 ---
 
-## Concrete code crimes to eliminate (known)
+## AAA quality (craft only)
 
-| Symptom | Likely code | Action |
-|---|---|---|
-| Black rings / shadow boxes | `kitLoader.ts` contact box + rake bar; `buildings.ts` `shadowBlob`; worker foot box | **Delete** hard black mesh stamps; one soft ShadowGenerator only |
-| Outline / ghost buildings | wireframe scaffold, densify wire, failed glTF → empty hit box | Ensure glTF loads; solid materials; no wireframe as “finished” |
-| Fake crowd | `syncWorkers` forces 14–26 | Use `settlement.workers` / assigned sum; cap low |
-| Giant people | `scaling.setAll(1.18)` + large body boxes | Scale to ~⅓ door height |
-| Zoom/fog | `attachControl` + radius range + EXP2 fog ~0.05+ | Lock radius; fog density near zero or off at board distance |
+When buildings are solid, raise materials/light/UI craft toward:
 
----
+- **Surviving Mars / Aven Colony** — readable high-angle solid structures  
+- **IXION / Frostpunk 2** — premium polish (papyrus skin)  
+- **ONI** — clear HUD  
 
-## AAA quality bar (craft only — not theme)
-
-While fixing the above, raise craft toward:
-
-- **Surviving Mars / Aven Colony** — readable high-angle board, solid modular buildings  
-- **IXION / Frostpunk 2** — premium UI materials (papyrus/ink), not default chrome  
-- **Oxygen Not Included** — clear readouts  
-
-**Do not** copy sci-fi/ice art. Identity = mudbrick river from **approved artboard**.
+Theme stays mudbrick river from **approved artboard**.
 
 ---
 
-## Acceptance (all required)
+## Acceptance
 
-### A. Director checklist (Playwright proof)
-
-- [ ] `tools/judge/evidence/goal-ready/FULL-BOARD-DAY.png` — entire settlement, no zoom needed  
-- [ ] No black rings under emmer/clay/reed/riverside kits  
-- [ ] No rectangular grey/black shadow stamps on sand  
-- [ ] Buildings solid (not outlines/wire ghosts)  
-- [ ] Workers small, few, sim-linked; no clipping through solids  
-- [ ] Fog not dominating; wheel does not zoom  
-- [ ] Side-by-sides `board-vs-game/` for GH + Market + one field  
-
-### B. Judge
-
-- [ ] Independent subagent: overall ≥ 8.0, min ≥ 6.0  
-- [ ] Instructed: boxes/outlines ⇒ Structures ≤ 3; shadow stamps ⇒ Materials/Depth fail  
-
-### C. Ship note
-
-- [ ] `GOAL-GRAPHICS-READY-COMPLETE.md` only when A and B both pass  
-- [ ] Server tests green  
+1. **Building gallery:** every hero close-up is solid and artboard-adjacent  
+2. **Full board still:** entire shore, fixed camera, buildings are the subject  
+3. No outline/ghost buildings; no grey shadow-box stamps  
+4. Judge ≥ 8.0 / min ≥ 6 with honest Structures  
+5. `GOAL-GRAPHICS-READY-COMPLETE.md`  
 
 ---
 
-## Start now
+## Start in the next 30 minutes
 
-1. Boot game. Capture current board. List which of the 8 FAIL rows are still true.  
-2. **This hour:** delete fake shadow meshes + lock camera + fix worker scale/count.  
-3. **Next:** solid buildings vs artboard (Blender if needed).  
-4. Loop until acceptance. **Do not stop.**
+1. Playwright: full board + close-ups of GH, Market, emmer, mudbrick.  
+2. Write `BUILDING-FAIL-LIST.md`: which kinds are outline / box / solid.  
+3. **Blender (or force-fix glTF load): Great House first** until close-up is solid vs board 01.  
+4. Market second. Field third.  
+5. Only then secondary presentation cleanup.  
+6. **Do not stop.**

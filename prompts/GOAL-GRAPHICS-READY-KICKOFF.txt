@@ -1,30 +1,34 @@
-/goal — paste as the entire session. No other scope.
+/goal — paste as entire session. Buildings first. Do not stop.
 
 ---
 
 Pull latest main Future-Industries-Hank/Immortal-Shores. Economy frozen.
-Artboard + fixed full-shore POV are locked. Use docs/visual-inspiration/ as look targets only.
+Artboard + fixed full-shore POV locked. Boards: docs/visual-inspiration/
 
-You are under /goal: GRAPHICS READY. You do NOT stop until the goal is met.
-
-The director still sees FAIL:
-- grey/black shadow boxes and rings under buildings (esp. by water)
-- buildings as outlines / ghost frames instead of solid models
-- fog soup; zoom-linked feel
-- people too big and too many; ghost through buildings
-- camera too tight / people-focused instead of full board
+THE MAIN PROBLEM IS NOT FOG OR WORKER COUNT.
+THE MAIN PROBLEM IS BUILDINGS: outlines, ghost frames, grey slabs, box kits —
+NOT solid artboard-quality structures in the live game.
 
 Execute prompts/GOAL-GRAPHICS-READY.md
 
-RULES:
-1. Loop forever: fix pixels → Playwright capture → verify director checklist → judge → fix top fails → repeat.
-2. FORBIDDEN: review pause, provisional 8.0, honest-FAIL-then-wait, round budget stop, asking permission to continue.
-3. Delete fake mesh shadows (kitLoader rake/box, shadowBlob, worker foot boxes). One soft real shadow max.
-4. Solid buildings only — no wireframe/outline as finished art. Match artboard silhouettes via glTF.
-5. Workers: small, sparse, count from sim — NEVER invent 14–26 for stills. No clipping.
-6. Fixed board camera — NO wheel zoom. Full settlement visible.
-7. AAA craft bar only (not theme): Surviving Mars, Aven Colony, IXION, Frostpunk 2, ONI.
-8. Complete ONLY when director checklist is all green AND independent judge ≥ 8.0 / min ≥ 6.0.
-9. If judge says 8 but checklist fails, CONTINUE.
+PRIMARY (80% of work) — do this first and keep doing it:
+1) Capture close-ups: great_house, market, emmer_field, mudbrick_yard, harbor.
+2) BUILDING-FAIL-LIST.md: outline / box / solid for each kind.
+3) For every non-solid hero: Blender re-author glTF to match artboard silhouette
+   (01-great-house.jpg → great_house.glb, etc.). New .glb bytes. Solid walls+roofs.
+4) Side-by-side board vs game. Structures ≤ 3 if still outline/box.
+5) kitLoader must show real glTF — no wireframe/outline densify as "finished".
 
-Start NOW: capture full board, list open FAILs, delete shadow stamps + fix workers + lock camera this iteration. Do not stop.
+SECONDARY (only after heroes are solid):
+- Delete black ring / rectangular mesh shadows (kitLoader rake, shadowBlob, foot boxes)
+- Fixed camera no zoom; fog minimal; workers small + sim count + no clipping
+
+AAA craft bar (not theme): Surviving Mars, Aven Colony, IXION, Frostpunk 2, ONI.
+
+FORBIDDEN: stop, review pause, provisional PASS, leading updates with fog/HUD while
+buildings are still outlines, claiming ready because .glb files exist on disk.
+
+GATE: all hero buildings solid + artboard-adjacent in browser AND judge ≥ 8.0/min ≥ 6
+AND no shadow-box stamps. Then GOAL-GRAPHICS-READY-COMPLETE.md.
+
+Start NOW: close-ups + Great House Blender pass vs board 01. Do not stop.

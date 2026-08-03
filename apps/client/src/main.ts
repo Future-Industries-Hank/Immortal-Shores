@@ -107,6 +107,14 @@ async function enterGame() {
     new URLSearchParams(location.search).get("standard") === "1";
   view.prepareStandardBoard();
   requestAnimationFrame(() => view?.prepareStandardBoard());
+  // Capture tooling: ?closeup=<kind> frames one hero for judge evidence
+  const closeupKind = new URLSearchParams(location.search).get("closeup");
+  if (closeupKind) {
+    const frameHero = () => view?.prepareCloseup(closeupKind);
+    frameHero();
+    setTimeout(frameHero, 800); // re-apply once kits/snapshot settle
+    setTimeout(frameHero, 2000);
+  }
   (window as unknown as {
     __prepareStandardBoard?: () => void;
     __boardDebug?: () => unknown;

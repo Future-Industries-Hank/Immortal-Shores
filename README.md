@@ -53,19 +53,20 @@ See [`HOSTING.md`](./HOSTING.md).
 Mechanics pre-check: [`CRITICAL-AUDIT-PRE-02.md`](./CRITICAL-AUDIT-PRE-02.md) (green).  
 Do not reopen escrow, plot counts, or GDD rates.
 
-### Planner kickoff — /goal graphics ready (current)
+### Planner kickoff — /goal (buildings first, non-stop)
 
 ```text
 Pull latest main. Economy frozen. Artboard + POV locked.
 
 Execute prompts/GOAL-GRAPHICS-READY.md (or GOAL-GRAPHICS-READY-KICKOFF.txt).
 
-NON-STOP until director checklist is green AND judge ≥ 8.0 / min ≥ 6.0.
-Still FAIL while: grey/black shadow boxes/rings, outline/ghost buildings,
-fog soup, giant/fake workers, zoomable tight camera. Delete mesh shadow stamps;
-solid glTF buildings; fixed full board; sim-accurate tiny workers.
-Forbidden: review pause, provisional PASS, stop after N rounds.
+PRIMARY: solid buildings matching artboard silhouettes — NOT outlines/ghosts/boxes.
+Blender re-author glTF heroes first (GH, Market, fields, shops, harbor).
+SECONDARY only after: shadow stamps, fog, worker scale/count.
+NON-STOP until heroes look solid in browser AND judge ≥ 8.0 / min ≥ 6.
+Forbidden: stop, review pause, lead with fog while buildings are outlines.
 ```
+
 ### Future packs (FI)
 
 Phase **1.9 art storyboard** is now mandatory in `fi-game-build` / `FI-PLAYBOOK` before multi-round visual overhaul. Browser titles use specialized skill **`fi-html-game`**.

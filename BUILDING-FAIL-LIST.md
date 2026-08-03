@@ -1,56 +1,49 @@
 # BUILDING-FAIL-LIST — GOAL-GRAPHICS-READY
 
-**Date:** 2026-08-02  
-**Method:** Live browser board capture + glTF byte sizes + artboard paths  
-**Rule:** outline / box / solid — solid required for heroes
+**Date:** 2026-08-02 (R3 — full Blender re-author)
+**Method:** Live browser close-ups (`?closeup=<kind>` capture camera) + full fixed board + glTF byte diffs
+**Rule:** outline / box / solid — solid required for heroes; heroes must be artboard-adjacent
 
 ## Heroes (close-up priority)
 
-| Kind | Artboard | glTF | Status (pre-pass) | Target |
-|---|---|---|---|---|
-| `great_house` | `buildings/01-great-house.jpg` | `great_house.glb` | **box / slab** (thin multi-cube densify) | **solid** multi-tier walls+roof+lintel |
-| `market` | `buildings/02-market.jpg` | `market.glb` | **box** (stalls thin) | **solid** stalls+canopy+posts |
-| `emmer_field` | `buildings/08-emmer-field.jpg` | `emmer_field.glb` | **box / grey slab** | **solid** soil+crop volumes+shed |
-| `mudbrick_yard` | `buildings/03-mudbrick-yard.jpg` | `mudbrick_yard.glb` | **box** | **solid** piles+kiln |
-| `harbor` | `buildings/04-harbor-pier-barge.jpg` | `harbor.glb` | **box** | **solid** deck+warehouse |
+| Kind | Artboard | glTF | Status (R3 live browser) |
+|---|---|---|---|
+| `great_house` | `buildings/01-great-house.jpg` | `great_house.glb` 68.8k | **solid + artboard-adjacent**: two-tier battered mass, stone band, external stair + stringer, loggia pergola w/ lattice + hanging rug, striped door awning, gold disc, yellow window awnings, pots |
+| `market` | `buildings/02-market.jpg` | `market.glb` 75.5k | **solid + artboard-adjacent**: stepped limestone base, battered end/back walls, 5-column colonnade, heavy bordered roof slab, roof mats, sloped cloth awnings, counters w/ textile tops + baskets, amphorae, corner steps |
+| `emmer_field` | `buildings/08-emmer-field.jpg` | `emmer_field.glb` 116k | **solid + artboard-adjacent**: 4 quadrant crop beds w/ two-tone rows + tuft spikes, irrigation cross w/ wet channels + banks, banded-brick shed w/ lattice roof, rush fence, grain pile + baskets |
+| `mudbrick_yard` | `buildings/03-mudbrick-yard.jpg` | `mudbrick_yard.glb` 85.3k | **solid + artboard-adjacent**: stepped battered kiln w/ soot band + ember crown + glowing mouth, brick stacks, drying rack, brick mats, shade canopy, clay baskets |
+| `harbor` | `buildings/04-harbor-pier-barge.jpg` | `harbor.glb` 115k | **solid + artboard-adjacent**: mudbrick warehouse w/ cornice + blue clerestory + roof mats/rolls, planked L-pier on posts, bollards + rope coils, amphorae, moored cargo barge w/ prow/stern + sacks + oar |
 
-## Secondary
+All five heroes re-authored in Blender (procedural kit generator `tools/kit-pipeline/author_kits.py`),
+exported as NEW .glb bytes, meshes merged per material (13–18 meshes/kit, ~1–2k tris),
+verified **in the live browser** at close-up and board distance.
 
-| Kind | Status | Note |
+## Support kits re-authored (were polluting hero frames)
+
+| Kind | Was | Now |
 |---|---|---|
-| shrine, training, shops, ration | box residual | re-author after heroes solid |
-| Empty pads | **outline FAIL** (was wireframe ghostWire) | → solid earth footprint only |
-| Construction scaffold | **outline FAIL** (wireframe box) | → solid timber posts |
+| `river_clay_pit` | amorphous low-poly mound ("m1/m2/pit.001" junk) | terraced dig w/ wet clay pool, plank ramp, clay balls, baskets |
+| `marsh_reed_bed` | flat blue slab + sticks | bermed paddies w/ solid rush clumps, seed heads, cut bundles |
+| ambient barges (scene.ts) | grey slab sail box kit | artboard cargo barge: low hull, raised prow/stern, deck mat, sacks — slab sail deleted |
 
-## Code crimes removed this pass
+## Code crimes removed this round
 
-- `ghostWire` wireframe boxes under empty pads — **deleted**  
-- `densifyKitOverlay` grey slab stack on glTF — **disabled** (not finished art)  
-- Scaffold wireframe cube — **replaced** with solid posts  
+- `ghost-<pad>` foundations were **alpha 0.75 translucent** → now solid packed earth
+- `reedMassMat` bank clumps were **alpha 0.85 ghost boxes** → opaque
+- bank mist: 5–8-unit ellipsoid pancakes over pier/bank → small, water-only, alpha 0.15, pier reach skipped
+- `farHaze` 42×50 plane filmed the whole settlement → far-desert only, alpha 0.09
+- scene EXP2 fog washed 28% grey at board radius 48 → `boardApprovalFog` now actually applied (density ×0.35)
+- foam blobs sat on the bank (white pills on dirt) → moved into the water
+- pale rocks read as paper scraps → warm sandstone
+- kits faced away from camera (axis chain) → 180° bake at export; facades on Babylon −Z
+- desert falloff planes were olive-grey → warm golden family, thinner alphas
 
-## Pass log
+## Secondary still open (not on screen in current evidence)
 
-| Pass | Kind | New glTF bytes | Live browser read |
-|---|---|---:|---|
-| 1 | great_house | ~27k solid multi-tier | **solid** walls/roof/lintel (not outline) |
-| 2 | market | ~17k | **solid** stalls+canopy |
-| 3 | emmer_field | ~16k | **solid** crop volumes |
-| 4 | mudbrick_yard | ~49k | **solid** piles+kiln |
-| 5 | harbor | ~15k | **solid** deck+warehouse |
-| 6 | shops/shrine/training/ration | re-exported solid | **solid** mass (modular box language residual) |
-
-## Code crimes fixed
-
-- [x] ghostWire wireframe empty pads removed  
-- [x] densifyKitOverlay slab hacks disabled on glTF  
-- [x] scaffold wireframe → solid timber  
-- [x] night gold window boxes hidden during day  
-
-## Still short of artboard craft
-
-Heroes are **solid** (not outlines) but still **modular prim mass** vs painted artboard silhouette richness. Continue Blender detail until artboard-adjacent at board distance.
+shrine, training_grounds, ration_house, warehouse, vessel/basket/luxury shops — old modular kits,
+not present in the evidence settlement; re-author with the same generator when they enter frame.
 
 ## Structures judge rule
 
-If hero still reads outline/box vs artboard → **Structures ≤ 3**.  
-Current: **solid** → Structures may score 6–8; not ≤3.
+If hero still reads outline/box vs artboard → Structures ≤ 3.
+R3: heroes **solid + artboard-adjacent** in live browser → rule not triggered.

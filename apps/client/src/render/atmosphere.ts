@@ -117,15 +117,19 @@ export class Atmosphere {
         : Color4.Lerp(clearDusk, clearNight, (n - 0.5) * 2);
 
     // Subtle desert heat + soft far falloff (depth without soup) (02.8/03)
+    // Board approval law: fog minimal — the fixed board camera sits ~48 units
+    // out, so density 0.012 washed 28% grey over every building. Near-zero
+    // density keeps depth cue without the film.
     this.scene.fogMode = Scene.FOGMODE_EXP2;
+    const fogScale = this.boardApprovalFog ? 0.35 : 1;
     if (n < 0.35) {
-      this.scene.fogDensity = 0.012;
+      this.scene.fogDensity = 0.012 * fogScale;
       this.scene.fogColor = hexToColor3("#C4B898");
     } else if (n < 0.7) {
-      this.scene.fogDensity = 0.015;
+      this.scene.fogDensity = 0.015 * fogScale;
       this.scene.fogColor = hexToColor3("#B8A080");
     } else {
-      this.scene.fogDensity = 0.018;
+      this.scene.fogDensity = 0.018 * fogScale;
       this.scene.fogColor = hexToColor3("#101820");
     }
 
