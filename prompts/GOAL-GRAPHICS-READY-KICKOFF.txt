@@ -1,0 +1,30 @@
+/goal — paste as the entire session. No other scope.
+
+---
+
+Pull latest main Future-Industries-Hank/Immortal-Shores. Economy frozen.
+Artboard + fixed full-shore POV are locked. Use docs/visual-inspiration/ as look targets only.
+
+You are under /goal: GRAPHICS READY. You do NOT stop until the goal is met.
+
+The director still sees FAIL:
+- grey/black shadow boxes and rings under buildings (esp. by water)
+- buildings as outlines / ghost frames instead of solid models
+- fog soup; zoom-linked feel
+- people too big and too many; ghost through buildings
+- camera too tight / people-focused instead of full board
+
+Execute prompts/GOAL-GRAPHICS-READY.md
+
+RULES:
+1. Loop forever: fix pixels → Playwright capture → verify director checklist → judge → fix top fails → repeat.
+2. FORBIDDEN: review pause, provisional 8.0, honest-FAIL-then-wait, round budget stop, asking permission to continue.
+3. Delete fake mesh shadows (kitLoader rake/box, shadowBlob, worker foot boxes). One soft real shadow max.
+4. Solid buildings only — no wireframe/outline as finished art. Match artboard silhouettes via glTF.
+5. Workers: small, sparse, count from sim — NEVER invent 14–26 for stills. No clipping.
+6. Fixed board camera — NO wheel zoom. Full settlement visible.
+7. AAA craft bar only (not theme): Surviving Mars, Aven Colony, IXION, Frostpunk 2, ONI.
+8. Complete ONLY when director checklist is all green AND independent judge ≥ 8.0 / min ≥ 6.0.
+9. If judge says 8 but checklist fails, CONTINUE.
+
+Start NOW: capture full board, list open FAILs, delete shadow stamps + fix workers + lock camera this iteration. Do not stop.

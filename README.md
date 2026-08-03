@@ -42,8 +42,9 @@ See [`HOSTING.md`](./HOSTING.md).
 | **2.7** | [`prompts/PROMPT-02.7-RESTART-FROM-BOARDS.md`](./prompts/PROMPT-02.7-RESTART-FROM-BOARDS.md) | Rebuild glTF from boards | Ran / partial |
 | **2.8** | [`prompts/PROMPT-02.8-DIRECTOR-PLAY-PASS.md`](./prompts/PROMPT-02.8-DIRECTOR-PLAY-PASS.md) | Director play issues (reference) | Nested in 02.9 Step 3 |
 | **2.9** | [`prompts/PROMPT-02.9-APPROVAL-THEN-CRAFT.md`](./prompts/PROMPT-02.9-APPROVAL-THEN-CRAFT.md) | Storyboard → standard view | **DONE** (locked) |
-| **03** | [`prompts/PROMPT-03-APPROVED-GAUNTLET.md`](./prompts/PROMPT-03-APPROVED-GAUNTLET.md) | **Boards + AAA quality → ≥ 8/10** | **RUN THIS** |
-| Kickoff | [`prompts/PROMPT-03-KICKOFF.txt`](./prompts/PROMPT-03-KICKOFF.txt) | Paste block | Copy-paste |
+| **03** | [`prompts/PROMPT-03-APPROVED-GAUNTLET.md`](./prompts/PROMPT-03-APPROVED-GAUNTLET.md) | Boards + AAA quality | Superseded if agent stops early |
+| **/goal** | [`prompts/GOAL-GRAPHICS-READY.md`](./prompts/GOAL-GRAPHICS-READY.md) | **Do not stop until graphics ready** | **RUN THIS** |
+| Kickoff | [`prompts/GOAL-GRAPHICS-READY-KICKOFF.txt`](./prompts/GOAL-GRAPHICS-READY-KICKOFF.txt) | Paste block | Copy-paste |
 | Review UI | [`ART-STORYBOARD-REVIEW.html`](./ART-STORYBOARD-REVIEW.html) | Yes/No boards | Open when locking look |
 | Inspiration | [`docs/visual-inspiration/`](./docs/visual-inspiration/) | Style guide JPGs | Generated |
 
@@ -52,24 +53,24 @@ See [`HOSTING.md`](./HOSTING.md).
 Mechanics pre-check: [`CRITICAL-AUDIT-PRE-02.md`](./CRITICAL-AUDIT-PRE-02.md) (green).  
 Do not reopen escrow, plot counts, or GDD rates.
 
-### Planner kickoff — approval then craft (current)
+### Planner kickoff — /goal graphics ready (current)
 
 ```text
-Pull latest main. Economy frozen.
+Pull latest main. Economy frozen. Artboard + POV locked.
 
-Execute prompts/PROMPT-02.9-APPROVAL-THEN-CRAFT.md (or PROMPT-02.9-KICKOFF.txt).
+Execute prompts/GOAL-GRAPHICS-READY.md (or GOAL-GRAPHICS-READY-KICKOFF.txt).
 
-STEP 1: Open ART-STORYBOARD-REVIEW.html for director Yes/No on inspiration boards.
-        WAIT. Write ART-STORYBOARD-APPROVED.md when done.
+NON-STOP until director checklist is green AND judge ≥ 8.0 / min ≥ 6.0.
+Still FAIL while: grey/black shadow boxes/rings, outline/ghost buildings,
+fog soup, giant/fake workers, zoomable tight camera. Delete mesh shadow stamps;
+solid glTF buildings; fixed full board; sim-accurate tiny workers.
+Forbidden: review pause, provisional PASS, stop after N rounds.
+```
+### Future packs (FI)
 
-STEP 2: Fixed full-settlement STANDARD VIEW (no zoom; few buildings + pads;
-        0–3 tiny workers for scale). Capture STANDARD-VIEW-DAY.png.
-        Director confirms POV + building/people scale. STANDARD-VIEW-APPROVED.md
+Phase **1.9 art storyboard** is now mandatory in `fi-game-build` / `FI-PLAYBOOK` before multi-round visual overhaul. Browser titles use specialized skill **`fi-html-game`**.
 
-STEP 3: Only then craft — fog/shadow stamps/workers/camera per director play notes.
-```### Future packs (FI)
-
-Phase **1.9 art storyboard** is now mandatory in `fi-game-build` / `FI-PLAYBOOK` before multi-round visual overhaul. Browser titles use specialized skill **`fi-html-game`**.---
+---
 
 ## Design docs
 
