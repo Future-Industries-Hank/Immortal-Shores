@@ -973,13 +973,26 @@ html.dark button.btn-locked svg {
   -webkit-overflow-scrolling: touch; /* momentum scrolling on iOS */
   overscroll-behavior: contain;
   max-height: 100%;
-  padding: 0.65rem 0.8rem 3rem; /* bottom padding clears the 48px fade mask */
+  padding: 0.65rem 0.8rem 3.6rem; /* bottom padding clears the 48px fade mask */
   min-height: 0;
   flex: 1 1 auto;
   /* Gentle snap so a flick settles with whole cards above the fold... */
   scroll-snap-type: y proximity;
   /* ...and snapped cards land clear of the head hairline / bottom fade */
-  scroll-padding-block: 0.5rem 56px;
+  scroll-padding-block: 0.5rem 64px;
+}
+
+/* Section heads join the snap grid and keep clear of the bottom fade, so a
+   head is never left half-cut at the fold when scrolling settles */
+.menu-popup-body .side-panel h3 {
+  scroll-snap-align: start;
+  scroll-margin-block: 0.5rem 64px;
+}
+
+/* The last section head gets a taller lead-in: at the initial (unscrolled)
+   position the fold then lands on the gap above it, not mid-string */
+.menu-popup-body .side-panel h3:last-of-type {
+  margin-top: 1.4rem;
 }
 
 /* Cards participate in the snap grid — the fold never slices their buttons */
@@ -3059,6 +3072,24 @@ html.dark .site-glyph {
 
   .hud-select span {
     display: none;
+  }
+
+  /* Nav tabs go icon-only: a glyph can never mid-word truncate the way
+     "MILITARY" → "MILI…" did. Buttons keep their aria-label names, the
+     glyph grows to carry the tap target, and the >=480px scroll+fade
+     treatment still applies if seven icons ever overflow. */
+  #nav button span {
+    display: none;
+  }
+
+  #nav button {
+    min-width: 2.9rem;
+    gap: 0;
+  }
+
+  #nav button svg {
+    width: 24px;
+    height: 24px;
   }
 
   .build-palette {

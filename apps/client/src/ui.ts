@@ -1604,32 +1604,19 @@ function buildRiverBoard(
   const segCount = Math.max(1, ordered.length);
 
   // Province medallion anchor points (also fixed obstacles for site relaxation)
+  const plaqueW = (name: string) => Math.max(74, name.length * 8.5 + 20);
   const provPts = ordered.map((_, i) => {
     const mid = riverPoint((i + 0.5) / segCount);
     const side = i % 2 === 0 ? 1 : -1;
     return { x: mid.x + mid.nx * 46 * side, y: mid.y + mid.ny * 46 * side };
   });
-
-  // Province markers: city glyph roundel on the bank + small-caps plaque label
-  const provMarks = ordered
-    .map((p, i) => {
-      const x = provPts[i]!.x;
-      const y = provPts[i]!.y;
-      const mine = p.id === myProvinceId;
-      const labelW = Math.max(74, p.name.length * 8.5 + 20);
-      return `<g class="wm-prov${mine ? " wm-mine" : ""}" data-prov="${p.id}" tabindex="0" role="button"
-        aria-label="${p.name}${mine ? " (your province)" : ""}">
-        <circle class="halo" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="20" fill="#e8c26a"/>
-        ${mine ? `<circle class="pulse" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="14" fill="none" stroke="#d4a84b" stroke-width="1.6"/>` : ""}
-        <circle class="sel-ring" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="16.5" fill="none" stroke="#a97f2e" stroke-width="2"/>
-        <circle class="roundel" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="12.5" fill="${mine ? "#e2b558" : "#f2e6c6"}" stroke="#6b512c" stroke-width="1.4"/>
-        ${glyphAt("ziggurat", x - 8, y - 8, 16, mine ? "#3d2c0e" : "#8a6b34")}
-        ${mine ? `<circle cx="${(x + 10.5).toFixed(1)}" cy="${(y - 9.5).toFixed(1)}" r="4" fill="#96323f" stroke="#4a1219" stroke-width="1"/>` : ""}
-        <rect class="wm-plaque" x="${(x - labelW / 2).toFixed(1)}" y="${(y + 17).toFixed(1)}" width="${labelW.toFixed(0)}" height="19" rx="9.5" fill="#fdf6e4" fill-opacity="0.9" stroke="#c2a26c" stroke-width="0.7"/>
-        <text class="wm-label" x="${x.toFixed(1)}" y="${(y + 31).toFixed(1)}" text-anchor="middle"${mine ? ' font-weight="700"' : ""}>${p.name}</text>
-      </g>`;
-    })
-    .join("");
+  // Keep medallion + plaque fully on the sheet: the plaque hangs ~36px below
+  // the medallion centre, and nothing may come within 26px of the bottom edge.
+  for (let i = 0; i < provPts.length; i++) {
+    const halfW = plaqueW(ordered[i]!.name) / 2;
+    provPts[i]!.x = Math.min(640 - halfW - 8, Math.max(halfW + 8, provPts[i]!.x));
+    provPts[i]!.y = Math.min(700 - 26 - 36, Math.max(46, provPts[i]!.y));
+  }
 
   // Dashed cartouche borders between province reaches: short ticks crossing
   // the river only — no strokes wandering across the open desert.
@@ -1661,14 +1648,21 @@ function buildRiverBoard(
   });
   // Collision relaxation: medallions are ~22px round — keep ≥34px separation
   // so no pair (site↔site or site↔province roundel) ever overlaps. Province
-  // medallions are authored anchors, so they act as fixed obstacles.
-  const minD = 34;
+  // medallions are authored anchors, so they act as fixed obstacles. The
+  // river mouth is the densest spot on the board, so any pair near the delta
+  // gets a raised 40px minimum.
+  const deltaPt = riverPoint(0);
+  const nearDelta = (p: { x: number; y: number }) =>
+    Math.hypot(p.x - deltaPt.x, p.y - deltaPt.y) < 130;
+  const sepFor = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+    nearDelta(a) || nearDelta(b) ? 40 : 34;
   for (let iter = 0; iter < 32; iter++) {
     let moved = false;
     for (let i = 0; i < sitePts.length; i++) {
       for (let j = i + 1; j < sitePts.length; j++) {
         const a = sitePts[i]!;
         const b = sitePts[j]!;
+        const minD = sepFor(a, b);
         const dx = b.x - a.x;
         const dy = b.y - a.y;
         const d = Math.hypot(dx, dy);
@@ -1686,6 +1680,7 @@ function buildRiverBoard(
       // fixed province medallions (Midstream / Delta Mouth pile-ups)
       const a = sitePts[i]!;
       for (const pp of provPts) {
+        const minD = sepFor(a, pp);
         const dx = a.x - pp.x;
         const dy = a.y - pp.y;
         const d = Math.hypot(dx, dy);
@@ -1701,10 +1696,64 @@ function buildRiverBoard(
     }
     if (!moved) break;
   }
+  // Clamp markers fully inside the sheet: halo radius is ~18px and the
+  // bottom edge keeps a 26px margin so the panel never clips a node.
   for (const p of sitePts) {
     p.x = Math.min(614, Math.max(26, p.x));
-    p.y = Math.min(674, Math.max(26, p.y));
+    p.y = Math.min(700 - 26 - 18, Math.max(26, p.y));
   }
+
+  // Label-vs-marker pass: a plaque hangs below its medallion by default; if
+  // that rectangle would cover another marker, flip it above the medallion
+  // instead (pick the side overlapping the fewest markers — ties stay below).
+  const circleHitsRect = (
+    cx: number, cy: number, r: number,
+    rx: number, ry: number, rw: number, rh: number
+  ) => {
+    const px = Math.min(rx + rw, Math.max(rx, cx));
+    const py = Math.min(ry + rh, Math.max(ry, cy));
+    return Math.hypot(cx - px, cy - py) < r;
+  };
+  const plaqueFlipped = ordered.map((p, i) => {
+    const { x, y } = provPts[i]!;
+    const w = plaqueW(p.name);
+    const hitsAt = (ry: number) => {
+      let n = 0;
+      for (const sp of sitePts) {
+        if (circleHitsRect(sp.x, sp.y, 18, x - w / 2, ry, w, 19)) n++;
+      }
+      for (let j = 0; j < provPts.length; j++) {
+        if (j === i) continue;
+        if (circleHitsRect(provPts[j]!.x, provPts[j]!.y, 20, x - w / 2, ry, w, 19)) n++;
+      }
+      return n;
+    };
+    const below = hitsAt(y + 17);
+    return below > 0 && hitsAt(y - 36) < below;
+  });
+
+  // Province markers: city glyph roundel on the bank + small-caps plaque label
+  const provMarks = ordered
+    .map((p, i) => {
+      const x = provPts[i]!.x;
+      const y = provPts[i]!.y;
+      const mine = p.id === myProvinceId;
+      const labelW = plaqueW(p.name);
+      const plaqueY = plaqueFlipped[i] ? y - 36 : y + 17;
+      const textY = plaqueFlipped[i] ? y - 22 : y + 31;
+      return `<g class="wm-prov${mine ? " wm-mine" : ""}" data-prov="${p.id}" tabindex="0" role="button"
+        aria-label="${p.name}${mine ? " (your province)" : ""}">
+        <circle class="halo" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="20" fill="#e8c26a"/>
+        ${mine ? `<circle class="pulse" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="14" fill="none" stroke="#d4a84b" stroke-width="1.6"/>` : ""}
+        <circle class="sel-ring" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="16.5" fill="none" stroke="#a97f2e" stroke-width="2"/>
+        <circle class="roundel" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="12.5" fill="${mine ? "#e2b558" : "#f2e6c6"}" stroke="#6b512c" stroke-width="1.4"/>
+        ${glyphAt("ziggurat", x - 8, y - 8, 16, mine ? "#3d2c0e" : "#8a6b34")}
+        ${mine ? `<circle cx="${(x + 10.5).toFixed(1)}" cy="${(y - 9.5).toFixed(1)}" r="4" fill="#96323f" stroke="#4a1219" stroke-width="1"/>` : ""}
+        <rect class="wm-plaque" x="${(x - labelW / 2).toFixed(1)}" y="${plaqueY.toFixed(1)}" width="${labelW.toFixed(0)}" height="19" rx="9.5" fill="#fdf6e4" fill-opacity="0.9" stroke="#c2a26c" stroke-width="0.7"/>
+        <text class="wm-label" x="${x.toFixed(1)}" y="${textY.toFixed(1)}" text-anchor="middle"${mine ? ' font-weight="700"' : ""}>${p.name}</text>
+      </g>`;
+    })
+    .join("");
   const siteMarks = sitePts
     .map(({ site, x, y }) => {
       const open = site.kind === "founding" && !site.ownerPlayerId;

@@ -14,6 +14,7 @@ import {
   ShadowGenerator,
   StandardMaterial,
   TransformNode,
+  Vector2,
   Vector3,
   VertexBuffer,
   VertexData,
@@ -45,6 +46,7 @@ import {
   type BuildingMeshes,
 } from "./buildings.js";
 import { hexToColor3 } from "./colors.js";
+import { WaterMaterial } from "@babylonjs/materials/water/waterMaterial.js";
 import {
   instantiateBuildingFromKit,
   preloadBuildingKits,
@@ -164,6 +166,16 @@ export class SettlementView {
     // Debug/capture handle (judge tooling probes mesh names)
     (window as unknown as { __scene?: Scene }).__scene = this.scene;
 
+    // Cinematic grade: soft warm vignette + gentle S-curve (stills lacked
+    // any camera grade — flagship shots read raw)
+    const ipc = this.scene.imageProcessingConfiguration;
+    ipc.vignetteEnabled = true;
+    ipc.vignetteWeight = 1.6;
+    ipc.vignetteStretch = 0.5;
+    ipc.vignetteColor = new Color4(0.12, 0.07, 0.03, 0);
+    ipc.contrast = 1.12;
+    ipc.exposure = 1.02;
+
     this.root = new TransformNode("settlement", this.scene);
     this.rebuildEnvironment(this.mapArch);
     this.buildRoads("dirt");
@@ -172,6 +184,9 @@ export class SettlementView {
     this.wirePicking(canvas);
 
     void this.bootKits();
+
+    // Water reflections: sample the world once meshes exist
+    setTimeout(() => this.refreshWaterReflections(), 2500);
 
     this.engine.runRenderLoop(() => {
       const now = performance.now() * 0.001;
@@ -193,7 +208,6 @@ export class SettlementView {
           lampBase * (0.82 + Math.sin(now * (1.1 + (wi % 5) * 0.3) + wi) * 0.08);
       }
       this.animateRiverLife(now);
-      this.animateSmoke(now);
       this.scene.render();
       this.fpsFrames++;
       const wall = performance.now();
@@ -522,62 +536,17 @@ export class SettlementView {
     return transformPlotPos(def.worldX, def.worldZ, this.mapArch.layout);
   }
 
-  private smokePuffs: Mesh[] = [];
-
-  /** Stylized chimney smoke — opaque faceted puffs on a rising loop.
-   *  The judges: "not a single smoke plume over a whole kiln district". */
-  private buildSmoke() {
-    for (const m of this.smokePuffs) m.dispose();
-    this.smokePuffs = [];
-    const mat = new StandardMaterial("smokeMat", this.scene);
-    mat.diffuseColor = hexToColor3("#847C70");
-    mat.emissiveColor = hexToColor3("#5A554C").scale(0.1);
-    mat.specularColor = Color3.Black();
-    const sources: Array<[string, number, number]> = [
-      ["mudbrick_yard", 0.75, 1.9],
-      ["vessel_shop", -0.4, 1.1],
-      ["luxury_workshop", 0.5, 1.2],
-    ];
-    const st = this.lastSettlement;
-    if (!st) return;
-    for (const [kind, ox, oy] of sources) {
-      const b = st.buildings.find((x) => x.kind === kind);
-      if (!b?.plotId) continue;
-      const w = this.plotWorldArch(b.plotId);
-      for (let i = 0; i < 3; i++) {
-        const puff = MeshBuilder.CreatePolyhedron(
-          `smoke-${kind}-${i}`,
-          { type: 3, size: 0.09 + i * 0.045 },
-          this.scene
-        );
-        // Anchored column: stacked puffs above the flue — reads as a plume
-        // in stills; the loop only sways/scales them gently.
-        puff.position.set(w.x - ox, oy + 0.22 + i * 0.34, w.z);
-        puff.metadata = {
-          smokeBase: oy + 0.22 + i * 0.34,
-          smokePhase: i * 0.33,
-          smokeX: w.x - ox,
-          smokeZ: w.z,
-        };
-        puff.material = mat;
-        puff.parent = this.root;
-        puff.isPickable = false;
-        this.smokePuffs.push(puff);
+  private refreshWaterReflections() {
+    const wm = this.waterMat;
+    if (!wm) return;
+    try {
+      for (const m of this.scene.meshes) {
+        if (m.name === "river" || !m.isEnabled() || m.visibility === 0) continue;
+        if (m.name.startsWith("pad-") || m.name.startsWith("hit-")) continue;
+        wm.addToRenderList(m);
       }
-    }
-  }
-
-  private animateSmoke(now: number) {
-    for (const p of this.smokePuffs) {
-      if (p.isDisposed()) continue;
-      const md = p.metadata as { smokeBase: number; smokePhase: number; smokeX: number; smokeZ: number };
-      const sway = Math.sin(now * 0.8 + md.smokePhase * 7);
-      p.position.y = md.smokeBase + Math.sin(now * 0.5 + md.smokePhase * 5) * 0.05;
-      p.position.x = md.smokeX + sway * 0.05 + (md.smokeBase - 1) * 0.12;
-      p.position.z = md.smokeZ;
-      const sc = 0.9 + Math.sin(now * 0.6 + md.smokePhase * 4) * 0.12;
-      p.scaling.set(sc, sc * 0.9, sc);
-      p.visibility = 1;
+    } catch {
+      /* reflection list is cosmetic */
     }
   }
 
@@ -613,7 +582,7 @@ export class SettlementView {
       const dRect = Math.hypot(rectDx, rectDz);
       const d = wx < -8.4 ? Math.max(0, -19.5 - wx) : dRect;
       const mask = Math.min(1, d / 18);
-      return Math.max(-0.12, this.desertNoise(wx, wz) * 0.75) * mask * mask;
+      return Math.max(-0.1, this.desertNoise(wx, wz) * 0.6) * mask * mask;
     };
 
     const palm = (x: number, z: number, h: number, lean: number, cast = false) => {
@@ -801,7 +770,7 @@ export class SettlementView {
       const d = Math.min(dRect, wx < -8.4 ? Math.max(0, -19.5 - wx) : dRect);
       const mask = Math.min(1, d / 18);
       const n = this.desertNoise(wx, wz);
-      pos[i + 1] = Math.max(-0.12, n * 0.75) * mask * mask;
+      pos[i + 1] = Math.max(-0.1, n * 0.6) * mask * mask;
       // macro tonal variation: ±6% warm patchiness + cool far-east grade
       const t =
         1 +
@@ -849,20 +818,6 @@ export class SettlementView {
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fill();
       }
-      // Wind streaks: long soft diagonal bands
-      ctx.save();
-      ctx.translate(size / 2, size / 2);
-      ctx.rotate(-0.6);
-      for (let k = 0; k < 7; k++) {
-        const y = (k / 7 - 0.5) * size * 1.6 + (Math.random() - 0.5) * 40;
-        const g = ctx.createLinearGradient(0, y - 14, 0, y + 14);
-        g.addColorStop(0, "rgba(0,0,0,0)");
-        g.addColorStop(0.5, `rgba(${br - 12},${bg - 12},${bb - 14},0.08)`);
-        g.addColorStop(1, "rgba(0,0,0,0)");
-        ctx.fillStyle = g;
-        ctx.fillRect(-size, y - 14, size * 2, 28);
-      }
-      ctx.restore();
       // MICRO: grit speckle + silt flecks
       const img = ctx.getImageData(0, 0, size, size);
       const d = img.data;
@@ -910,7 +865,7 @@ export class SettlementView {
       {
         width: 240,
         height: 210,
-        subdivisions: this.quality === "low" ? 24 : 48,
+        subdivisions: this.quality === "low" ? 24 : 72,
         updatable: true,
       },
       this.scene
@@ -1042,13 +997,47 @@ export class SettlementView {
       this.scene
     );
     river.position.set(-15.4, -0.12, 2);
-    const rmat = new StandardMaterial("riverMat", this.scene);
-    rmat.diffuseColor = hexToColor3("#061820");
-    rmat.specularColor = hexToColor3("#5A98B0").scale(0.55);
-    rmat.specularPower = 80;
-    rmat.alpha = 0.98;
-    rmat.emissiveColor = hexToColor3("#041018").scale(0.25);
-    river.material = rmat;
+    if (this.quality !== "low") {
+      // Real animated water: bump ripples + scene reflections (Nile, not slab)
+      const wm = new WaterMaterial("riverWater", this.scene);
+      const bump = new DynamicTexture("riverBump", 256, this.scene, false);
+      const bctx = bump.getContext() as CanvasRenderingContext2D;
+      // hand-rolled normal-ish noise: neutral base + soft blobs
+      bctx.fillStyle = "rgb(128,128,255)";
+      bctx.fillRect(0, 0, 256, 256);
+      for (let i = 0; i < 220; i++) {
+        const x = Math.random() * 256;
+        const y = Math.random() * 256;
+        const r = 3 + Math.random() * 10;
+        const g = bctx.createRadialGradient(x, y, 0, x, y, r);
+        const dx = Math.round((Math.random() - 0.5) * 70);
+        const dy = Math.round((Math.random() - 0.5) * 70);
+        g.addColorStop(0, `rgba(${128 + dx},${128 + dy},255,0.55)`);
+        g.addColorStop(1, "rgba(128,128,255,0)");
+        bctx.fillStyle = g;
+        bctx.beginPath();
+        bctx.arc(x, y, r, 0, Math.PI * 2);
+        bctx.fill();
+      }
+      bump.update(false);
+      wm.bumpTexture = bump;
+      wm.windForce = -3;
+      wm.waveHeight = 0.02;
+      wm.waveLength = 0.06;
+      wm.bumpHeight = 0.32;
+      wm.waterColor = hexToColor3("#0E2E3E");
+      wm.colorBlendFactor = 0.55;
+      wm.windDirection = new Vector2(0.6, 1);
+      river.material = wm;
+      this.waterMat = wm;
+    } else {
+      const rmat = new StandardMaterial("riverMat", this.scene);
+      rmat.diffuseColor = hexToColor3("#061820");
+      rmat.specularColor = hexToColor3("#5A98B0").scale(0.55);
+      rmat.specularPower = 80;
+      rmat.emissiveColor = hexToColor3("#041018").scale(0.25);
+      river.material = rmat;
+    }
     river.parent = this.envRoot;
     river.isPickable = false;
     this.riverMesh = river;
@@ -1709,11 +1698,11 @@ export class SettlementView {
     }
     this.syncWorkers(settlement);
     this.syncNightWindows(settlement);
-    this.buildSmoke();
     this.updateSelectRing();
   }
 
   private bankMistMat: StandardMaterial | null = null;
+  private waterMat: WaterMaterial | null = null;
   private nightWindows: Mesh[] = [];
   private nightWinMat: StandardMaterial | null = null;
 
@@ -2068,7 +2057,11 @@ export class SettlementView {
       add(jar);
     }
 
-    if (this.shadowGen) this.shadowGen.addShadowCaster(torso, false);
+    if (this.shadowGen) {
+      for (const part of root.getChildMeshes()) {
+        this.shadowGen.addShadowCaster(part as Mesh, false);
+      }
+    }
     // No fake foot shadow boxes (02.8 hard fail)
 
     const agent: WorkerAgent = {
