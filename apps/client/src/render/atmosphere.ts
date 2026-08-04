@@ -127,7 +127,7 @@ export class Atmosphere {
     this.hemi.groundColor = hexToColor3(STYLE.sandDeep).scale(0.28 * (1 - n * 0.75));
 
     // Day clear matches desert sand so map fringe never reads as void edge
-    const clearDay = Color4.FromColor3(hexToColor3("#C4B490"), 1);
+    const clearDay = Color4.FromColor3(hexToColor3("#D8C39A"), 1);
     const clearDusk = Color4.FromColor3(hexToColor3("#B86848"), 1);
     const clearNight = Color4.FromColor3(hexToColor3("#070C12"), 1);
     this.scene.clearColor =
@@ -143,10 +143,10 @@ export class Atmosphere {
     // real near/far value falloff (EXP2 at ortho distance was either invisible
     // or a flat wash). Judges flagged the absence every round.
     this.scene.fogMode = Scene.FOGMODE_LINEAR;
-    this.scene.fogStart = 34;
+    this.scene.fogStart = 46;
     this.scene.fogEnd = this.boardApprovalFog ? 96 : 120;
     if (n < 0.35) {
-      this.scene.fogColor = hexToColor3("#CFC3A4");
+      this.scene.fogColor = hexToColor3("#E4D4AE");
     } else if (n < 0.7) {
       this.scene.fogColor = hexToColor3("#C08A62");
     } else {

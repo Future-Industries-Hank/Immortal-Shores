@@ -18,7 +18,9 @@
 | R7 | 6.7 | 5.6 | scrub anchoring, olive banks, summed night lamps |
 | R8 | 6.7 | 5.3 | painted AO carpet, occupancy-gated roads, inspect scrim |
 | R9 | 5.8 | 4.2 | *harsher panel (3× zoom)*; kit transparency root cause found |
-| **R10** | **6.0** | **4.8** | contact discs, palm rebuild, shop-tier identity, greybox purge |
+| R10 | 6.0 | 4.8 | contact discs, palm rebuild, shop-tier identity, greybox purge |
+| R11 | 6.4 | 5.2 | horizon band, unified plot trays (structures 7.2, cohesion 6.8, map 7.4) |
+| **R12** | **5.8** | **4.3** | **owner directive: board framing cut ~45% dead desert** |
 
 R9/R10 panels zoomed to 3× and found defects earlier rounds never saw, so the
 numbers dip while the product improves — compare `board-day.png` across rounds
@@ -67,7 +69,10 @@ with level-path table, tutorial + goals, toasts, dark mode, mobile at 390px,
 and an authored inline-SVG world map (860px set piece, province borders,
 arc-placed markers, ownership wash, 7-state legend, collision-relaxed labels).
 
-**Camera:** fixed board tightened 48 → 30 per the owner's "zoom it in" note.
+**Camera:** fixed board tightened 48 → 30 → **24** and recentred on the built
+area per the owner's "cut out 80% of the empty desert" directive — the frame is
+now settlement + river edge + a thin desert margin. `setOrtho` is aspect-aware so
+portrait phones widen the frustum instead of cropping the shore.
 
 ---
 
@@ -92,6 +97,15 @@ the bug class is exhausted.
 4. **Kit awnings** are untapered flat quads whose poles do not always meet the
    ground — the "orange billboard" the R10 panel flagged in five frames.
 5. **Villagers** are visibly a fidelity tier below the architecture at close zoom.
+6. **Particle atmosphere is blocked, not skipped.** Babylon never creates an
+   internal texture for the particle sprite in this ESM build — `Texture._texture`
+   stays null for both `DynamicTexture` and a data-URL `Texture`, so
+   `ParticleSystem.isReady()` is false and nothing emits. Importing
+   `Shaders/particles.{vertex,fragment}.js` did not help. The engine texture
+   extension is the thing to chase; once a sprite is ready, the smoke/dust/gnat
+   systems are a ~100-line drop-in (see git history for the reverted version).
+7. **Panel top edge jumps between tabs** because the popup is vertically
+   centred and each panel is a different height — anchor it to a fixed top.
 
 ---
 

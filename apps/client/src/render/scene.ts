@@ -170,10 +170,10 @@ export class SettlementView {
     // any camera grade — flagship shots read raw)
     const ipc = this.scene.imageProcessingConfiguration;
     ipc.vignetteEnabled = true;
-    ipc.vignetteWeight = 1.6;
+    ipc.vignetteWeight = 1.05;
     ipc.vignetteStretch = 0.5;
     ipc.vignetteColor = new Color4(0.12, 0.07, 0.03, 0);
-    ipc.contrast = 1.12;
+    ipc.contrast = 1.08;
     ipc.exposure = 1.02;
 
     this.root = new TransformNode("settlement", this.scene);
@@ -578,6 +578,9 @@ export class SettlementView {
     if (!st) return;
     for (const b of st.buildings) {
       if (!b.plotId) continue;
+      // The harbor sits on the pier over open water — a ground contact disc
+      // there reads as an orphaned shadow ellipse floating on the river.
+      if (b.plotId === "special-harbor") continue;
       const w = this.plotWorldArch(b.plotId);
       const disc = MeshBuilder.CreateDisc(
         `contact-${b.id}`,
@@ -670,7 +673,7 @@ export class SettlementView {
         const a = (f / frondCount) * Math.PI * 2 + (h % 0.7);
         const droop = 0.3 + (f % 3) * 0.12;
         let px = Math.sin(a) * 0.1;
-        let pz = Math.cos(a) * 0.1;
+        let pz = crownZ + Math.cos(a) * 0.1;
         let py = crownY + 0.04;
         for (let seg = 0; seg < 3; seg++) {
           const segLen = h * (0.24 - seg * 0.045);
@@ -686,7 +689,7 @@ export class SettlementView {
           blade.position.set(
             px + stepX / 2,
             py - Math.sin(tilt) * segLen * 0.5,
-            pz + crownZ * 0 + stepZ / 2
+            pz + stepZ / 2
           );
           blade.rotation.y = a;
           blade.rotation.x = tilt;
@@ -745,10 +748,10 @@ export class SettlementView {
     // and faceted, because smooth spheres read as blurred decals pasted
     // behind a flat-shaded world (judge R11).
     const ridgeSpecs: Array<[number, number, number, number, boolean]> = [
-      [46, -26, 30, 3.6, false], [52, 6, 34, 4.2, false],
-      [44, 34, 28, 3.4, false], [16, -44, 28, 3.4, false],
-      [-14, 46, 30, 3.6, false], [70, -8, 36, 5.4, true],
-      [60, 40, 30, 4.4, true], [-34, -46, 28, 4.0, true],
+      [58, -34, 32, 3.8, false], [64, 8, 36, 4.4, false],
+      [56, 44, 30, 3.6, false], [22, -58, 30, 3.6, false],
+      [-20, 58, 32, 3.8, false], [84, -10, 38, 5.6, true],
+      [74, 50, 32, 4.6, true], [-44, -58, 30, 4.2, true],
     ];
     for (const [rx, rz, rlen, rh, far] of ridgeSpecs) {
       const ridge = MeshBuilder.CreatePolyhedron(
@@ -1014,7 +1017,7 @@ export class SettlementView {
     ground.position.set(4, 0, 4);
     this.displaceDesert(ground);
     const mat = new StandardMaterial("groundMat", this.scene);
-    mat.diffuseColor = Color3.White();
+    mat.diffuseColor = new Color3(1.0, 0.95, 0.86);
     mat.specularColor = hexToColor3("#3A3020").scale(0.08);
     mat.emissiveColor = hexToColor3(pal.sand).scale(0.03);
     const grit = this.makeSandTexture(pal.sand);
@@ -1550,8 +1553,8 @@ export class SettlementView {
         corner.isPickable = false;
         this.padGhosts.set(`${def.id}-corner`, corner);
         const gm = new StandardMaterial(`ghostMat-${def.id}`, this.scene);
-        gm.diffuseColor = hexToColor3(STYLE.mudbrick);
-        gm.emissiveColor = hexToColor3(STYLE.mudbrick).scale(0.04);
+        gm.diffuseColor = hexToColor3("#B49A72");
+        gm.emissiveColor = Color3.Black();
         gm.specularColor = Color3.Black();
         gm.alpha = 1; // solid packed earth — translucent = ghost-frame fail
         gm.wireframe = false;
