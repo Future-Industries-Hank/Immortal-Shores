@@ -129,19 +129,29 @@ export function applySettlementTick(
   blessingMult = 1,
   pauseNonEssential = false
 ): TickSummary {
+  const idle: TickSummary = {
+    elapsedHours: 0,
+    produced: [],
+    consumed: [],
+    workersGrown: 0,
+    shortageMultiplier: 1,
+  };
+
+  // A missing/garbled lastTickAt (older save, hand-edited file) would make every
+  // downstream amount NaN and permanently poison the vault — re-anchor instead.
+  // A future lastTickAt (host clock skew, restored backup) would otherwise freeze
+  // production until wall-clock caught up.
+  if (!Number.isFinite(settlement.lastTickAt) || settlement.lastTickAt > now) {
+    settlement.lastTickAt = now;
+    return idle;
+  }
+
   const elapsedMs = Math.max(0, now - settlement.lastTickAt);
+  // Catch-up is capped, and lastTickAt jumps to now: a long gap credits at most
+  // TICK_CAP_HOURS once, and can never be replayed by a second call or a restart.
   let hours = elapsedMs / 3_600_000;
   if (hours > TICK_CAP_HOURS) hours = TICK_CAP_HOURS;
-  if (hours < 1 / 3600) {
-    // sub-second: skip
-    return {
-      elapsedHours: 0,
-      produced: [],
-      consumed: [],
-      workersGrown: 0,
-      shortageMultiplier: 1,
-    };
-  }
+  if (hours < 1 / 3600) return idle;
 
   // Effective workers (pause non-essential without clearing assignments)
   const effWorkers = (b: BuildingState) => {

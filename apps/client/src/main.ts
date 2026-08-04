@@ -1,4 +1,4 @@
-import { api, getToken, setToken } from "./api.js";
+import { api, getToken, setToken, takeAuthMessage } from "./api.js";
 import { SettlementView, type Quality } from "./render/scene.js";
 import {
   initUi,
@@ -39,20 +39,32 @@ function layoutCanvas() {
   window.dispatchEvent(new Event("resize"));
 }
 
+// A token can die mid-session (expiry, server-side reap), and api.ts signals that
+// by clearing it and firing immortal:signed-out. Without this the game screen just
+// stops updating, so fall back to the login form and say why.
+function showAuthScreen(message?: string | null) {
+  authEl.hidden = false;
+  gameEl.hidden = true;
+  const err = document.getElementById("auth-error")!;
+  const msg = message ?? takeAuthMessage();
+  if (msg) {
+    err.hidden = false;
+    err.textContent = msg;
+  }
+}
+
+window.addEventListener("immortal:signed-out", (e) => {
+  showAuthScreen((e as CustomEvent<string>).detail);
+});
+
 async function enterGame() {
   authEl.hidden = true;
   gameEl.hidden = false;
   const canvas = document.getElementById("view") as HTMLCanvasElement;
   view = new SettlementView(canvas);
-  const q = document.getElementById("quality") as HTMLSelectElement;
-  view.setQuality(q.value as Quality);
-  q.addEventListener("change", () => view?.setQuality(q.value as Quality));
-  const tod = document.getElementById("tod") as HTMLSelectElement | null;
-  tod?.addEventListener("change", () => {
-    const v = tod.value;
-    if (v === "auto") view?.setDayPhase(null);
-    else view?.setDayPhase(v as "day" | "dusk" | "night");
-  });
+  // No detail picker in the HUD any more — everyone gets the medium preset,
+  // and the day/night cycle stays on auto (the scene's own default).
+  view.setQuality("med" satisfies Quality);
 
   // Keep canvas sized when top/bottom bars reflow
   const viewport = document.getElementById("viewport");
@@ -198,7 +210,6 @@ document.getElementById("btn-login")!.addEventListener("click", () => tryAuth("l
 if (getToken()) {
   enterGame().catch(() => {
     setToken(null);
-    authEl.hidden = false;
-    gameEl.hidden = true;
+    showAuthScreen();
   });
 }

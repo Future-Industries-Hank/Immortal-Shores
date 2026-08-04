@@ -104,11 +104,26 @@ export class Atmosphere {
         ? Color3.Lerp(dayColor, duskColor, n * 2)
         : Color3.Lerp(duskColor, nightColor, (n - 0.5) * 2);
     this.sun.diffuse = sunCol;
-    // Clear colony-board day key — readable solid buildings (Surviving Mars)
-    this.sun.intensity = 1.9 - n * 1.0;
+    // LIGHT BUDGET — do not raise without re-measuring the sand hue.
+    // StandardMaterial computes clamp(lightSum * diffuseColor + emissive, 0, 1)
+    // and only THEN multiplies the albedo texture. At the old 1.9 key + 0.52 fill
+    // the sand's red and green both pinned at 1.0 while blue did not, which rotated
+    // the hue +12 degrees off the sand axis: that clamp WAS the olive/sage stain the
+    // judges saw, and it flattened every lit face to the same value. Measured:
+    // hue p05/p95 35.2/46.5 clamped vs 33.3/37.9 once the sum sits under 1.
+    // Measured headroom at these values: the clamp starts skewing hue again at a
+    // 1.12x key, so there is ~10% of margin and no more.
+    this.sun.intensity = 1.3 - n * 0.65;
     // Sun path: high warm day key -> long low western dusk -> faint moon.
     // Judges: "dusk is the day shot with an orange tint" — direction must move.
-    const dayDir = new Vector3(-0.74, -0.38, 0.4);
+    // Day elevation raised 24 -> 32 degrees: at 24 the flat gameplay rect only took
+    // NdotL 0.41 and had to be carried by fill, which is what made the board hazy.
+    // Azimuth swung 16 degrees too. The board camera sits at azimuth -51 deg and the
+    // old key at -29 deg, i.e. 22 deg off the camera: near-frontal, so every surface
+    // the camera could see was lit and nothing modelled. 38 deg off gives the dune
+    // slip faces and the building side walls a shaded plane that is still on screen.
+    // scene.ts SUN_H_X / SUN_H_Z / WIND_ANGLE are derived from this vector.
+    const dayDir = new Vector3(-0.82, -0.535, 0.196);
     const duskDir = new Vector3(-0.97, -0.2, 0.1);
     const nightDir = new Vector3(-0.45, -0.5, 0.3);
     const dir =
@@ -118,16 +133,18 @@ export class Atmosphere {
     this.sun.direction = dir.normalize();
     this.sun.position = new Vector3(14, 26 - n * 14, -8);
 
-    this.hemi.intensity = 0.52 - n * 0.24;
+    // Fill sits at ~0.4 of the key. Lower and the slip faces go to tar; higher and
+    // the sum crosses the clamp again and the sand desaturates back to khaki.
+    this.hemi.intensity = 0.51 - n * 0.24;
     this.hemi.diffuse = Color3.Lerp(
-      hexToColor3("#F0E8D8"),
+      hexToColor3("#F2E6CE"),
       hexToColor3("#1A2840"),
       n
     );
-    this.hemi.groundColor = hexToColor3(STYLE.sandDeep).scale(0.28 * (1 - n * 0.75));
+    this.hemi.groundColor = hexToColor3(STYLE.sandDeep).scale(0.3 * (1 - n * 0.75));
 
     // Day clear matches desert sand so map fringe never reads as void edge
-    const clearDay = Color4.FromColor3(hexToColor3("#D8C39A"), 1);
+    const clearDay = Color4.FromColor3(hexToColor3("#C9A972"), 1);
     const clearDusk = Color4.FromColor3(hexToColor3("#B86848"), 1);
     const clearNight = Color4.FromColor3(hexToColor3("#070C12"), 1);
     this.scene.clearColor =
@@ -146,7 +163,9 @@ export class Atmosphere {
     this.scene.fogStart = 32;
     this.scene.fogEnd = this.boardApprovalFog ? 88 : 110;
     if (n < 0.35) {
-      this.scene.fogColor = hexToColor3("#E4D4AE");
+      // Sits ON the sand's own hue axis. #E4D4AE was two stops lighter and a touch
+      // cooler than the sand it fogged, so distance read as milk rather than depth.
+      this.scene.fogColor = hexToColor3("#D3AF77");
     } else if (n < 0.7) {
       this.scene.fogColor = hexToColor3("#C08A62");
     } else {
@@ -161,10 +180,15 @@ export class Atmosphere {
       lamp.intensity = n > 0.55 ? (1.1 + (qi % 3) * 0.25) * (n - 0.4) : 0;
     }
 
-    // PRESERVE dark depth water — never lerp toward candy riverLight
+    // PRESERVE dark depth water — never lerp toward candy riverLight.
+    // StandardMaterial ONLY. On the med/high tiers the channel is a WaterMaterial,
+    // and this block was writing alpha 0.97 onto it every frame: that put the water
+    // in the transparent pass at the same alphaIndex as the shore ribbon, so which
+    // of the two drew last came down to bounding-sphere sort order and the channel
+    // routinely painted over the wet sand it was supposed to meet.
     if (river) {
       const rm = river.material as StandardMaterial | null;
-      if (rm) {
+      if (rm && rm.getClassName() === "StandardMaterial") {
         const deep = hexToColor3("#061820");
         const mid = hexToColor3("#0C2838");
         rm.diffuseColor = Color3.Lerp(mid, deep, 0.5 + n * n * 0.4);

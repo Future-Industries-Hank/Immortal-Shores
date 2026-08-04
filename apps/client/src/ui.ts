@@ -150,8 +150,10 @@ export function showPanel(name: string) {
   const title = document.getElementById("menu-popup-title");
   if (title) title.textContent = PANEL_TITLES[name] ?? name;
 
-  // World map gets the wide "set piece" shell; every other panel is a card.
+  // World map gets the wide "set piece" shell; Build gets a roomier one so its
+  // list rows have space for the description. Every other panel is a card.
   popup.classList.toggle("map-wide", name === "map");
+  popup.classList.toggle("build-wide", name === "build");
 
   // Panels must open at the top — judges saw headers sliced mid-scroll
   const body = popup.querySelector(".menu-popup-body");
@@ -1411,9 +1413,15 @@ function renderBuild(s: PublicSnapshot) {
   const st = s.settlements[0];
   if (!st) return;
   const built = new Set(st.buildings.map((b) => b.kind as string));
+  const vault = s.player.vault;
+  // Each cost bit carries its own affordability, so "you are short 12 bricks"
+  // reads off the row itself instead of only dimming the whole card.
   const costLine = (cost: { resource: ResourceId; amount: number }[]) =>
     cost
-      .map((c) => `<span class="cost-bit">${resourceIcon(c.resource)}${c.amount} ${resourceShort(c.resource)}</span>`)
+      .map(
+        (c) =>
+          `<span class="cost-bit${(vault[c.resource] ?? 0) < c.amount ? " is-short" : ""}">${resourceIcon(c.resource)}${c.amount} ${resourceShort(c.resource)}</span>`
+      )
       .join("");
   const cards = (Object.keys(NEW_BUILD_COST) as BuildingKind[])
     .map((kind) => {
@@ -1422,11 +1430,23 @@ function renderBuild(s: PublicSnapshot) {
       let title = BUILDING_TITLE[kind];
       if (kind === "luxury_material") title = `Luxury Works (${resourceShort(st.uniqueLuxury)})`;
       const done = built.has(kind);
-      return `<div class="palette-card${done ? " is-built" : ""}">
+      const poor = !done && cost.some((c) => (vault[c.resource] ?? 0) < c.amount);
+      const blurb = BUILDING_BLURB[kind];
+      const state = done
+        ? `<span class="built-chip">Built</span>`
+        : poor
+          ? `<span class="short-chip">Short</span>`
+          : "";
+      return `<div class="palette-card${done ? " is-built" : poor ? " is-short" : ""}">
         <span class="palette-glyph">${buildingIcon(kind)}</span>
-        <strong class="palette-name">${title}</strong>
-        <span class="palette-cost">${costLine(cost)}</span>
-        <span class="palette-foot"><span class="pad-chip ${pad.cls}">${pad.label}</span>${done ? `<span class="built-chip">Built</span>` : `<span class="muted">~${formatHours(constructionHours(kind, 1))}</span>`}</span>
+        <div class="palette-body">
+          <div class="palette-head"><strong class="palette-name">${title}</strong>${state}</div>
+          <p class="palette-desc" title="${blurb}">${blurb}</p>
+          <div class="palette-foot">
+            <span class="palette-cost">${costLine(cost)}</span>
+            <span class="palette-tags"><span class="pad-chip ${pad.cls}">${pad.label}</span><span class="palette-time">~${formatHours(constructionHours(kind, 1))}</span></span>
+          </div>
+        </div>
       </div>`;
     })
     .join("");

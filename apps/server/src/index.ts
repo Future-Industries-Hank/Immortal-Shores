@@ -6,7 +6,17 @@ import { Game } from "./game.js";
 const PORT = Number(process.env.PORT ?? 8787);
 const HOST = process.env.HOST ?? "0.0.0.0";
 
-const game = new Game();
+/** A refusing store means the world file is damaged — never boot an empty world over it. */
+function bootGame(): Game {
+  try {
+    return new Game();
+  } catch (err) {
+    console.error(`\n${(err as Error).message}\n`);
+    process.exit(1);
+  }
+}
+
+const game = bootGame();
 const app = Fastify({ logger: true });
 
 await app.register(cors, { origin: true });
@@ -490,12 +500,41 @@ app.register(async (instance) => {
   });
 });
 
-const shutdown = () => {
-  game.store.close();
+let shuttingDown = false;
+/**
+ * Stop accepting requests, then flush. store.close() clears the 5s save interval before it
+ * writes and every write inside it is synchronous + fsynced, so exiting right after it
+ * returns cannot truncate or lose the last mutations.
+ */
+const shutdown = async (signal: string) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  app.log.info(`${signal} received — flushing world to disk`);
+  try {
+    await app.close();
+  } catch {
+    /* closing the listener must never block the final save */
+  }
+  try {
+    game.store.close();
+  } catch (err) {
+    app.log.error(`final save FAILED: ${(err as Error).message}`);
+    process.exit(1);
+  }
   process.exit(0);
 };
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
+process.on("SIGINT", () => void shutdown("SIGINT"));
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+// Last-ditch save: a crashing process still owns unsaved player progress.
+process.on("uncaughtException", (err) => {
+  app.log.error(`uncaught exception: ${err?.message}`);
+  try {
+    game.store.close();
+  } catch {
+    /* nothing left to try */
+  }
+  process.exit(1);
+});
 
 await app.listen({ port: PORT, host: HOST });
 console.log(`Immortal Shores server on http://${HOST}:${PORT}`);

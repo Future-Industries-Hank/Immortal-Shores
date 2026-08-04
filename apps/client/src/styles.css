@@ -241,8 +241,7 @@ html.dark .auth-panel h1 {
 
 .auth-panel input,
 .side-panel input,
-.side-panel select,
-#quality {
+.side-panel select {
   width: 100%;
   margin-top: 0.25rem;
   padding: 0.55rem 0.65rem;
@@ -693,25 +692,6 @@ html.dark button.btn-locked svg {
   margin-right: 0;
 }
 
-.hud-select {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 1px;
-  font-size: 0.52rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: rgba(212, 168, 75, 0.8);
-  text-align: center;
-}
-
-#quality,
-#tod {
-  width: auto;
-  margin-top: 0;
-  padding: 0 0.4rem;
-}
-
 #viewport {
   position: relative;
   min-width: 0;
@@ -901,6 +881,13 @@ html.dark button.btn-locked svg {
 
 .menu-popup.map-wide .map-grid {
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+/* Build is a reading list, not a modal card: a little extra width is what
+   keeps each building's name, blurb and cost on comfortable lines. */
+.menu-popup.build-wide {
+  width: min(560px, calc(100vw - 16px));
+  max-width: calc(100vw - 16px);
 }
 
 /* Scroll affordance, only present when the body actually overflows.
@@ -2549,33 +2536,56 @@ button.build-choice strong {
   line-height: 1.4;
 }
 
+/* One building per ROW. The old 2-up auto-fill grid squeezed a name, two cost
+   chips, a pad chip and a build time into ~150px, which is what read as
+   "smooshed" — full panel width per building buys real type and a blurb. */
 .build-palette {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
-  gap: 0.45rem;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.4rem;
   margin: 0.4rem 0 0.6rem;
 }
 
 .palette-card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.3rem;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.1rem 0.6rem;
   min-width: 0;
-  padding: 0.55rem 0.6rem 0.5rem;
+  padding: 0.6rem 0.7rem;
   background: var(--surface-inset);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-md);
-  font-size: 0.76rem;
+  font-size: 0.82rem;
 }
 
 .palette-card.is-built {
   opacity: 0.62;
 }
 
+/* Can't pay for it yet: legible, just visibly held back. */
+.palette-card.is-short {
+  opacity: 0.9;
+  border-style: dashed;
+}
+
+.palette-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+}
+
+.palette-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
 .palette-glyph {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2590,20 +2600,39 @@ html.dark .palette-glyph {
 }
 
 .palette-glyph svg {
-  width: 19px;
-  height: 19px;
+  width: 21px;
+  height: 21px;
 }
 
 .palette-name {
   font-family: var(--font-display);
-  font-size: 0.88rem;
+  font-size: 1rem;
+  line-height: 1.3;
   letter-spacing: 0.01em;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Clamped to two lines; the full blurb stays on the title attribute. */
+.palette-desc {
+  margin: 0;
+  min-width: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--ink-soft);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
 }
 
 .palette-cost {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.15rem 0.5rem;
+  gap: 0.15rem 0.6rem;
+  min-width: 0;
+  font-size: 0.82rem;
   font-variant-numeric: tabular-nums;
   color: var(--ink-soft);
 }
@@ -2611,13 +2640,18 @@ html.dark .palette-glyph {
 .palette-cost .cost-bit {
   display: inline-flex;
   align-items: center;
-  gap: 0.2rem;
+  gap: 0.22rem;
   white-space: nowrap;
 }
 
+.palette-cost .cost-bit.is-short {
+  color: var(--warn-red);
+  font-weight: 600;
+}
+
 .palette-cost svg {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
   color: var(--gold-deep);
 }
 
@@ -2625,20 +2659,40 @@ html.dark .palette-cost svg {
   color: var(--gold-soft);
 }
 
+/* Cost on the left, pad + build time on the right; each side is its own
+   wrap context so a long pad label never splits a cost token. */
 .palette-foot {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.4rem;
-  margin-top: 0.1rem;
+  justify-content: space-between;
+  gap: 0.25rem 0.6rem;
+  margin-top: 0.12rem;
+  min-width: 0;
   width: 100%;
+}
+
+.palette-tags {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.palette-time {
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--ink-soft);
 }
 
 .pad-chip {
   display: inline-flex;
   align-items: center;
-  padding: 0.08rem 0.45rem;
+  white-space: nowrap;
+  padding: 0.1rem 0.5rem;
   border-radius: 999px;
-  font-size: 0.64rem;
+  font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -2664,9 +2718,13 @@ html.dark .pad-chip.pad-shop {
   color: var(--gold-soft);
 }
 
-.built-chip {
+.built-chip,
+.short-chip {
   display: inline-flex;
   align-items: center;
+  flex: 0 0 auto;
+  margin-left: auto;
+  white-space: nowrap;
   padding: 0.08rem 0.45rem;
   border-radius: 999px;
   font-size: 0.64rem;
@@ -2676,6 +2734,10 @@ html.dark .pad-chip.pad-shop {
   color: var(--reed-green);
   border: 1px solid currentColor;
   opacity: 0.85;
+}
+
+.short-chip {
+  color: var(--warn-red);
 }
 
 @media (max-width: 600px) {
@@ -3118,6 +3180,22 @@ html.dark .site-glyph {
     max-height: min(72vh, 560px);
   }
 
+  /* Phone: the build list is already full-bleed, so drop the extra width and
+     let the rows breathe vertically instead. */
+  .menu-popup.build-wide {
+    width: min(460px, calc(100vw - 12px));
+    max-width: calc(100vw - 12px);
+  }
+
+  .palette-card {
+    gap: 0.1rem 0.5rem;
+    padding: 0.55rem 0.6rem;
+  }
+
+  .palette-foot {
+    justify-content: flex-start;
+  }
+
   /* Phone board: the whole sheet still has to clear the panel chrome, or the
      fold would have to be parked above it and the map would vanish. */
   .world-river-map {
@@ -3151,10 +3229,6 @@ html.dark .site-glyph {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
-  .hud-select span {
-    display: none;
-  }
-
   /* Nav tabs go icon-only: a glyph can never mid-word truncate the way
      "MILITARY" → "MILI…" did. Buttons keep their aria-label names, the
      glyph grows to carry the tap target, and the >=480px scroll+fade
@@ -3173,9 +3247,6 @@ html.dark .site-glyph {
     height: 24px;
   }
 
-  .build-palette {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 /* ── Production overlay ──────────────────────────────────────────── */
@@ -3410,5 +3481,9 @@ html.dark .goals-ring {
     margin-inline: auto;
     top: 0.75rem;
     width: min(860px, calc(100vw - 24px));
+  }
+  /* Stays docked left like the other panels, just wider than the 430px card. */
+  .menu-popup.build-wide {
+    width: min(540px, 42vw);
   }
 }

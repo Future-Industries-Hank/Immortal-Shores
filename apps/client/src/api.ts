@@ -2,13 +2,55 @@ import type { PublicSnapshot, ResourceId, ResourceStack } from "@immortal/shared
 
 const TOKEN_KEY = "immortal_token";
 
+// iOS Safari private browsing throws on localStorage access instead of returning null,
+// and mobile browsers evict storage under pressure. Probe once, then keep a memory copy
+// so a storage failure degrades to "logged in for this tab" instead of a hard crash.
+const storage: Storage | null = (() => {
+  try {
+    const s = window.localStorage;
+    s.setItem(`${TOKEN_KEY}__probe`, "1");
+    s.removeItem(`${TOKEN_KEY}__probe`);
+    return s;
+  } catch {
+    return null;
+  }
+})();
+
+let memoryToken: string | null = null;
+
 export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  if (memoryToken) return memoryToken;
+  try {
+    memoryToken = storage?.getItem(TOKEN_KEY) ?? null;
+  } catch {
+    memoryToken = null;
+  }
+  return memoryToken;
 }
 
 export function setToken(token: string | null) {
-  if (token) localStorage.setItem(TOKEN_KEY, token);
-  else localStorage.removeItem(TOKEN_KEY);
+  memoryToken = token;
+  try {
+    if (token) storage?.setItem(TOKEN_KEY, token);
+    else storage?.removeItem(TOKEN_KEY);
+  } catch {
+    /* evicted or quota-full — the in-memory token still carries this tab */
+  }
+}
+
+export class ApiError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+  }
+}
+
+let authMessage: string | null = null;
+
+/** Reason the last session ended, for the login screen. Reading it clears it. */
+export function takeAuthMessage(): string | null {
+  const msg = authMessage;
+  authMessage = null;
+  return msg;
 }
 
 async function req<T>(
@@ -29,7 +71,17 @@ async function req<T>(
     body: opts.json !== undefined ? JSON.stringify(opts.json) : opts.body,
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || res.statusText);
+  if (res.status === 401) {
+    // Expired or rejected token: drop it so the app falls back to the login screen
+    // with a reason instead of retrying a dead session forever.
+    setToken(null);
+    authMessage = "Your session expired. Sign in to return to your settlement.";
+    window.dispatchEvent(
+      new CustomEvent("immortal:signed-out", { detail: authMessage })
+    );
+    throw new ApiError(401, data.error || authMessage);
+  }
+  if (!res.ok) throw new ApiError(res.status, data.error || res.statusText);
   return data as T;
 }
 

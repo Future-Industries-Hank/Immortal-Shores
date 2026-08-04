@@ -12,14 +12,22 @@ from mathutils import Vector
 
 REPO = "/home/eric/apps/mmo-city-builder"
 MODELS = os.path.join(REPO, "apps/client/public/models/buildings")
+DECOR_MODELS = os.path.join(REPO, "apps/client/public/models/decor")
 OUT = "/tmp/claude-1000/-home-eric/f840123e-860a-4c45-add6-0b16a98ff524/scratchpad/kit-previews"
 os.makedirs(OUT, exist_ok=True)
+os.makedirs(DECOR_MODELS, exist_ok=True)
 
 ALL = ["great_house", "market", "emmer_field", "mudbrick_yard", "harbor",
        "river_clay_pit", "marsh_reed_bed", "training_grounds", "shrine",
        "ration_house", "luxury_material", "luxury_workshop", "vessel_shop",
        "reed_basket_shop", "warehouse"]
-KINDS = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else ALL
+DECOR_ALL = ["obelisk", "statue_standing", "statue_seated", "small_pyramid",
+             "stele"]
+# no `--` args = author everything; named args select from either family, so
+# `-- market` still authors only the market kit exactly as before
+_sel = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else None
+KINDS = [k for k in _sel if k in ALL] if _sel else ALL
+DECOR_KINDS = [k for k in _sel if k in DECOR_ALL] if _sel else DECOR_ALL
 
 # ---------------------------------------------------------------- materials
 
@@ -120,6 +128,10 @@ def palette():
         # luxury goods
         "copper": M("copper_ingot", "#B4652F", rough=0.5, metal=0.45),
         "gem": M("gem_violet", "#7B4E93", rough=0.45),
+        # decor: Aswan red granite, dressed smoother than mudbrick so the
+        # obelisk reads as imported hard stone next to local limestone
+        "granite": M("granite_red", "#96594B", rough=0.62),
+        "granite_dk": M("granite_deep", "#754034", rough=0.66),
     }
 
 
@@ -323,14 +335,44 @@ def bevel(o, w=0.02):
     md.angle_limit = math.radians(40)
 
 
+_cutters = []
+
+
+def carve(o, cuts):
+    """Boolean-subtract solid boxes out of `o`: chipped corners, knocked-out
+    blocks, real cavities. Weathering that REMOVES stone keeps a silhouette
+    crisp where piling loose geometry on top of it only blurs the mass.
+    `cuts` are (w, d, h, (x, y, z_bottom), rz_degrees); cutters carry the
+    target's own material so the difference never opens an empty slot, and
+    they are dropped once merge_by_material applies the stack."""
+    mat = o.data.materials[0] if o.data.materials else None
+    for w, d, h, loc, rz in cuts:
+        c = box("CUT", w, d, h, loc, mat, rz=math.radians(rz))
+        _cutters.append(c)
+        md = o.modifiers.new("cut", "BOOLEAN")
+        md.operation = "DIFFERENCE"
+        md.object = c
+
+
+def chip(cx, cy, sx, sy, inset, z, h, s=0.7):
+    """`carve` cut that shears a corner at (cx, cy) back by `inset` along its
+    bisector. The cutter is parked so ONLY its inner plane reaches the solid,
+    which is what keeps the break a single clean triangle instead of the
+    knife-edge slivers a corner-centred cutter leaves behind."""
+    t = (s - inset) / math.sqrt(2)
+    return (2 * s, 2 * s, h, (cx + sx * t, cy + sy * t, z), 45.0)
+
+
 def reset():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     _mats.clear()
     _counter[0] = 0
+    _cutters.clear()
 
 
 def grab_all():
-    return [o for o in bpy.context.scene.objects if o.type == "MESH"]
+    return [o for o in bpy.context.scene.objects
+            if o.type == "MESH" and not o.name.startswith("CUT_")]
 
 
 # ---------------------------------------------------------------- GREAT HOUSE
@@ -1934,6 +1976,261 @@ def build_warehouse(P):
     basket("wh", 1.3, 0.15, 0.08, P, r=0.1, fill="grey")
 
 
+# ---------------------------------------------------------------- DECOR: OBELISK
+def build_obelisk(P):
+    """Modest red-granite obelisk, 2.4 tall on a 0.75 stepped plinth. The shaft
+    is authored as three stacked frusta so the cartouche band is a REAL
+    recessed course, not a painted stripe."""
+    s1 = box("ob_stone_step1", 0.75, 0.75, 0.13, (0, 0, 0), P["stone_wm"])
+    bevel(s1, 0.022)
+    s2 = box("ob_granite_step2", 0.58, 0.58, 0.13, (0, 0, 0.13), P["granite_dk"])
+    bevel(s2, 0.018)
+
+    # slender shaft, 0.32 -> 0.25 over 1.88; the band splits it at 1.30..1.46
+    # so the section above stays long and the tip never reads as a lantern
+    lo = frustum("ob_granite_shaft_lo", 0.32, 0.32, 0.2812, 0.2812, 1.04,
+                 (0, 0, 0.26), P["granite"])
+    bevel(lo, 0.012)
+    frustum("ob_granite_band", 0.2572, 0.2572, 0.2513, 0.2513, 0.16,
+            (0, 0, 1.3), P["granite_dk"])
+    hi = frustum("ob_granite_shaft_hi", 0.2753, 0.2753, 0.25, 0.25, 0.68,
+                 (0, 0, 1.46), P["granite"])
+    bevel(hi, 0.012)
+    # cartouche in raised relief inside the recessed band, front (-Y) face only
+    box("ob_granite_cartouche", 0.07, 0.02, 0.11, (0, -0.1355, 1.325),
+        P["granite"])
+    box("ob_granite_cartie", 0.088, 0.02, 0.022, (0, -0.1355, 1.312),
+        P["granite"])
+    # pyramidion: near-point tip, 0.012 top face keeps the apex non-degenerate
+    frustum("ob_granite_pyramidion", 0.25, 0.25, 0.012, 0.012, 0.26,
+            (0, 0, 2.14), P["granite"])
+
+
+# ------------------------------------------------------- DECOR: STANDING STATUE
+def build_statue_standing(P):
+    """Striding limestone figure, 1.7 tall on a 0.55 stepped base. Built as a
+    real body — separate shins, thighs, kilt, tapering torso, shoulder balls,
+    arms at the sides, neck, nemes and face — so it reads as a FIGURE at board
+    zoom instead of a stack of blocks."""
+    b1 = box("ss_stone_base", 0.55, 0.55, 0.1, (0, 0, 0), P["stone"])
+    bevel(b1, 0.022)
+    z0 = 0.1
+
+    # striding stance: left leg advanced toward the front (-Y). Joints sit at
+    # 7-head canon — crotch at mid-figure, shoulders at 0.82, head 1/7 — so the
+    # mass reads as a body and not as stacked parts.
+    for sx, fy, ly in ((-1, -0.09, -0.07), (1, 0.03, 0.045)):
+        f = box("ss_stone_foot", 0.125, 0.225, 0.065, (sx * 0.082, fy, z0),
+                P["stone_w"])
+        bevel(f, 0.016)
+        cyl("ss_stone_shin", 0.066, 0.375, (sx * 0.082, ly, z0 + 0.055),
+            P["stone_w"], seg=10, rtop=0.056)
+        cyl("ss_stone_thigh", 0.09, 0.42, (sx * 0.082, ly, 0.5),
+            P["stone_w"], seg=10, rtop=0.072)
+    box("ss_stone_hips", 0.27, 0.225, 0.17, (0, -0.01, 0.81), P["stone_w"])
+    # shendyt kilt: flared hem, cinched waist
+    k = frustum("ss_stone_kilt", 0.335, 0.285, 0.26, 0.22, 0.32, (0, 0, 0.76),
+                P["stone_wm"])
+    bevel(k, 0.014)
+    box("ss_stone_belt", 0.275, 0.232, 0.045, (0, 0, 1.055), P["stone_gv"])
+
+    torso = frustum("ss_stone_torso", 0.26, 0.215, 0.4, 0.225, 0.34,
+                    (0, 0, 1.06), P["stone_w"])
+    bevel(torso, 0.018)
+    # broad collar tapering INTO the neck. As a flat slab it stacked a
+    # rectangle on the head rectangle and the figure read robotic at board
+    # zoom; the taper gives the shoulders a carved slope instead.
+    frustum("ss_stone_collar", 0.4, 0.238, 0.325, 0.222, 0.075, (0, 0, 1.3),
+            P["stone_wm"])
+    for sx in (-1, 1):
+        sphere("ss_stone_shoulder", 0.082, (sx * 0.182, -0.005, 1.3),
+               P["stone_w"], seg=10)
+        cyl("ss_stone_arm", 0.058, 0.53, (sx * 0.192, -0.008, 0.855),
+            P["stone_w"], seg=10, rtop=0.049)
+        sphere("ss_stone_fist", 0.058, (sx * 0.192, -0.022, 0.79),
+               P["stone_w"], seg=8)
+    cyl("ss_stone_neck", 0.058, 0.11, (0, 0, 1.38), P["stone_w"], seg=10)
+
+    # nemes headcloth: flared trapezoid mass, face proud of its front, lappets
+    # falling over the collar — the silhouette that makes it read as Egyptian
+    nemes = frustum("ss_stone_nemes", 0.238, 0.205, 0.112, 0.118, 0.235,
+                    (0, 0, 1.465), P["stone_w"])
+    bevel(nemes, 0.014)
+    # face tapers to the chin so the head is a head, not another cube
+    frustum("ss_stone_face", 0.1, 0.062, 0.118, 0.062, 0.135, (0, -0.1, 1.48),
+            P["stone_w"])
+    box("ss_stone_fillet", 0.175, 0.162, 0.026, (0, 0, 1.612), P["stone_gv"])
+    for sx in (-1, 1):
+        box("ss_stone_lappet", 0.072, 0.05, 0.23, (sx * 0.082, -0.102, 1.345),
+            P["stone_w"])
+    # back pillar carries the figure, as every standing Egyptian statue does;
+    # same stone as the body so the whole thing reads as one carved monolith
+    bp = box("ss_stone_backpillar", 0.24, 0.13, 1.5, (0, 0.1, z0),
+             P["stone_w"])
+    bevel(bp, 0.018)
+
+
+# --------------------------------------------------------- DECOR: SEATED STATUE
+def build_statue_seated(P):
+    """Seated figure on a block throne, 1.45 tall on a 0.6 x 0.7 base. Hands
+    flat on the knees, nemes tail bridging the head to the throne back."""
+    b = box("sq_stone_base", 0.6, 0.7, 0.07, (0, 0, 0), P["stone"])
+    bevel(b, 0.016)
+    p = box("sq_stone_plinth", 0.46, 0.52, 0.05, (0, 0.07, 0.07), P["stone"])
+    bevel(p, 0.014)
+    seat = box("sq_stone_throne", 0.4, 0.46, 0.415, (0, 0.07, 0.12),
+               P["stone"])
+    bevel(seat, 0.018)
+    back = box("sq_stone_thronebk", 0.4, 0.09, 1.18, (0, 0.295, 0.12),
+               P["stone"])
+    bevel(back, 0.016)
+
+    for sx in (-1, 1):
+        f = box("sq_stone_foot", 0.13, 0.2, 0.075, (sx * 0.09, -0.24, 0.07),
+                P["stone_w"])
+        bevel(f, 0.016)
+        box("sq_stone_shin", 0.125, 0.12, 0.465, (sx * 0.09, -0.2, 0.07),
+            P["stone_w"])
+        box("sq_stone_thigh", 0.14, 0.3, 0.14, (sx * 0.09, -0.105, 0.535),
+            P["stone_w"])
+        sphere("sq_stone_knee", 0.078, (sx * 0.09, -0.245, 0.537),
+               P["stone_w"], seg=10)
+    # kilt drawn tight over the lap as a SOLID wedge; without it the space
+    # between chest and knees reads as a hole punched through the figure
+    box("sq_stone_lapkilt", 0.3, 0.3, 0.16, (0, -0.03, 0.6), P["stone_wm"])
+
+    torso = frustum("sq_stone_torso", 0.28, 0.25, 0.39, 0.22, 0.575,
+                    (0, 0.125, 0.535), P["stone_w"])
+    bevel(torso, 0.018)
+    box("sq_stone_collar", 0.39, 0.235, 0.06, (0, 0.115, 1.005), P["stone_wm"])
+    for sx in (-1, 1):
+        sphere("sq_stone_shoulder", 0.08, (sx * 0.177, 0.1, 1.02),
+               P["stone_w"], seg=10)
+        cyl("sq_stone_arm", 0.056, 0.35, (sx * 0.185, 0.09, 0.75),
+            P["stone_w"], seg=10, rtop=0.048)
+        box("sq_stone_forearm", 0.1, 0.3, 0.09, (sx * 0.125, -0.05, 0.7),
+            P["stone_w"])
+        box("sq_stone_hand", 0.12, 0.13, 0.06, (sx * 0.105, -0.24, 0.685),
+            P["stone_w"])
+        box("sq_stone_lappet", 0.07, 0.052, 0.25, (sx * 0.088, -0.018, 1.06),
+            P["stone_w"])
+    cyl("sq_stone_neck", 0.055, 0.13, (0, 0.06, 1.11), P["stone_w"], seg=10)
+
+    nemes = frustum("sq_stone_nemes", 0.245, 0.21, 0.17, 0.16, 0.23,
+                    (0, 0.045, 1.22), P["stone_w"])
+    bevel(nemes, 0.014)
+    box("sq_stone_nemestail", 0.1, 0.13, 0.28, (0, 0.2, 1.17), P["stone_w"])
+    frustum("sq_stone_face", 0.105, 0.062, 0.125, 0.062, 0.145,
+            (0, -0.077, 1.245), P["stone_w"])
+    box("sq_stone_fillet", 0.213, 0.185, 0.03, (0, 0.045, 1.36), P["stone_gv"])
+
+
+# ---------------------------------------------------------- DECOR: SMALL PYRAMID
+def build_small_pyramid(P):
+    """A YOUNG settlement's own tomb, not Giza: four squarely stacked limestone
+    courses 3.0 wide and 1.7 tall, closed by a dressed pyramidion so the mass
+    TERMINATES instead of ending on a roof deck. Every course keeps the same
+    0.23-0.24 ledge and a gentle batter, so the stagger — not the weathering —
+    is what the eye reads at board zoom. Weathering is cut OUT of the mass —
+    one sheared corner per course and two blocks gone from a top row — with
+    only the two fallen blocks added back, so nothing piles up on a ledge and
+    blurs it the way the previous ragged summit did."""
+    # course 1 doubles as the plinth. Only a sheared corner is taken out of it:
+    # the desert here climbs ~0.7 across the 3.0 footprint, so anything cut
+    # into this course ends up under sand on the uphill half.
+    c1 = frustum("sp_stone_c1", 3.0, 3.0, 2.92, 2.92, 0.4, (0, 0, 0),
+                 P["stone_wm"])
+    # every corner cut runs the FULL height of its course: one that stops
+    # part-way up leaves a knife-edge wedge that photographs as a debug spike
+    carve(c1, [chip(-1.48, 1.48, -1, 1, 0.22, -0.05, 0.51)])
+    bevel(c1, 0.018)
+
+    # battered upper courses, each sat true on the one below; one sheared
+    # corner apiece, plus the offering cavity and one knocked-out block on the
+    # front (-Y) faces of c2 and c3
+    for nm, wb, wt, h, z, cuts in (
+            ("c2", 2.44, 2.34, 0.36, 0.4,
+             [chip(1.21, -1.21, 1, -1, 0.18, 0.38, 0.42),
+              (0.44, 0.235, 0.26, (0, -1.1925, 0.45), 0.0),
+              (0.3, 0.26, 0.19, (-0.62, -1.2, 0.63), 0.0)]),
+            ("c3", 1.88, 1.79, 0.33, 0.76,
+             [chip(-0.93, -0.93, -1, -1, 0.15, 0.74, 0.39),
+              (0.28, 0.24, 0.19, (0.42, -0.93, 0.96), 0.0)]),
+            ("c4", 1.32, 1.24, 0.29, 1.09,
+             [chip(0.65, 0.65, 1, 1, 0.12, 1.07, 0.35)])):
+        c = frustum(f"sp_stone_{nm}", wb, wb, wt, wt, h, (0, 0, z),
+                    P["stone_wm"])
+        carve(c, cuts)
+        bevel(c, 0.018)
+    # pyramidion: 0.78 base drawn to a 0.09 tip, left uncarved so the apex
+    # stays the one crisp edge on the whole prop
+    apex = frustum("sp_stone_apex", 0.78, 0.78, 0.09, 0.09, 0.32, (0, 0, 1.38),
+                   P["stone_wm"])
+    bevel(apex, 0.012)
+
+    # offering chapel: the cavity is cut into course 2 and opens onto course
+    # 1's terrace, which keeps the whole shrine clear of the sand line. Jambs,
+    # lintel and false door all stay in the mass's own limestone — a paler
+    # stone in there goes cool against the sky ambient and photographs as a
+    # blue chip; the darker chisel tone on the false door is what keeps the
+    # cavity from reading as a punched black hole.
+    for sx in (-1, 1):
+        j = box("sp_stone_njamb", 0.06, 0.09, 0.31, (sx * 0.25, -1.175, 0.45),
+                P["stone_wm"])
+        bevel(j, 0.012)
+    lint = box("sp_stone_nlintel", 0.62, 0.09, 0.05, (0, -1.175, 0.71),
+               P["stone_wm"])
+    bevel(lint, 0.012)
+    box("sp_stone_nfalsedoor", 0.28, 0.035, 0.17, (0, -1.0925, 0.48),
+        P["stone_gv"])
+    # offering bowl on the chapel floor, kept INSIDE the doorway: out on the
+    # terrace the terracotta is the only saturated thing on the prop and it
+    # reads as a stray red dot
+    cyl("sp_pot_bowl", 0.05, 0.042, (0.07, -1.125, 0.45), P["pot"], seg=9,
+        rtop=0.06)
+
+    # the two blocks that came out of the courses above, landed on the ledge
+    # directly under their gap — two only, so the ledge line survives
+    for nm, w, d, h, x, y, z, rot in (
+            ("f1", 0.2, 0.17, 0.13, -0.62, -1.33, 0.4, 7.0),
+            ("f2", 0.16, 0.19, 0.11, 0.42, -1.06, 0.76, -9.0)):
+        f = box(f"sp_stone_{nm}", w, d, h, (x, y, z), P["stone_gv"],
+                rz=math.radians(rot))
+        bevel(f, 0.012)
+
+
+# ------------------------------------------------------------------ DECOR: STELE
+def build_stele(P):
+    """Round-topped boundary stele, 1.05 tall on a 0.4 x 0.25 base. The border
+    stands proud of the slab face, so the inscribed panel behind it is a real
+    recess with real AO rather than a decal."""
+    b = box("st_stone_base", 0.4, 0.25, 0.11, (0, 0, 0), P["stone_wm"])
+    bevel(b, 0.016)
+    body = box("st_stone_slab", 0.3, 0.095, 0.79, (0, 0, 0.11), P["stone_w"])
+    bevel(body, 0.012)
+    # round top: disc axis laid along Y, 0.007 deeper than the slab so its face
+    # never lands coplanar with the slab face
+    cyl("st_stone_top", 0.15, 0.102, (0, 0, 0.849), P["stone_w"], seg=20,
+        rx=math.radians(90))
+
+    # proud border framing the sunk panel (opening 0.21 x 0.53)
+    for sx in (-1, 1):
+        box("st_stone_jamb", 0.045, 0.022, 0.79, (sx * 0.1275, -0.0585, 0.11),
+            P["stone_w"])
+    box("st_stone_rail_lo", 0.21, 0.022, 0.1, (0, -0.0585, 0.11), P["stone_w"])
+    box("st_stone_rail_hi", 0.21, 0.022, 0.16, (0, -0.0585, 0.74),
+        P["stone_w"])
+    # inscription registers: bars raised off the sunk panel but still standing
+    # behind the border line, so the panel never reads as an empty window
+    for i, rw in enumerate((0.17, 0.155, 0.17, 0.105)):
+        box("st_stone_register", rw, 0.02, 0.022, (0, -0.0545,
+            0.26 + i * 0.13), P["stone_gv"])
+    # sun disc in the lunette, carved from the same stone so it reads as low
+    # relief on the flat front face of the round top, never as a pinned badge
+    cyl("st_stone_disc", 0.055, 0.028, (0, -0.0655, 0.908), P["stone_w"],
+        seg=16, rx=math.radians(90))
+
+
 # ---------------------------------------------------------------- export/render
 BUILDERS = {
     "great_house": build_great_house,
@@ -1952,6 +2249,17 @@ BUILDERS = {
     "reed_basket_shop": build_reed_basket_shop,
     "warehouse": build_warehouse,
 }
+
+DECOR_BUILDERS = {
+    "obelisk": build_obelisk,
+    "statue_standing": build_statue_standing,
+    "statue_seated": build_statue_seated,
+    "small_pyramid": build_small_pyramid,
+    "stele": build_stele,
+}
+# preview framing per prop; decor is far smaller than a building pad
+DECOR_PREVIEW = {"obelisk": 3.0, "statue_standing": 2.2, "statue_seated": 2.0,
+                 "small_pyramid": 4.0, "stele": 1.5}
 
 
 def add_preview_rig(size=4.2):
@@ -2009,7 +2317,10 @@ def merge_by_material(kind):
     for o in bpy.context.scene.objects:
         o.select_set(o in objs)
     bpy.context.view_layer.objects.active = objs[0]
-    bpy.ops.object.convert(target="MESH")  # applies bevels
+    bpy.ops.object.convert(target="MESH")  # applies bevels + booleans
+    for c in _cutters:
+        bpy.data.objects.remove(c, do_unlink=True)
+    _cutters.clear()
     groups = {}
     for o in grab_all():
         mat = o.data.materials[0].name if o.data.materials else "none"
@@ -2144,5 +2455,25 @@ for kind in KINDS:
     # preview render
     add_preview_rig()
     bpy.context.scene.render.filepath = os.path.join(OUT, f"new-{kind}.png")
+    bpy.ops.render.render(write_still=True)
+
+# decor props: same author -> merge -> AO bake -> GLB path, own output dir
+for kind in DECOR_KINDS:
+    reset()
+    P = palette()
+    DECOR_BUILDERS[kind](P)
+    prop_objs = merge_by_material(kind)
+    bake_ao(prop_objs)
+    tris = sum(len(o.data.polygons) * 2 for o in prop_objs)
+    print(f"BUILT decor/{kind}: {len(prop_objs)} meshes ~{tris} tris")
+    for o in bpy.context.scene.objects:
+        o.select_set(o in prop_objs)
+    out = os.path.join(DECOR_MODELS, f"{kind}.glb")
+    bpy.ops.export_scene.gltf(filepath=out, export_format="GLB",
+                              use_selection=True, export_apply=True,
+                              export_yup=True)
+    print(f"EXPORTED {out} bytes={os.path.getsize(out)}")
+    add_preview_rig(size=DECOR_PREVIEW[kind])
+    bpy.context.scene.render.filepath = os.path.join(OUT, f"decor-{kind}.png")
     bpy.ops.render.render(write_still=True)
 print("DONE")

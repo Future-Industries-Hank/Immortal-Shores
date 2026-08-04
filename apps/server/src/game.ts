@@ -140,11 +140,15 @@ function refundPartial(vault: VaultBalances, cost: ResourceStack[], rate: number
 
 export class Game {
   store: Store;
-  sessions = new Map<string, string>(); // token -> playerId
   private listeners = new Set<(ev: GameEvent) => void>();
 
   constructor(store = new Store()) {
     this.store = store;
+  }
+
+  /** Durable token → playerId map (survives restarts). */
+  get sessions() {
+    return this.store.sessions;
   }
 
   onEvent(fn: (ev: GameEvent) => void) {
@@ -379,6 +383,7 @@ export class Game {
 
     const token = nanoid(24);
     this.sessions.set(token, id);
+    this.store.flush();
     return { token, playerId: id };
   }
 
@@ -392,12 +397,20 @@ export class Game {
     if (player.ascended) throw new Error("This name has Ascended");
     const token = nanoid(24);
     this.sessions.set(token, player.id);
+    this.store.flush();
     return { token, playerId: player.id };
   }
 
   playerIdFromToken(token: string | undefined): string | null {
     if (!token) return null;
-    return this.sessions.get(token) ?? null;
+    const playerId = this.sessions.get(token);
+    if (!playerId) return null;
+    // A token pointing at a player the world no longer has is dead weight
+    if (!this.store.world.players[playerId]) {
+      this.sessions.delete(token);
+      return null;
+    }
+    return playerId;
   }
 
   tickPlayer(playerId: string) {
