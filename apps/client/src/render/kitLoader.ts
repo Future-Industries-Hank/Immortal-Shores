@@ -44,7 +44,7 @@ export async function preloadBuildingKits(scene: Scene): Promise<KitCache> {
     kinds.map(async (file) => {
       try {
         // Bump when Blender re-exports solid kits (dev/prod cache bust)
-        const KIT_VER = "overhaul-r11";
+        const KIT_VER = "overhaul-r15";
         const result = await SceneLoader.ImportMeshAsync(
           null,
           "/models/buildings/",
@@ -155,7 +155,11 @@ export function instantiateBuildingFromKit(
           } else if (n.includes("gold") || n.includes("lintel") || n.includes("win") || n.includes("glow")) {
             mat.emissiveColor = new Color3(0.2, 0.12, 0.04);
             mat.diffuseColor = Color3.Lerp(mat.diffuseColor, new Color3(0.85, 0.68, 0.28), 0.4);
-          } else if (n.includes("roof") || n.includes("canopy") || n.includes("cloth") || n.includes("awn")) {
+          } else if (n.includes("roof") || n.includes("thatch") || n.includes("plank")) {
+            // Roofs darker than walls: at board zoom the settlement was
+            // merging into one brown mass with no structure separation.
+            mat.diffuseColor = Color3.Lerp(mat.diffuseColor, new Color3(0.34, 0.25, 0.16), 0.3);
+          } else if (n.includes("canopy") || n.includes("cloth") || n.includes("awn")) {
             mat.diffuseColor = Color3.Lerp(mat.diffuseColor, new Color3(0.55, 0.4, 0.25), 0.25);
           }
         }
@@ -176,10 +180,12 @@ export function instantiateBuildingFromKit(
       ) {
         const am = c.material as StandardMaterial | null;
         if (am && am.diffuseColor) {
-          am.diffuseColor = new Color3(0.7, 0.62, 0.47);
+          // Match the desert almost exactly — a tray that reads as its own
+          // rectangle is a "sticker" deduction every round.
+          am.diffuseColor = new Color3(0.79, 0.71, 0.55);
           am.specularColor = Color3.Black();
         }
-        c.scaling.y = 0.45;
+        c.scaling.y = 0.22;
       }
       // Night craft = windows/hearth/glow only — never flat roof planes
       if (
