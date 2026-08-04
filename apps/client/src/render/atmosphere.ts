@@ -143,8 +143,8 @@ export class Atmosphere {
     // real near/far value falloff (EXP2 at ortho distance was either invisible
     // or a flat wash). Judges flagged the absence every round.
     this.scene.fogMode = Scene.FOGMODE_LINEAR;
-    this.scene.fogStart = 46;
-    this.scene.fogEnd = this.boardApprovalFog ? 96 : 120;
+    this.scene.fogStart = 32;
+    this.scene.fogEnd = this.boardApprovalFog ? 88 : 110;
     if (n < 0.35) {
       this.scene.fogColor = hexToColor3("#E4D4AE");
     } else if (n < 0.7) {

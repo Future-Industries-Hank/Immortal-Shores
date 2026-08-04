@@ -1,4 +1,4 @@
-# GOAL — FULL VISUAL OVERHAUL · Status after 10 judged rounds
+# GOAL — FULL VISUAL OVERHAUL · Status after 16 judged rounds
 
 **Date:** 2026-08-03 · **Branch:** main · **Evidence:** `tools/judge/evidence/full-overhaul/` (31 shots, regenerated every round)
 **Method:** build round → regenerate the whole 31-shot gallery from the live game → 4 independent art-director judges (structures/cohesion, environment, UI, product) score the *whole* gallery → fix their exact findings → repeat.
@@ -20,25 +20,33 @@
 | R9 | 5.8 | 4.2 | *harsher panel (3× zoom)*; kit transparency root cause found |
 | R10 | 6.0 | 4.8 | contact discs, palm rebuild, shop-tier identity, greybox purge |
 | R11 | 6.4 | 5.2 | horizon band, unified plot trays (structures 7.2, cohesion 6.8, map 7.4) |
-| **R12** | **5.8** | **4.3** | **owner directive: board framing cut ~45% dead desert** |
+| R12 | 5.8 | 4.3 | **owner directive: board framing cut the dead desert** |
+| R14 | 6.5 | 5.4 | framing pays off: depth 4.8→6.0, ground 4.6→6.2, **UI 8.1** |
+| **R16** | **6.3** | **4.6** | geometry repair: **cohesion 8.0**, **structures 7.4** |
 
 R9/R10 panels zoomed to 3× and found defects earlier rounds never saw, so the
 numbers dip while the product improves — compare `board-day.png` across rounds
 in git history rather than trusting the scalar.
 
-### Current per-category (R10, min across 4 judges)
+### Current per-category (R16, min across 4 judges)
 
-| Category | Score | Category | Score |
-|---|---:|---|---:|
-| **UI / HUD** | **7.9** | Materials | 6.0 |
-| **Mobile** | **7.4** | Life & motion | 5.9 |
-| **World map** | **7.2** | Cohesion | 5.6 |
-| Structures | 6.4 | Ground & river | 5.2 |
-| Lighting | 6.3 | Depth / staging | 5.0 |
-| First impression | 6.2 | Atmosphere | 4.8 |
+| Category | Score | | Category | Score |
+|---|---:|---|---|---:|
+| **Cohesion** | **8.0** | | Materials | 6.0 |
+| **UI / HUD** | **7.8** | | Lighting | 5.9 |
+| **Structures** | **7.4** | | Depth / staging | 5.8 |
+| World map | 6.8 | | First impression | 5.8 |
+| Mobile | 6.5 | | Ground & river | 5.6 |
+| | | | Life & motion | 5.3 |
+| | | | **Atmosphere** | **4.6** |
 
-**Gate (mean ≥ 8.0 / min ≥ 6) is NOT met.** UI, mobile and the world map are at
-or near the bar. The 3D environment is the whole remaining gap.
+**Gate (mean ≥ 8.0 / min ≥ 6) is NOT met**, but cohesion has reached the bar and
+structures/UI are within half a point. The floor is **atmosphere (4.6)** and
+**life & motion (5.3)** — both dominated by the single blocked item below
+(no smoke, dust, haze or water motion anywhere), plus ground & river.
+
+Trajectory over the 16 rounds: cohesion 5.6 → **8.0**, structures 6.4 → **7.4**,
+depth 5.0 → 5.8, ground 5.2 → 5.6, UI 7.9 → 7.8–8.1.
 
 ---
 

@@ -570,7 +570,7 @@ export class SettlementView {
       this.contactMat.diffuseColor = hexToColor3("#4A3520");
       this.contactMat.specularColor = Color3.Black();
       this.contactMat.emissiveColor = Color3.Black();
-      this.contactMat.alpha = 0.22;
+      this.contactMat.alpha = 0.15;
       this.contactMat.disableLighting = true;
       this.contactMat.zOffset = -2;
     }
@@ -584,7 +584,7 @@ export class SettlementView {
       const w = this.plotWorldArch(b.plotId);
       const disc = MeshBuilder.CreateDisc(
         `contact-${b.id}`,
-        { radius: 1.55, tessellation: 20 },
+        { radius: 1.45, tessellation: 20 },
         this.scene
       );
       disc.rotation.x = Math.PI / 2;

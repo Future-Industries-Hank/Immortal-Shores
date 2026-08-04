@@ -44,7 +44,7 @@ export async function preloadBuildingKits(scene: Scene): Promise<KitCache> {
     kinds.map(async (file) => {
       try {
         // Bump when Blender re-exports solid kits (dev/prod cache bust)
-        const KIT_VER = "overhaul-r15";
+        const KIT_VER = "overhaul-r16";
         const result = await SceneLoader.ImportMeshAsync(
           null,
           "/models/buildings/",
@@ -171,6 +171,31 @@ export function instantiateBuildingFromKit(
         if ("wireframe" in anyMat) anyMat.wireframe = false;
       }
       const name = c.name.toLowerCase();
+      // Per-kind roof/canopy accent: five workshop kinds were reading as one
+      // brown mass at board zoom. Each gets a distinguishing top colour.
+      const KIND_ACCENT: Record<string, [number, number, number]> = {
+        vessel_shop: [0.42, 0.47, 0.52],
+        reed_basket_shop: [0.78, 0.7, 0.45],
+        mudbrick_yard: [0.66, 0.42, 0.28],
+        luxury_workshop: [0.5, 0.4, 0.5],
+        training_grounds: [0.44, 0.4, 0.3],
+        ration_house: [0.56, 0.46, 0.3],
+      };
+      const accent = KIND_ACCENT[b.kind];
+      if (
+        accent &&
+        (name.includes("roof") || name.includes("thatch") ||
+          name.includes("plank") || name.includes("tile"))
+      ) {
+        const rm = c.material as StandardMaterial | null;
+        if (rm?.diffuseColor) {
+          rm.diffuseColor = Color3.Lerp(
+            rm.diffuseColor,
+            new Color3(accent[0], accent[1], accent[2]),
+            0.55
+          );
+        }
+      }
       // Plot trays: force ONE shared ground tone + flatten, so kits stop
       // reading as differently-beige tiles pasted onto the sand (cohesion).
       if (
@@ -178,14 +203,11 @@ export function instantiateBuildingFromKit(
         name.includes("earth_pack") ||
         name.includes("dirt_")
       ) {
-        const am = c.material as StandardMaterial | null;
-        if (am && am.diffuseColor) {
-          // Match the desert almost exactly — a tray that reads as its own
-          // rectangle is a "sticker" deduction every round.
-          am.diffuseColor = new Color3(0.79, 0.71, 0.55);
-          am.specularColor = Color3.Black();
-        }
-        c.scaling.y = 0.22;
+        // Hidden outright: neighbouring kits overlap, so their trays stacked
+        // into mismatched dark rectangles ("unfinished decal blending").
+        // Grounding comes from the per-building contact discs instead.
+        c.setEnabled(false);
+        continue;
       }
       // Night craft = windows/hearth/glow only — never flat roof planes
       if (
