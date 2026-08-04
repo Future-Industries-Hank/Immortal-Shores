@@ -514,7 +514,11 @@ export class SettlementView {
   private setOrtho(radius: number) {
     const aspect =
       this.engine.getRenderWidth() / Math.max(1, this.engine.getRenderHeight());
-    const h = radius * 0.45;
+    let h = radius * 0.45;
+    // Portrait/narrow: widen the frustum so the settlement still fits on a
+    // phone (a width-derived frame at this radius would crop the shore).
+    const MIN_HALF_WIDTH = 11.5;
+    if (h * aspect < MIN_HALF_WIDTH) h = MIN_HALF_WIDTH / aspect;
     this.camera.orthoLeft = -h * aspect;
     this.camera.orthoRight = h * aspect;
     this.camera.orthoTop = h;
@@ -737,16 +741,19 @@ export class SettlementView {
     const ridgeFarMat = new StandardMaterial("horizonRidgeFarMat", this.scene);
     ridgeFarMat.diffuseColor = hexToColor3("#9A8A70");
     ridgeFarMat.specularColor = Color3.Black();
+    // Far enough out that the tightened board frame never shows them whole —
+    // and faceted, because smooth spheres read as blurred decals pasted
+    // behind a flat-shaded world (judge R11).
     const ridgeSpecs: Array<[number, number, number, number, boolean]> = [
-      [26, -16, 22, 2.6, false], [30, 4, 24, 3.0, false],
-      [25, 21, 20, 2.4, false], [10, -24, 20, 2.4, false],
-      [-6, 26, 22, 2.6, false], [44, -6, 30, 4.4, true],
-      [40, 26, 26, 3.6, true], [-22, -30, 22, 3.0, true],
+      [46, -26, 30, 3.6, false], [52, 6, 34, 4.2, false],
+      [44, 34, 28, 3.4, false], [16, -44, 28, 3.4, false],
+      [-14, 46, 30, 3.6, false], [70, -8, 36, 5.4, true],
+      [60, 40, 30, 4.4, true], [-34, -46, 28, 4.0, true],
     ];
     for (const [rx, rz, rlen, rh, far] of ridgeSpecs) {
-      const ridge = MeshBuilder.CreateSphere(
+      const ridge = MeshBuilder.CreatePolyhedron(
         `horizonRidge-${rx}-${rz}`,
-        { diameter: 2, segments: 9 },
+        { type: 3, size: 1 },
         this.scene
       );
       ridge.scaling.set(rlen / 2, rh * 0.5, rlen / 4.5);

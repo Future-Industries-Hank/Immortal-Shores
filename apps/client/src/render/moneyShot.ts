@@ -23,10 +23,12 @@ export function applyStandardBoardCamera(camera: ArcRotateCamera) {
   camera.beta = 0.78; // more top-down than mid-iso money-shot
   // Owner law (full-overhaul goal): board was too zoomed out at 48 —
   // settlement + river should FILL the frame. Still fixed: no wheel zoom.
-  camera.radius = 30;
-  camera.target.set(-1.8, 0, 2.4);
-  camera.lowerRadiusLimit = 30;
-  camera.upperRadiusLimit = 30;
+  // Owner law: the board was mostly empty desert. Frame = settlement + the
+  // river edge + a thin desert margin for context, nothing more.
+  camera.radius = 24;
+  camera.target.set(-0.6, 0, 2.9);
+  camera.lowerRadiusLimit = 24;
+  camera.upperRadiusLimit = 24;
   camera.lowerBetaLimit = 0.78;
   camera.upperBetaLimit = 0.78;
   camera.lowerAlphaLimit = camera.alpha;
