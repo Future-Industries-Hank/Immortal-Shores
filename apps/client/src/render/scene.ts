@@ -729,6 +729,35 @@ export class SettlementView {
     palm(4.3, -12.3, 1.1, -0.15);
     palm(-1.8, -12.0, 1.3, 0.12);
 
+    // Horizon ridge band: gives the sand plane a terminus and closes the
+    // composition (judges: "no framing element, no horizon, plane flattens")
+    const ridgeMat = new StandardMaterial("horizonRidgeMat", this.scene);
+    ridgeMat.diffuseColor = hexToColor3("#A8926B");
+    ridgeMat.specularColor = Color3.Black();
+    const ridgeFarMat = new StandardMaterial("horizonRidgeFarMat", this.scene);
+    ridgeFarMat.diffuseColor = hexToColor3("#9A8A70");
+    ridgeFarMat.specularColor = Color3.Black();
+    const ridgeSpecs: Array<[number, number, number, number, boolean]> = [
+      [26, -16, 22, 2.6, false], [30, 4, 24, 3.0, false],
+      [25, 21, 20, 2.4, false], [10, -24, 20, 2.4, false],
+      [-6, 26, 22, 2.6, false], [44, -6, 30, 4.4, true],
+      [40, 26, 26, 3.6, true], [-22, -30, 22, 3.0, true],
+    ];
+    for (const [rx, rz, rlen, rh, far] of ridgeSpecs) {
+      const ridge = MeshBuilder.CreateSphere(
+        `horizonRidge-${rx}-${rz}`,
+        { diameter: 2, segments: 9 },
+        this.scene
+      );
+      ridge.scaling.set(rlen / 2, rh * 0.5, rlen / 4.5);
+      ridge.position.set(rx, -rh * 0.3, rz);
+      ridge.rotation.y = -0.6 + ((rx + rz) % 8) * 0.06;
+      ridge.material = far ? ridgeFarMat : ridgeMat;
+      ridge.parent = this.envRoot;
+      ridge.isPickable = false;
+      ridge.receiveShadows = true;
+    }
+
     // Crescent dune ridges — shared NW-SE wind direction
     const duneSpecs: Array<[number, number, number, number]> = [
       [16, -3, 5.5, 1.1], [21, 7, 7, 1.4], [13.5, 16.5, 5, 0.9],

@@ -44,7 +44,7 @@ export async function preloadBuildingKits(scene: Scene): Promise<KitCache> {
     kinds.map(async (file) => {
       try {
         // Bump when Blender re-exports solid kits (dev/prod cache bust)
-        const KIT_VER = "overhaul-r9";
+        const KIT_VER = "overhaul-r11";
         const result = await SceneLoader.ImportMeshAsync(
           null,
           "/models/buildings/",
@@ -167,6 +167,20 @@ export function instantiateBuildingFromKit(
         if ("wireframe" in anyMat) anyMat.wireframe = false;
       }
       const name = c.name.toLowerCase();
+      // Plot trays: force ONE shared ground tone + flatten, so kits stop
+      // reading as differently-beige tiles pasted onto the sand (cohesion).
+      if (
+        name.includes("apron") ||
+        name.includes("earth_pack") ||
+        name.includes("dirt_")
+      ) {
+        const am = c.material as StandardMaterial | null;
+        if (am && am.diffuseColor) {
+          am.diffuseColor = new Color3(0.7, 0.62, 0.47);
+          am.specularColor = Color3.Black();
+        }
+        c.scaling.y = 0.45;
+      }
       // Night craft = windows/hearth/glow only — never flat roof planes
       if (
         name.includes("gold") ||
