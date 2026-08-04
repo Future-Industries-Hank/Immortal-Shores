@@ -139,17 +139,18 @@ export class Atmosphere {
     // Board approval law: fog minimal — the fixed board camera sits ~48 units
     // out, so density 0.012 washed 28% grey over every building. Near-zero
     // density keeps depth cue without the film.
-    this.scene.fogMode = Scene.FOGMODE_EXP2;
-    const fogScale = this.boardApprovalFog ? 0.35 : 1;
+    // Aerial perspective: LINEAR fog over the board's depth range gives a
+    // real near/far value falloff (EXP2 at ortho distance was either invisible
+    // or a flat wash). Judges flagged the absence every round.
+    this.scene.fogMode = Scene.FOGMODE_LINEAR;
+    this.scene.fogStart = 34;
+    this.scene.fogEnd = this.boardApprovalFog ? 96 : 120;
     if (n < 0.35) {
-      this.scene.fogDensity = 0.012 * fogScale;
-      this.scene.fogColor = hexToColor3("#C4B898");
+      this.scene.fogColor = hexToColor3("#CFC3A4");
     } else if (n < 0.7) {
-      this.scene.fogDensity = 0.010 * fogScale;
-      this.scene.fogColor = hexToColor3("#C89878");
+      this.scene.fogColor = hexToColor3("#C08A62");
     } else {
-      this.scene.fogDensity = 0.018 * fogScale;
-      this.scene.fogColor = hexToColor3("#101820");
+      this.scene.fogColor = hexToColor3("#0E1620");
     }
 
     // Night local lamps (window/hearth falloff — not roof flood)

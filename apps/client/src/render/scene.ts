@@ -892,18 +892,36 @@ export class SettlementView {
       ctx.fillStyle = `rgb(${br},${bg},${bb})`;
       ctx.fillRect(0, 0, size, size);
       // MACRO: large soft tonal blotches (visible at board distance)
-      for (let k = 0; k < 26; k++) {
+      for (let k = 0; k < 34; k++) {
         const x = Math.random() * size;
         const y = Math.random() * size;
         const r = size * (0.12 + Math.random() * 0.2);
-        const dv = (Math.random() - 0.42) * 44;
+        const dv = (Math.random() - 0.4) * 62;
         const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-        g.addColorStop(0, `rgba(${br + dv},${bg + dv * 0.86},${bb + dv * 0.66},0.72)`);
+        g.addColorStop(0, `rgba(${br + dv},${bg + dv * 0.84},${bb + dv * 0.6},0.85)`);
         g.addColorStop(1, "rgba(0,0,0,0)");
         ctx.fillStyle = g;
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fill();
+      }
+      // Dune shadow crescents — soft form, so the plane is not just noise
+      for (let k = 0; k < 9; k++) {
+        const cx = Math.random() * size;
+        const cy = Math.random() * size;
+        const rr = size * (0.09 + Math.random() * 0.13);
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(-0.7 + Math.random() * 0.3);
+        ctx.scale(1, 0.42);
+        const g2 = ctx.createRadialGradient(0, 0, rr * 0.25, 0, 0, rr);
+        g2.addColorStop(0, `rgba(${br - 34},${bg - 32},${bb - 26},0.34)`);
+        g2.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = g2;
+        ctx.beginPath();
+        ctx.arc(0, 0, rr, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
       }
       // MICRO: grit speckle + silt flecks
       const img = ctx.getImageData(0, 0, size, size);
@@ -1307,7 +1325,7 @@ export class SettlementView {
   private makeOneBarge(name: string, x: number, z: number, scale: number): TransformNode {
     const root = new TransformNode(name, this.scene);
     root.parent = this.envRoot;
-    root.position.set(x, 0.08, z);
+    root.position.set(x, -0.06, z);
     root.scaling.setAll(scale);
     const dark = name.endsWith("2") ? "#4E3018" : "#5A3A22";
     const hm = new StandardMaterial(`${name}HullMat`, this.scene);
@@ -1373,13 +1391,13 @@ export class SettlementView {
     if (this.bargeNode) {
       const z = -6 + Math.sin(now * 0.12) * 8;
       this.bargeNode.position.z = z;
-      this.bargeNode.position.y = 0.12 + Math.sin(now * 1.6) * 0.03;
+      this.bargeNode.position.y = -0.06 + Math.sin(now * 1.6) * 0.02;
       this.bargeNode.rotation.y = Math.sin(now * 0.2) * 0.08;
     }
     if (this.bargeNode2) {
       const z2 = 4 + Math.sin(now * 0.09 + 1.2) * 6;
       this.bargeNode2.position.z = z2;
-      this.bargeNode2.position.y = 0.12 + Math.sin(now * 1.4 + 0.5) * 0.025;
+      this.bargeNode2.position.y = -0.06 + Math.sin(now * 1.4 + 0.5) * 0.02;
       this.bargeNode2.rotation.y = Math.PI + Math.sin(now * 0.15) * 0.06;
     }
   }
