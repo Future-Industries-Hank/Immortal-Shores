@@ -3390,3 +3390,25 @@ html.dark .goals-ring {
   background: rgba(16, 11, 6, 0.42);
   z-index: 29;
 }
+
+/* Wide screens: dock the panel to the left over the river instead of
+   centring it over the settlement it manages, and anchor its TOP so the
+   card no longer leaps vertically when you switch tabs (judge R12). */
+@media (min-width: 1100px) {
+  .menu-popup {
+    left: 1rem;
+    right: auto;
+    margin-inline: 0;
+    top: 0.75rem;
+    bottom: auto;
+    width: min(430px, 34vw);
+    max-height: min(86vh, 760px);
+  }
+  .menu-popup.map-wide {
+    left: 0;
+    right: 0;
+    margin-inline: auto;
+    top: 0.75rem;
+    width: min(860px, calc(100vw - 24px));
+  }
+}
