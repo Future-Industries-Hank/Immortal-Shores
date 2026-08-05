@@ -278,6 +278,10 @@ export class Atmosphere {
           hexToColor3("#050E16"),
           n
         );
+        // Inert on this Babylon build — water.fragment declares waterColor2 and
+        // never reads it (both FRESNELSEPARATE mixes use waterColor). Driven
+        // anyway so a version that honours it inherits the right arc rather
+        // than a stale constant.
         wm.waterColor2 = Color3.Lerp(
           hexToColor3("#2A6474"),
           hexToColor3("#0C2438"),
@@ -298,15 +302,24 @@ export class Atmosphere {
         // The refraction target is deliberately empty (scene.ts), so its clear
         // colour IS the "looking into the water" term. Left alone it inherits
         // the warm desert clearColor and puts sand inside the Nile.
+        // #57594A -> #3A4638. This term is a fixed 30% of every water pixel and
+        // it cannot vary, so it is the floor the channel can never go below.
+        // scene.ts moved 7.4% of the pixel off flat waterColor and onto the
+        // mirror (colorBlendFactor2 0.84 -> 0.66); taking the same amount of
+        // value out of this constant holds the body where it measured while
+        // roughly doubling the range the ripples have to swing through.
         const refr = wm.refractionTexture;
         if (refr) {
           refr.clearColor = Color4.FromColor3(
-            Color3.Lerp(hexToColor3("#57594A"), hexToColor3("#131A1E"), n),
+            Color3.Lerp(hexToColor3("#3A4638"), hexToColor3("#0E1418"), n),
             1
           );
         }
         // Specular takes the sun's own colour, so the band on the water is
         // literally the sun that is lighting the sand, and it dims out at night.
+        // Left at 0.45: the measured sweep (see scene.ts specularPower) shows
+        // the broad lobe already carries the whole channel, so raising this
+        // only lifts the mean.
         wm.specularColor = sunCol.scale(0.45 * (1 - n * 0.85));
       }
     }

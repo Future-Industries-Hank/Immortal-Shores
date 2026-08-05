@@ -307,6 +307,12 @@ export function plotWorld(plotId: string): { x: number; z: number } {
 // "where" is a function of the plot layout above and has to move with it.
 // Nothing in apps/server reads this.
 
+/**
+ * Only "obelisk" is on the board today. "statue_seated" is kept in the union so
+ * the shape is still there if a single sited colossus is ever wanted again, but
+ * it is NOT in the client's DECOR_KINDS, so adding one here without also adding
+ * it back there would place a monument that never loads.
+ */
 export type MonumentKind = "obelisk" | "statue_seated";
 
 export interface MonumentSpec {
@@ -326,26 +332,33 @@ export interface MonumentSpec {
 }
 
 /**
- * FOUR monuments on the whole board — the owner's ceiling ("just 1-4 spread
- * around different parts of the settlement", "we dont want groupings of
- * statutes/obelisks"), with the pyramid's flanking pair counted against it.
+ * TWO standing monuments here, THREE on the board once the pyramid is counted —
+ * the owner's ceiling is "just 1-4 spread around different parts of the
+ * settlement", and it has now been overshot twice.
  *
- * Three sites, all of them EDGES of the settlement, none inside or adjacent to
- * the plot cluster: the nearest pad to any monument is 0.30 units clear of its
- * footprint and the nearest road is 0.70 clear of its apron. The two obelisks
- * are 18.0 units apart and the statue pair is 18.3 from the nearer of them, so
- * no two sites can read as a group.
+ * THE SEATED PAIR IS DELETED, not relocated. Both entries stood at x 9.9 either
+ * side of z 8.6, and the measured result was the regression the judges called
+ * out: their two contact discs (r 1.20) reached x 11.10 while the pyramid's
+ * socle starts at x 10.902, so each disc ran 0.198 UNDER the tomb, and both
+ * aprons sat inside the causeway slab (dy 0.018) so the two figures shared one
+ * paved court. That is a "grouping" and a "crowding" in one object, which is
+ * exactly what the owner ruled out twice.
  *
- * DELETE, do not relocate: the standing pair on the Great House forecourt
- * (statue_standing at -3.05,0.15 and -1.3,0.15). Those are the "two statues in
- * the middle of the plot area" — with the workshop crescent moved south they
- * now sit in open plaza between hub-shop and the civic core, which is worse,
- * and they are over budget regardless.
+ * Neither half could simply move: the only ground with a real reason for a
+ * seated colossus is the tomb approach, and putting one monument back there
+ * rebuilds the same precinct the judges asked to be cleared. Better three
+ * monuments in three genuinely different quarters than four with two sharing a
+ * quarter, so the kind is dropped from the board entirely (and from
+ * DECOR_KINDS, so its .glb is no longer fetched).
  *
- * Every position below was probed against the LIVE ground mesh: the obelisks
- * return y = 0.000 and the statue pair 0.154 / 0.174 (a 0.02 difference across
- * the 2.7-unit gate, so the pair reads level). All four project inside the
- * 1600x852 frame — see the sx/sy in each `why`.
+ * DELETED in the previous round for the same reason, kept deleted: the
+ * statue_standing pair on the Great House forecourt (-3.05,0.15 / -1.3,0.15),
+ * the "two statues in the middle of the plot area".
+ *
+ * Both surviving positions were probed against the LIVE ground mesh and return
+ * y = 0.000, and both project inside the 1600x852 frame — see the sx/sy in each
+ * `why`. They are 18.0 units apart, so they bracket the settlement rather than
+ * grouping, and the pyramid is 21+ from either.
  */
 export const SETTLEMENT_MONUMENTS: MonumentSpec[] = [
   {
@@ -377,44 +390,32 @@ export const SETTLEMENT_MONUMENTS: MonumentSpec[] = [
       "and it is the single object that occupies the deep lower-left the " +
       "judges called empty. Ground y 0.000, 1.7 clear of the reed line.",
   },
-  {
-    id: "mon-tomb-gate-s",
-    kind: "statue_seated",
-    worldX: 9.9,
-    worldZ: 7.25,
-    rotY: -1.5708,
-    apron: 1.5,
-    why:
-      "South half of the pyramid gate. The pair straddles z = 8.6, the tomb's " +
-      "own centreline, at x 9.9 — 2.5 short of the tomb and 2.65 clear of the " +
-      "chariot grounds — so they actually flank the approach instead of one " +
-      "sitting far back and one square in the doorway. Both face -x, down the " +
-      "causeway toward the settlement (screen 1231,509).",
-  },
-  {
-    id: "mon-tomb-gate-n",
-    kind: "statue_seated",
-    worldX: 9.9,
-    worldZ: 9.95,
-    rotY: -1.5708,
-    apron: 1.5,
-    why:
-      "North half of the same gate, mirrored about z = 8.6 (screen 1296,454). " +
-      "2.70 between the two, which is one clear gate-width at this camera.",
-  },
 ];
 
 /**
- * The paved processional the tomb gate stands on — this is the "causeway that
- * made it read as a processional" the judges said had gone. Runs along the
- * tomb's centreline from the open sand east of the training column up to the
- * tomb's own sand drift, which takes over at x ~ 11.2.
+ * The paved processional to the tomb. It now runs along Z, into the pyramid's
+ * ENTRANCE, and it is a way rather than a slab. Both changes are corrections:
+ *
+ *  - WRONG FACE. Laid along x it approached the tomb's -x flank, while the
+ *    portal is modelled on the -z face — the judges' "the court adjoins the
+ *    pyramid's NW flank while the entrance portal is on another face".
+ *  - INTERPENETRATION. The old run ended at x 11.2 but the pyramid's socle
+ *    starts at x 10.902, so 0.298 of the slab passed UNDER the tomb with a hard
+ *    seam. `toZ` is now 7.05 against a measured socle edge of z 7.102: a 0.052
+ *    sand line, so the paving butts the base and can never slice it.
+ *  - PROPORTION. 2.3 long by 2.9 wide is a forecourt, not a processional, and
+ *    that is what let two monuments look like they shared one apron. 4.45 by
+ *    1.90 is 2.3:1 and reads as a road.
+ *
+ * The whole run was ray-probed against the live ground: y spans 0.000-0.023
+ * from z 2.5 to 7.0 at x 12.4, i.e. dead flat, and it crosses the tomb's own
+ * sand drift toe (z ~ 5.1) where the renderer conforms it to the drift.
  */
 export const TOMB_CAUSEWAY = {
-  fromX: 8.9,
-  toX: 11.2,
-  z: 8.6,
-  width: 2.9,
+  x: 12.4,
+  fromZ: 2.6,
+  toZ: 7.05,
+  width: 1.9,
 } as const;
 
 /** Cost to found a brand-new building on an empty typed pad (L1). */

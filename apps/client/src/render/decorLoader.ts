@@ -21,18 +21,22 @@ import "@babylonjs/loaders/glTF";
  * asset" to go, the kit agent deleted `stele.glb`, and leaving the kind in this
  * list would only cost a 404 per boot.
  *
- * STATUE_STANDING is absent for the same reason as of this round. The owner:
- * "delete those 4 items in the middle of the plot area… just 1-4 spread around
- * different parts of the settlement." The standing pair was the Great House
- * forecourt group; the board's four monuments are now two obelisks and the
- * tomb's seated gate (SETTLEMENT_MONUMENTS). statue_standing.glb is still on
- * disk — it is simply never fetched, which is 185 KB off every cold boot.
+ * STATUE_STANDING is absent for the same reason: it was the Great House
+ * forecourt group, and the owner asked for "1-4 spread around different parts
+ * of the settlement", not groups.
+ *
+ * STATUE_SEATED joins them this round. The seated pair was the tomb gate, and
+ * measured against the live scene it was a grouping (two figures on one paved
+ * court) whose contact discs ran 0.198 under the pyramid's socle. There is no
+ * second quarter on the board with a reason for a lone colossus, so the pair is
+ * cut rather than half-relocated — see SETTLEMENT_MONUMENTS. The board's three
+ * monuments are now two obelisks and the tomb.
+ *
+ * stele.glb is gone from disk; statue_seated.glb (215 KB) and
+ * statue_standing.glb (185 KB) are still there and simply never fetched, which
+ * keeps 400 KB off every cold boot.
  */
-export const DECOR_KINDS = [
-  "obelisk",
-  "statue_seated",
-  "small_pyramid",
-] as const;
+export const DECOR_KINDS = ["obelisk", "small_pyramid"] as const;
 
 export type DecorKind = (typeof DECOR_KINDS)[number];
 

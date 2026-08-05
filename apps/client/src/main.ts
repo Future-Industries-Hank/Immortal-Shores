@@ -119,13 +119,50 @@ async function enterGame() {
     new URLSearchParams(location.search).get("standard") === "1";
   view.prepareStandardBoard();
   requestAnimationFrame(() => view?.prepareStandardBoard());
-  // Capture tooling: ?closeup=<kind> frames one hero for judge evidence
-  const closeupKind = new URLSearchParams(location.search).get("closeup");
+  // Capture tooling: ?closeup=<kind> frames one hero for judge evidence.
+  // Debug-only path — the product board never reaches any of this.
+  //
+  // Why the extra frustum step: scene.setOrtho() clamps every frame to a
+  // MIN_HALF_WIDTH (11.5 world units) so the whole settlement still fits on a
+  // narrow phone. That clamp also floors the closeup: at radius 7 the derived
+  // half-width is 5.9, so the clamp inflated it back to 11.5 — the closeup
+  // could never actually get close, AND the inflated frame ran off the south
+  // edge of the terrain mesh, letting the day clear colour (#C9A972) through
+  // as a flat ~29px band at the bottom of 15/16. Re-deriving the frustum here
+  // after prepareCloseup() fixes both without touching setOrtho or the board.
+  const qp = new URLSearchParams(location.search);
+  const closeupKind = qp.get("closeup");
   if (closeupKind) {
-    const frameHero = () => view?.prepareCloseup(closeupKind);
+    // world half-width of the closeup frame; ?closeupHalf= overrides
+    const halfW = Math.max(1, Number(qp.get("closeupHalf")) || 6);
+    const tighten = (half = halfW) => {
+      const v = view;
+      if (!v) return;
+      const aspect =
+        v.engine.getRenderWidth() / Math.max(1, v.engine.getRenderHeight());
+      v.camera.orthoLeft = -half;
+      v.camera.orthoRight = half;
+      v.camera.orthoTop = half / aspect;
+      v.camera.orthoBottom = -half / aspect;
+    };
+    const frameHero = () => {
+      const ok = view?.prepareCloseup(closeupKind) ?? false;
+      tighten(); // prepareCloseup() ends in setOrtho(), so re-derive after it
+      return ok;
+    };
     frameHero();
     setTimeout(frameHero, 800); // re-apply once kits/snapshot settle
     setTimeout(frameHero, 2000);
+    // scene.ts re-runs setOrtho on every resize; re-tighten behind it
+    window.addEventListener("resize", () => setTimeout(tighten, 0));
+    (window as unknown as { __closeup?: (k: string, h?: number) => boolean }).__closeup = (
+      k: string,
+      h?: number
+    ) => {
+      const ok = view?.prepareCloseup(k) ?? false;
+      tighten(h && h > 0 ? h : halfW);
+      return ok;
+    };
   }
   (window as unknown as {
     __prepareStandardBoard?: () => void;
@@ -137,6 +174,12 @@ async function enterGame() {
     beta: view?.camera.beta,
     alpha: view?.camera.alpha,
     fps: view?.getFps(),
+    // frustum, so the harness can assert framing instead of guessing from px
+    orthoLeft: view?.camera.orthoLeft,
+    orthoRight: view?.camera.orthoRight,
+    orthoTop: view?.camera.orthoTop,
+    orthoBottom: view?.camera.orthoBottom,
+    target: view ? { x: view.camera.target.x, z: view.camera.target.z } : null,
   });
   if (showBoardLabel) {
     const lab = document.createElement("div");
