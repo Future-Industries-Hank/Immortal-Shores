@@ -44,7 +44,7 @@ export async function preloadBuildingKits(scene: Scene): Promise<KitCache> {
     kinds.map(async (file) => {
       try {
         // Bump when Blender re-exports solid kits (dev/prod cache bust)
-        const KIT_VER = "overhaul-r16";
+        const KIT_VER = "textured-r17";
         const result = await SceneLoader.ImportMeshAsync(
           null,
           "/models/buildings/",

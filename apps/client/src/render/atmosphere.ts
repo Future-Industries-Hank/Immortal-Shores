@@ -29,6 +29,8 @@ export class Atmosphere {
   private pausedPhase: DayPhase | null = null;
   /** 02.9 Step 2 — minimal fog for board readability */
   private boardApprovalFog = false;
+  /** 0 humble → 1 imperial. AMBIENT POLISH ONLY — see setTierWarmth(). */
+  private tierWarmth = 0;
 
   constructor(
     private scene: Scene,
@@ -93,6 +95,26 @@ export class Atmosphere {
     this.boardApprovalFog = on;
   }
 
+  /**
+   * Settlement tier → "lighting slightly warmer and richer at higher tiers".
+   *
+   * DELIBERATELY TINY, and it has to stay that way. The exposure and hue
+   * balance took three rounds (board p50/p95/p99 181/233/240, light-to-shadow
+   * hue separation 7.98 deg) and the failure mode is well documented in
+   * update(): StandardMaterial clamps the light sum BEFORE the albedo
+   * multiplies, so pushing the key warm pins red ahead of blue and rotates the
+   * whole desert off its hue axis. So this moves ONLY the two terms that are
+   * either outside the clamp or too small to reach it:
+   *   - the day key chromaticity by 7 units of blue out of 255 (#FFF2E2 →
+   *     #FFF2DB), which is under the clamp headroom at intensity 1.12
+   *   - the sand-bounce fill, which is a hemispheric groundColor and therefore
+   *     only ever adds to surfaces facing away from the key
+   * Neither term changes intensity, so the exposure percentiles do not move.
+   */
+  setTierWarmth(w: number) {
+    this.tierWarmth = w < 0 ? 0 : w > 1 ? 1 : w;
+  }
+
   update(now = performance.now() * 0.001, river?: Mesh | null) {
     const n = this.phase01(now);
     // KEY CHROMATICITY IS THE CLAMP GUARD. StandardMaterial clamps
@@ -104,7 +126,11 @@ export class Atmosphere {
     // together, so over-driving it costs highlight MODELLING but cannot move
     // the hue. The warmth the key used to supply now lives in the sand albedo,
     // where it is immune to the clamp entirely.
-    const dayColor = hexToColor3("#FFF2E2");
+    const dayColor = Color3.Lerp(
+      hexToColor3("#FFF2E2"),
+      hexToColor3("#FFF2DB"),
+      this.tierWarmth
+    );
     const duskColor = hexToColor3("#E07040");
     const nightColor = hexToColor3("#1A2840");
     const sunCol =
@@ -118,7 +144,21 @@ export class Atmosphere {
     // on the ALBEDO side — groundMat.diffuseColor and the sand tile's own
     // lightness in scene.ts — and the key stays where the hue measurements were
     // taken. Raising this is not the lever; it only clips the windward brinks.
-    this.sun.intensity = 1.3 - n * 0.65;
+    //
+    // KEY CUT 1.30 -> 1.12, AND THIS IS A MODELLING FIX, NOT AN EXPOSURE ONE.
+    // Measured on the live board (drop the key 10%, then map which bright
+    // pixels do NOT move — anything that cannot respond is sitting on the
+    // clamp): 13.4% of the frame was pinned at the ceiling at 1.30, and it was
+    // pinned on exactly the surfaces that carry form — building roofs, sunward
+    // walls, white stone. A kit wall facing the sun takes NdotL 0.82 and a roof
+    // 0.535, so at 1.30 the wall summed to 1.33 and the roof to 0.96 and BOTH
+    // resolved to 1.0: the lit plane and the mid plane photographed as the same
+    // value. That is the "flat / stickers on a plane" read. At 1.12 the pair
+    // lands at 1.15 / 0.83, clipping falls to ~7%, and the mass gets its three
+    // planes back. The stop that comes off here is bought back downstream in
+    // scene.ts (imageProcessing exposure/contrast, and the sand's own albedo),
+    // both of which sit OUTSIDE the clamp and so cannot re-pin anything.
+    this.sun.intensity = 1.12 - n * 0.56;
     // Sun path: high warm day key -> long low western dusk -> faint moon.
     // Judges: "dusk is the day shot with an orange tint" — direction must move.
     // Day elevation raised 24 -> 32 degrees: at 24 the flat gameplay rect only took
@@ -139,7 +179,10 @@ export class Atmosphere {
     this.sun.position = new Vector3(14, 26 - n * 14, -8);
 
     // Fill sits at ~0.4 of the key. Lower and the slip faces go to tar.
-    this.hemi.intensity = 0.51 - n * 0.24;
+    // Tracks the key cut above so the ratio stays 0.41 — leaving the fill at
+    // 0.51 against a 1.12 key would have taken it to 0.46 of the key, i.e.
+    // handed back in flatness exactly what the key cut just bought.
+    this.hemi.intensity = 0.46 - n * 0.216;
     // SKY, not a second sun. The fill used to be #F2E6CE — warm cream, i.e. the
     // same swatch as the key, which is why a lee slope was the lit slope minus
     // value and the desert's whole hue span collapsed to 5 degrees. A real sky
@@ -154,7 +197,11 @@ export class Atmosphere {
     // Bounce off the sand, so it must be WARM and must not be read from the map
     // palette: delta_marsh ships sandDeep #A8B070, a green, and routing that
     // into the downward fill put a olive wash under every overhang.
-    this.hemi.groundColor = hexToColor3("#C08E52").scale(0.3 * (1 - n * 0.75));
+    // +8% of its own value at imperial: a richer bounce under the overhangs,
+    // which is where "warmer and richer" is legible without touching the key.
+    this.hemi.groundColor = hexToColor3("#C08E52").scale(
+      0.3 * (1 + this.tierWarmth * 0.08) * (1 - n * 0.75)
+    );
 
     // Day clear matches desert sand so map fringe never reads as void edge
     const clearDay = Color4.FromColor3(hexToColor3("#C9A972"), 1);

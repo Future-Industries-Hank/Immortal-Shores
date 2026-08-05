@@ -16,12 +16,16 @@ import {
 } from "@babylonjs/core";
 import "@babylonjs/loaders/glTF";
 
+/**
+ * The STELE is deliberately absent: the owner asked for "the tablet looking
+ * asset" to go, the kit agent deleted `stele.glb`, and leaving the kind in this
+ * list would only cost a 404 per boot.
+ */
 export const DECOR_KINDS = [
   "obelisk",
   "statue_standing",
   "statue_seated",
   "small_pyramid",
-  "stele",
 ] as const;
 
 export type DecorKind = (typeof DECOR_KINDS)[number];
@@ -32,6 +36,14 @@ export type DecorCache = Map<
 >;
 
 const DECOR_DIR = "/models/decor/";
+
+/**
+ * Cache bust. The decor GLBs were re-authored this round (hardstone hue rotated
+ * off plum, standing statue re-modelled, baked surface atlases added) and this
+ * loader had no version token at all, so a warm browser cache would keep
+ * serving the old props. Bump whenever /models/decor/*.glb is re-exported.
+ */
+const DECOR_VER = "r7-hardstone";
 
 /**
  * Per-kind albedo exposure. The tomb ships at the same hue AND the same value
@@ -55,7 +67,7 @@ export async function preloadDecorKits(scene: Scene): Promise<DecorCache> {
   await Promise.all(
     DECOR_KINDS.map(async (kind) => {
       try {
-        const res = await fetch(`${DECOR_DIR}${kind}.glb`);
+        const res = await fetch(`${DECOR_DIR}${kind}.glb?v=${DECOR_VER}`);
         if (!res.ok) return;
         const buf = await res.arrayBuffer();
         const result = await SceneLoader.ImportMeshAsync(
