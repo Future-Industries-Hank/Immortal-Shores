@@ -13,7 +13,6 @@ import {
   type Mesh,
   type StandardMaterial,
 } from "@babylonjs/core";
-import { STYLE } from "@immortal/shared";
 import { hexToColor3 } from "./colors.js";
 
 export type DayPhase = "day" | "dusk" | "night";
@@ -96,7 +95,16 @@ export class Atmosphere {
 
   update(now = performance.now() * 0.001, river?: Mesh | null) {
     const n = this.phase01(now);
-    const dayColor = hexToColor3("#FFE0A8");
+    // KEY CHROMATICITY IS THE CLAMP GUARD. StandardMaterial clamps
+    // (lightSum * diffuseColor + emissive) to 1 BEFORE the albedo multiplies,
+    // so a warm key makes red hit the ceiling while blue is still climbing —
+    // that differential pin is what rotated the sand off its hue axis and read
+    // as olive, and it is why the key had to be cut to 1.30 and the whole frame
+    // lost a third of a stop. A near-neutral key clamps all three channels
+    // together, so over-driving it costs highlight MODELLING but cannot move
+    // the hue. The warmth the key used to supply now lives in the sand albedo,
+    // where it is immune to the clamp entirely.
+    const dayColor = hexToColor3("#FFF2E2");
     const duskColor = hexToColor3("#E07040");
     const nightColor = hexToColor3("#1A2840");
     const sunCol =
@@ -104,15 +112,12 @@ export class Atmosphere {
         ? Color3.Lerp(dayColor, duskColor, n * 2)
         : Color3.Lerp(duskColor, nightColor, (n - 0.5) * 2);
     this.sun.diffuse = sunCol;
-    // LIGHT BUDGET — do not raise without re-measuring the sand hue.
-    // StandardMaterial computes clamp(lightSum * diffuseColor + emissive, 0, 1)
-    // and only THEN multiplies the albedo texture. At the old 1.9 key + 0.52 fill
-    // the sand's red and green both pinned at 1.0 while blue did not, which rotated
-    // the hue +12 degrees off the sand axis: that clamp WAS the olive/sage stain the
-    // judges saw, and it flattened every lit face to the same value. Measured:
-    // hue p05/p95 35.2/46.5 clamped vs 33.3/37.9 once the sum sits under 1.
-    // Measured headroom at these values: the clamp starts skewing hue again at a
-    // 1.12x key, so there is ~10% of margin and no more.
+    // LIGHT BUDGET. The clamp still exists, but with a near-neutral key (above)
+    // it now pins all three channels within ~3% of each other, so crossing it
+    // costs highlight modelling rather than hue. Exposure is therefore bought
+    // on the ALBEDO side — groundMat.diffuseColor and the sand tile's own
+    // lightness in scene.ts — and the key stays where the hue measurements were
+    // taken. Raising this is not the lever; it only clips the windward brinks.
     this.sun.intensity = 1.3 - n * 0.65;
     // Sun path: high warm day key -> long low western dusk -> faint moon.
     // Judges: "dusk is the day shot with an orange tint" — direction must move.
@@ -133,15 +138,23 @@ export class Atmosphere {
     this.sun.direction = dir.normalize();
     this.sun.position = new Vector3(14, 26 - n * 14, -8);
 
-    // Fill sits at ~0.4 of the key. Lower and the slip faces go to tar; higher and
-    // the sum crosses the clamp again and the sand desaturates back to khaki.
+    // Fill sits at ~0.4 of the key. Lower and the slip faces go to tar.
     this.hemi.intensity = 0.51 - n * 0.24;
+    // SKY, not a second sun. The fill used to be #F2E6CE — warm cream, i.e. the
+    // same swatch as the key, which is why a lee slope was the lit slope minus
+    // value and the desert's whole hue span collapsed to 5 degrees. A real sky
+    // term is blue, and because it only dominates where NdotL is low it shifts
+    // exactly the surfaces that should read as shadow while leaving the lit
+    // faces (and therefore the clamp) alone.
     this.hemi.diffuse = Color3.Lerp(
-      hexToColor3("#F2E6CE"),
+      hexToColor3("#C9D9EF"),
       hexToColor3("#1A2840"),
       n
     );
-    this.hemi.groundColor = hexToColor3(STYLE.sandDeep).scale(0.3 * (1 - n * 0.75));
+    // Bounce off the sand, so it must be WARM and must not be read from the map
+    // palette: delta_marsh ships sandDeep #A8B070, a green, and routing that
+    // into the downward fill put a olive wash under every overhang.
+    this.hemi.groundColor = hexToColor3("#C08E52").scale(0.3 * (1 - n * 0.75));
 
     // Day clear matches desert sand so map fringe never reads as void edge
     const clearDay = Color4.FromColor3(hexToColor3("#C9A972"), 1);
@@ -181,24 +194,74 @@ export class Atmosphere {
     }
 
     // PRESERVE dark depth water — never lerp toward candy riverLight.
-    // StandardMaterial ONLY. On the med/high tiers the channel is a WaterMaterial,
-    // and this block was writing alpha 0.97 onto it every frame: that put the water
-    // in the transparent pass at the same alphaIndex as the shore ribbon, so which
-    // of the two drew last came down to bounding-sphere sort order and the channel
-    // routinely painted over the wet sand it was supposed to meet.
+    // The two tiers carry different materials and must be driven differently.
+    // The old guard limited this block to StandardMaterial because it was
+    // writing alpha 0.97 onto the WaterMaterial every frame, which put the
+    // channel in the transparent pass at the same alphaIndex as the shore
+    // ribbon and let it paint over the wet sand. Skipping it wholesale left the
+    // WaterMaterial with NO time-of-day response at all — the channel stayed
+    // one fixed colour from noon to midnight. It gets its own branch now.
     if (river) {
-      const rm = river.material as StandardMaterial | null;
+      const rm = river.material;
       if (rm && rm.getClassName() === "StandardMaterial") {
+        const sm = rm as StandardMaterial;
         const deep = hexToColor3("#061820");
         const mid = hexToColor3("#0C2838");
-        rm.diffuseColor = Color3.Lerp(mid, deep, 0.5 + n * n * 0.4);
-        rm.specularColor = n > 0.25 && n < 0.75
+        sm.diffuseColor = Color3.Lerp(mid, deep, 0.5 + n * n * 0.4);
+        sm.specularColor = n > 0.25 && n < 0.75
           ? hexToColor3("#E8925A").scale(0.5)
           : hexToColor3("#6AA8C0").scale(0.35 + (1 - n) * 0.2);
-        rm.specularPower = 72;
-        rm.alpha = 0.97;
-        rm.emissiveColor = deep.scale(0.12 + Math.sin(now * 1.1) * 0.02);
+        sm.specularPower = 72;
+        sm.alpha = 0.97;
+        sm.emissiveColor = deep.scale(0.12 + Math.sin(now * 1.1) * 0.02);
+      } else if (rm && rm.getClassName() === "WaterMaterial") {
+        const wm = rm as unknown as WaterLike;
+        // Body colour: the deep channel. Never touch alpha here.
+        wm.waterColor = Color3.Lerp(
+          hexToColor3("#123C44"),
+          hexToColor3("#050E16"),
+          n
+        );
+        wm.waterColor2 = Color3.Lerp(
+          hexToColor3("#2A6474"),
+          hexToColor3("#0C2438"),
+          n
+        );
+        // The reflection target has no skybox to render, so its clear colour IS
+        // the sky the water reflects. Driving it on the same arc as
+        // scene.clearColor keeps the river and the horizon telling one story.
+        const skyDay = hexToColor3("#7FA8CC");
+        const skyDusk = hexToColor3("#DE8A58");
+        const skyNight = hexToColor3("#0A1424");
+        const sky =
+          n < 0.5
+            ? Color3.Lerp(skyDay, skyDusk, n * 2)
+            : Color3.Lerp(skyDusk, skyNight, (n - 0.5) * 2);
+        const refl = wm.reflectionTexture;
+        if (refl) refl.clearColor = Color4.FromColor3(sky, 1);
+        // The refraction target is deliberately empty (scene.ts), so its clear
+        // colour IS the "looking into the water" term. Left alone it inherits
+        // the warm desert clearColor and puts sand inside the Nile.
+        const refr = wm.refractionTexture;
+        if (refr) {
+          refr.clearColor = Color4.FromColor3(
+            Color3.Lerp(hexToColor3("#57594A"), hexToColor3("#131A1E"), n),
+            1
+          );
+        }
+        // Specular takes the sun's own colour, so the band on the water is
+        // literally the sun that is lighting the sand, and it dims out at night.
+        wm.specularColor = sunCol.scale(0.45 * (1 - n * 0.85));
       }
     }
   }
 }
+
+/** Only the WaterMaterial fields this file drives — avoids a runtime import. */
+type WaterLike = {
+  waterColor: Color3;
+  waterColor2: Color3;
+  specularColor: Color3;
+  reflectionTexture: { clearColor: Color4 } | null;
+  refractionTexture: { clearColor: Color4 } | null;
+};
