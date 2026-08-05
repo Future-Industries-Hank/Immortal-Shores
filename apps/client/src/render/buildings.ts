@@ -23,6 +23,13 @@ export type BuildingMeshes = {
   emissives: Mesh[];
   /** Workshop motion (smoke, wheel) */
   anim: { mesh: Mesh; kind: "spin" | "bob" | "pulse" }[];
+  /**
+   * Per-tier dressing cloned from a companion kit (great_house_dress). `band`
+   * is the tier INDEX of first appearance and the bands are CUMULATIVE, exactly
+   * like SettlementView.tierBands: show while band <= tier index. Visibility
+   * only — no footprint, no collision, nothing the sim reads.
+   */
+  dress?: { band: number; mesh: Mesh }[];
 };
 
 function mat(

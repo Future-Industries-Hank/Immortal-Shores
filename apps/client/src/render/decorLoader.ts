@@ -53,7 +53,7 @@ const DECOR_DIR = "/models/decor/";
  * loader had no version token at all, so a warm browser cache would keep
  * serving the old props. Bump whenever /models/decor/*.glb is re-exported.
  */
-const DECOR_VER = "r8-quantized";
+const DECOR_VER = "r9-pyramid-base";
 
 /**
  * Per-kind albedo exposure. The tomb ships at the same hue AND the same value

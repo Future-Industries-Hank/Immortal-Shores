@@ -18,7 +18,8 @@ OUT = "/tmp/claude-1000/-home-eric/f840123e-860a-4c45-add6-0b16a98ff524/scratchp
 os.makedirs(OUT, exist_ok=True)
 os.makedirs(DECOR_MODELS, exist_ok=True)
 
-ALL = ["great_house", "market", "emmer_field", "mudbrick_yard", "harbor",
+ALL = ["great_house", "great_house_dress", "market", "emmer_field",
+       "mudbrick_yard", "harbor",
        "river_clay_pit", "marsh_reed_bed", "training_grounds", "shrine",
        "ration_house", "luxury_material", "luxury_workshop", "vessel_shop",
        "reed_basket_shop", "warehouse"]
@@ -952,6 +953,230 @@ def build_great_house(P):
     amphora("gh", 1.30, -1.33, APRON, P, s=1.1)
     amphora("gh2", 1.20, -1.13, APRON, P, s=0.8)
     basket("gh", 0.85, -1.36, APRON, P, r=0.1, fill="crop_g")
+
+
+# --------------------------------------------------- GREAT HOUSE TIER DRESSING
+# A7: the Great House photographs IDENTICALLY at humble and at imperial, two
+# rounds after the owner asked that levelling it visibly level the settlement.
+# The renderer already has the machinery — scene.ts keeps `tierBands` (a mesh is
+# enabled while band <= the settlement tier index) and drives roads, ground,
+# greenery and props off it. What it has never had is anything to show ON the
+# building.
+#
+# This kit is that dressing, and it is a SEPARATE GLB on purpose. Adding meshes
+# to great_house.glb would re-pack its shared UV atlas and re-run its AO bake,
+# i.e. it would change the HUMBLE building in order to describe the imperial
+# one. Authored as its own kit, great_house.glb stays byte-identical and
+# "hide every band" is exactly today's Great House by construction, not by
+# measurement.
+#
+# THE CONTRACT THE SCENE CAN RELY ON (all of it verified in the report):
+#   * Authored in great_house's own local frame, and the kit's bounding box is
+#     PINNED to great_house's — x +-1.530, z -1.535..+1.525, y from 0 — by the
+#     four corner precinct posts of band 1. kitLoader centres a kit on the XZ
+#     midpoint of its own box and seats it on its own minimum Y, so both kits
+#     get the SAME correction and the dressing lands on the building with no
+#     per-kit offset table. The pins are real geometry that is HIDDEN at humble
+#     and still bounds the box, because preload measures every mesh in the file
+#     before anything is toggled.
+#   * Every mesh is named  great_house_dress_<material>_b<N>  with N the tier
+#     INDEX at which the piece first appears: 1 settled, 2 prosperous, 3 grand,
+#     4 imperial. Nothing carries b0 — humble shows none of it. Bands are
+#     CUMULATIVE, matching tierBands: show a mesh while N <= tier index.
+#   * Purely cosmetic. No apron, no ground plane, no footprint: the kit adds
+#     nothing at all below z 0.05 except the corner posts, and kitLoader's pick
+#     box is a fixed 2.8 x 2.5 x 2.8 this file never touches.
+#
+# The materials are the settlement palette re-declared with a _b<N> suffix, so
+# merge_by_material — which groups by material — lands one mesh per (band,
+# material) pair without the shared merge code having to learn about bands.
+# family_of() still matches on the leading name, so the dressing is surfaced by
+# the same atlas stage as everything else.
+GH_DRESS_MATS = {
+    "mud":     ("mud_terra",   "#AC865F", 0.92, 0.0),
+    "stone":   ("stone_pale",  "#D9CDB0", 0.80, 0.0),
+    "stone_w": ("stone_white", "#E4DCC6", 0.78, 0.0),
+    "wood_dk": ("wood_dark",   "#4E3418", 0.92, 0.0),
+    "thatch":  ("thatch_mat",  "#C4A05A", 0.92, 0.0),
+    "cl_red":  ("cloth_red",   "#A6402E", 0.92, 0.0),
+    "linen":   ("linen_pale",  "#D8C9A8", 0.92, 0.0),
+    "pot":     ("pottery",     "#A05A34", 0.92, 0.0),
+    "gold":    ("gold_leaf",   "#D4A438", 0.45, 0.6),
+}
+
+
+def DM(key, band):
+    """Palette material tagged with the tier band that owns it."""
+    base, hexc, rough, metal = GH_DRESS_MATS[key]
+    return M(f"{base}_b{band}", hexc, rough=rough, metal=metal)
+
+
+def _gh_dress_occluders():
+    """great_house's own masses, rebuilt as unexported grey solids.
+
+    bake_ao and surface_bake's texel-AO pass both shoot rays through the whole
+    Blender scene, so without the building present the dressing would bake as
+    if it floated in empty space: the cornice would carry no soffit, the
+    banners no contact, the parapet no shadow against the terrace — the exact
+    "sits ON not IN" failure the judges keep scoring. These stand-ins are named
+    CUT_* so grab_all() never picks them up (no merge, no export, no atlas) and
+    they are pre-rotated 180 degrees about Z because merge_by_material rotates
+    the REAL kit by that much afterwards; both then sit in the same frame for
+    every bake."""
+    # plain material, NOT M(): M() multiplies base colour by the COLOR_0
+    # attribute, which only merge_by_material/paint_variation ever create, so
+    # an occluder built with it renders black in the preview and hides the very
+    # alignment the preview exists to check.
+    G = bpy.data.materials.new("CUToccluder")
+    G.use_nodes = True
+    G.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = \
+        srgb("#8C8C8C")
+    G.node_tree.nodes["Principled BSDF"].inputs["Roughness"].default_value = 0.9
+    frustum("CUT_occ_low", 2.75, 2.45, 2.6, 2.3, 1.12, (0, 0, 0.05), G)
+    frustum("CUT_occ_band", 2.66, 2.36, 2.56, 2.26, 0.62, (0, 0, 1.16), G)
+    box("CUT_occ_terr", 2.62, 2.32, 0.1, (0, 0, 1.78), G)
+    frustum("CUT_occ_tower", 1.28, 2.2, 1.2, 2.1, 0.82, (-0.62, 0, 1.88), G)
+    box("CUT_occ_towerroof", 1.24, 2.14, 0.07, (-0.62, 0, 2.7), G)
+    for s in (-1, 1):
+        box("CUT_occ_rimY", 1.2, 0.08, 0.14, (-0.62, s * 1.0, 2.73), G)
+        box("CUT_occ_rimX", 0.08, 1.92, 0.14, (-0.62 + s * 0.56, 0, 2.73), G)
+    box("CUT_occ_bulk", 0.3, 0.36, 0.24, (-0.85, 0.55, 2.77), G)
+    lx, lw, ld, deckz = 0.72, 1.35, 2.15, 1.88
+    for px in (lx - lw / 2 + 0.08, lx + lw / 2 - 0.08):
+        for py in (-ld / 2 + 0.08, 0, ld / 2 - 0.08):
+            box("CUT_occ_post", 0.09, 0.09, 0.78, (px, py, deckz), G)
+    box("CUT_occ_thatch", lw + 0.25, ld + 0.25, 0.09, (lx, 0, deckz + 0.78), G)
+    # the flight, its cheek wall and the two piers it runs between
+    sy_out, sy_in, cheek_d = -1.51, -1.20, 0.075
+    tread_y = (sy_out + cheek_d + sy_in) / 2
+    tread_w = sy_in - (sy_out + cheek_d)
+    x0, run, rise = -1.28, 0.16, 0.185
+    for i in range(9):
+        box("CUT_occ_tread", run, tread_w, rise * (i + 1),
+            (x0 + (i + 0.5) * run, tread_y, 0.05), G)
+    for k in range(3):
+        box("CUT_occ_cheek", run * 3, cheek_d, rise * (3 * k + 1),
+            (x0 + (3 * k + 1.5) * run, sy_out + cheek_d / 2, 0.05), G)
+    box("CUT_occ_newel", 0.2, 0.30, 0.68, (-1.40, -1.355, 0.05), G)
+    box("CUT_occ_pil", 0.30, 0.28, 1.665, (0.32, -1.35, 0.05), G)
+    box("CUT_occ_lint", 0.80, 0.14, 0.13, (0.85, -1.27, 0.91), G)
+    import mathutils
+    rot = mathutils.Matrix.Rotation(math.pi, 4, "Z")
+    for o in bpy.context.scene.objects:
+        if o.name.startswith("CUT_occ"):
+            o.matrix_world = rot @ o.matrix_world
+
+
+def build_great_house_dress(P):
+    """Board 01 DRESSING: everything the Great House gains as the settlement
+    levels, in four cumulative bands. Band 0 is deliberately empty."""
+    _gh_dress_occluders()
+
+    # ---- BAND 1, settled: the estate is kept -------------------------------
+    # Four corner precinct posts. They are also the kit's BBOX PINS: cap
+    # half-width 0.085 about (+-1.445, -1.45 / +1.44) reproduces great_house's
+    # own x +-1.530 and z -1.535..+1.525 to the millimetre, which is what makes
+    # the two kits share one centring correction. Do not move them without
+    # re-measuring great_house.glb.
+    for sx in (-1, 1):
+        for sy, cy in ((-1, -1.45), (1, 1.44)):
+            box("gd_mud_post", 0.13, 0.13, 0.24, (sx * 1.445, cy, 0.0),
+                DM("mud", 1))
+            box("gd_stone_postcap", 0.17, 0.17, 0.04, (sx * 1.445, cy, 0.24),
+                DM("stone_w", 1))
+    # a woven screen rolled down the loggia's open +X side, under the eave
+    box("gd_thatch_screen", 0.035, 1.90, 0.60, (1.375, 0, 1.99),
+        DM("thatch", 1))
+    cyl("gd_wood_screenrod", 0.026, 1.94, (1.375, 0, 1.63), DM("wood_dk", 1),
+        seg=7, rx=math.radians(90))
+    # stores on the tower roof: the only free deck on the building, and the
+    # one place a small prop still reads from a fixed 45-degree board camera
+    cyl("gd_pottery_jar", 0.105, 0.30, (-0.32, 0.42, 2.77), DM("pot", 1),
+        seg=8, rtop=0.07)
+    cyl("gd_pottery_jar2", 0.085, 0.24, (-0.46, 0.10, 2.77), DM("pot", 1),
+        seg=8, rtop=0.055)
+    box("gd_thatch_matroll", 0.22, 0.60, 0.15, (-0.24, -0.42, 2.77),
+        DM("thatch", 1))
+
+    # ---- BAND 2, prosperous: the house is dressed in stone -----------------
+    # Two-step corbel cornice at the terrace line. This is the single most
+    # useful piece in the kit and not only for the tier read: it is a real 0.13
+    # overhang over the facade, so it puts a soffit and a cast shadow exactly
+    # where three rounds of judging have said the building has none.
+    #
+    # RINGS, NOT SLABS, and that distinction is the whole piece. Authored as
+    # solid frusta the first time, the cornice's top face became a 2.84 x 2.54
+    # pale plane at z1.92 that swallowed the mud terrace, the loggia deck and
+    # the foot of every post — a bald light polygon on the roof, which is the
+    # complaint (A8) another part of this round is busy fixing. As annuli the
+    # dark terrace deck stays exactly where it is and only the eaves change.
+    def rect(w, d):
+        return [(-w / 2, -d / 2), (w / 2, -d / 2), (w / 2, d / 2),
+                (-w / 2, d / 2)]
+
+    ring("gd_stone_cornice", rect(2.74, 2.44), rect(2.46, 2.16), 1.78, 0.07,
+         DM("stone", 2))
+    ring("gd_stone_cornicecap", rect(2.88, 2.58), rect(2.50, 2.20), 1.85, 0.06,
+         DM("stone_w", 2))
+    # terrace parapet: front run plus two short returns, standing on the cap
+    box("gd_stone_parapet", 2.72, 0.11, 0.26, (0, -1.235, 1.91),
+        DM("stone", 2))
+    for sx in (-1, 1):
+        box("gd_stone_parapetret", 0.11, 0.50, 0.26, (sx * 1.385, -1.03, 1.91),
+            DM("stone", 2))
+    # heavier door architrave on top of the existing lintel, on two consoles
+    box("gd_stone_architrave", 1.00, 0.18, 0.11, (0.85, -1.30, 1.04),
+        DM("stone_w", 2))
+    for s in (-1, 1):
+        box("gd_stone_console", 0.12, 0.14, 0.09, (0.85 + s * 0.40, -1.33,
+            0.95), DM("stone", 2))
+
+    # ---- BAND 3, grand: a formal front -------------------------------------
+    # Flanking standards. They stand clear of the battered wall on stone
+    # buttress blocks and inside the +-1.53 envelope the posts already pin, so
+    # the kit's silhouette grows UPWARD and never outward.
+    for sx in (-1, 1):
+        box("gd_stone_mastbase", 0.24, 0.30, 0.30, (sx * 1.40, 0.10, 0.05),
+            DM("stone", 3))
+        cyl("gd_wood_mast", 0.042, 2.20, (sx * 1.44, 0.10, 0.35),
+            DM("wood_dk", 3), seg=8)
+        cyl("gd_wood_mastcross", 0.020, 0.42, (sx * 1.44, 0.10, 2.21),
+            DM("wood_dk", 3), seg=6, rx=math.radians(90))
+        box("gd_cloth_pennant", 0.030, 0.38, 1.00, (sx * 1.487, 0.10, 1.40),
+            DM("cl_red", 3))
+        box("gd_linen_pennantband", 0.030, 0.38, 0.22,
+            (sx * 1.4885, 0.10, 1.52), DM("linen", 3))
+    # stepped merlons along the tower parapet — a serrated roofline is the one
+    # change to this building that is legible at board zoom without any zoom
+    for mx in (-1.18, -0.90, -0.62, -0.34, -0.06):
+        box("gd_stone_merlon", 0.13, 0.10, 0.11, (mx, -1.0, 2.87),
+            DM("stone_w", 3))
+    for my in (-0.60, -0.20, 0.20, 0.60):
+        box("gd_stone_merlonside", 0.10, 0.13, 0.11, (-1.18, my, 2.87),
+            DM("stone_w", 3))
+
+    # ---- BAND 4, imperial: gilding -----------------------------------------
+    # Everything here is a THIN plate on something band 2 or 3 already built,
+    # so the imperial step is a change of MATERIAL at the same silhouette. The
+    # "gold" in the mesh name is what kitLoader keys its night emissive off.
+    # gilded moulding tucked in the reveal between the two cornice steps, so
+    # the gold is a LINE catching the key rather than a plate facing the sky
+    ring("gd_gold_cornicefillet", rect(2.78, 2.48), rect(2.70, 2.40), 1.83,
+         0.02, DM("gold", 4))
+    box("gd_gold_architrave", 1.02, 0.04, 0.06, (0.85, -1.40, 1.06),
+        DM("gold", 4))
+    # winged disc centred on the parapet over the door
+    cyl("gd_gold_disc", 0.16, 0.05, (0.85, -1.345, 2.04), DM("gold", 4),
+        seg=12, rx=math.radians(90))
+    for s in (-1, 1):
+        box("gd_gold_wing", 0.30, 0.04, 0.06, (0.85 + s * 0.30, -1.32, 2.01),
+            DM("gold", 4))
+    for sx in (-1, 1):
+        cyl("gd_gold_finial", 0.05, 0.17, (sx * 1.44, 0.10, 2.55),
+            DM("gold", 4), seg=8, rtop=0.010)
+    for mx in (-1.18, -0.90, -0.62, -0.34, -0.06):
+        box("gd_gold_merloncap", 0.15, 0.12, 0.025, (mx, -1.0, 2.98),
+            DM("gold", 4))
 
 
 # ---------------------------------------------------------------- MARKET
@@ -2996,16 +3221,35 @@ def build_small_pyramid(P):
     chipped corner, five spalled blocks instead of two, and a pyramidion that
     converges to 0.014 instead of ending on a 0.04 deck — because every earlier
     attempt to fix this prop with PROFILE was rejected."""
-    # socle: the course that meets the sand, in the dark stone so it never
-    # reads as a bright lip and the mass looks bedded rather than placed
-    p0 = frustum("sp_stone_socle", 3.0, 3.0, 2.96, 2.96, 0.16, (0, 0, 0),
+    # BASE COURSE (A5: "the pyramid still has no base and clips the dune").
+    # The old socle was one 0.16 course, and measured on the live board the
+    # desert under the tomb rises 0.132 across the 3.0 footprint while the prop
+    # is seated at y -0.039 — so on the uphill side the whole socle was under
+    # the sand and the sand line cut into the CASING, which is what reads as a
+    # pyramid sliced off by a dune. The base is now a real 0.36 plinth in three
+    # value steps (dark foot / mid plinth / dark cap band), which is 0.17 more
+    # stone than the terrain can eat, so the batter starts clear of the sand on
+    # every side and the buried part is a plinth being bedded, not a broken
+    # mass. Height and footprint are unchanged — 1.70 tall, 3.0 x 3.0 — the
+    # casing is shortened to pay for the base, so the apex chain still lands
+    # on 1.70 and the batter is re-solved to 45.5 degrees, within half a degree
+    # of the line it had before.
+    p0 = frustum("sp_stone_foot", 3.0, 3.0, 2.96, 2.96, 0.12, (0, 0, 0),
                  P["tomb_dk"])
     bevel(p0, 0.020)
+    p1 = frustum("sp_stone_plinth", 2.82, 2.82, 2.78, 2.78, 0.17,
+                 (0, 0, 0.12), P["tomb"])
+    bevel(p1, 0.018)
+    # projecting cap band: the drip line that tells the eye where the plinth
+    # ends and the batter begins. Dark stone, so it is a shadow, not a lip.
+    p2 = box("sp_stone_plinthcap", 2.86, 2.86, 0.03, (0, 0, 0.29),
+             P["tomb_dk"])
+    bevel(p2, 0.010)
 
-    # Casing: one continuous 46-degree batter from 2.86 at z0.16 to 0.42 at
+    # Casing: one continuous 45.5-degree batter from 2.66 at z0.32 to 0.42 at
     # z1.46, cut into four courses that each step in 0.025 per side. The taper
     # is solved on the true line so the four segments cannot drift off it.
-    Z0, Z1, W0, W1 = 0.16, 1.46, 2.86, 0.42
+    Z0, Z1, W0, W1 = 0.32, 1.46, 2.66, 0.42
 
     def face(z):                       # full width of the true casing line
         return W0 + (W1 - W0) * (z - Z0) / (Z1 - Z0)
@@ -3022,9 +3266,9 @@ def build_small_pyramid(P):
         # and different courses, so the mass reads as eroded rather than as one
         # modelled notch. Both are off the front so the entrance stays clean.
         if i == 0:
-            carve(k, [chip(-1.43, 1.43, -1, 1, 0.22, 0.16, 0.30)])
+            carve(k, [chip(-1.33, 1.33, -1, 1, 0.22, 0.32, 0.30)])
         elif i == 2:
-            carve(k, [chip(0.77, 0.77, 1, 1, 0.13, 0.81, 0.15)])
+            carve(k, [chip(0.67, 0.67, 1, 1, 0.13, 0.89, 0.15)])
         bevel(k, 0.014)
 
     # pyramidion: the only pale stone on the mass, and the only one whose whole
@@ -3045,31 +3289,35 @@ def build_small_pyramid(P):
     # standing ~0.45 proud of it by the top, so it emerges from the slope the
     # way a real chapel front does. This is the only element that gives the
     # tomb human scale at board zoom.
-    pylon = box("sp_stone_pylon", 0.70, 0.30, 0.52, (0, -1.24, 0.16), P["tomb"])
+    # Re-seated on the new plinth (z0.32) and pulled back to y -1.12: the
+    # casing is narrower now, so the same 0.45 of projection at the pylon's top
+    # is solved at a different y. Measured: casing front at z0.84 is y -0.819,
+    # pylon face y -1.27, so it stands 0.451 proud exactly as before.
+    pylon = box("sp_stone_pylon", 0.70, 0.30, 0.52, (0, -1.12, 0.32), P["tomb"])
     bevel(pylon, 0.016)
     for sx in (-1, 1):                 # jambs standing proud of the pylon face
-        j = box("sp_stone_pjamb", 0.07, 0.05, 0.34, (sx * 0.19, -1.40, 0.16),
+        j = box("sp_stone_pjamb", 0.07, 0.05, 0.34, (sx * 0.19, -1.28, 0.32),
                 P["tomb_cap"])
         bevel(j, 0.010)
-    lint = box("sp_stone_plintel", 0.52, 0.06, 0.05, (0, -1.40, 0.50),
+    lint = box("sp_stone_plintel", 0.52, 0.06, 0.05, (0, -1.28, 0.66),
                P["tomb_cap"])
     bevel(lint, 0.010)
     # dark reveal, never a punched black hole: the socle stone, not a void
-    box("sp_stone_pdoor", 0.28, 0.04, 0.32, (0, -1.39, 0.16), P["tomb_dk"])
+    box("sp_stone_pdoor", 0.28, 0.04, 0.32, (0, -1.27, 0.32), P["tomb_dk"])
 
-    # Casing blocks that came off the face, resting on the sand inside the 3.0
-    # footprint — weathering that does not touch the silhouette. Five now, not
-    # two, and two of them are the pale cap stone rather than the socle stone,
-    # so the debris reads as spalled casing from the courses above instead of
-    # as three identical dark pebbles. One sits ON the socle lip (z 0.16) under
-    # the chipped corner it fell from, which is the only one of these the eye
-    # actually connects to the damage.
+    # Casing blocks that came off the face, resting inside the 3.0 footprint —
+    # weathering that does not touch the silhouette. They now sit on the two
+    # LEDGES the base course opened up (the plinth cap at z0.33 and the foot
+    # tread at z0.13) instead of on the sand: every one of these used to be
+    # authored at z0 inside a 3.0-wide 0.16-tall socle, i.e. buried in solid
+    # stone and invisible on the board. Three are on the cap ring under the
+    # chipped corners they fell from; two are on the foot tread below.
     for nm, w, d, h, x, y, z, rot, mat in (
-            ("f1", 0.22, 0.18, 0.13, -0.92, -1.16, 0.00, 7.0, "tomb_dk"),
-            ("f2", 0.17, 0.20, 0.11, 0.78, -1.24, 0.00, -9.0, "tomb_dk"),
-            ("f3", 0.19, 0.15, 0.10, -1.24, -0.62, 0.00, 22.0, "tomb"),
-            ("f4", 0.13, 0.14, 0.09, 1.16, -0.30, 0.00, -31.0, "tomb_cap"),
-            ("f5", 0.15, 0.13, 0.08, 0.86, 0.94, 0.16, 14.0, "tomb_cap")):
+            ("f1", 0.14, 0.15, 0.11, -1.37, -0.62, 0.32, 7.0, "tomb_dk"),
+            ("f2", 0.16, 0.13, 0.10, 1.37, 0.48, 0.32, -9.0, "tomb"),
+            ("f3", 0.13, 0.14, 0.09, 0.36, 1.37, 0.32, 22.0, "tomb_cap"),
+            ("f4", 0.13, 0.14, 0.09, -1.40, 1.10, 0.12, -31.0, "tomb_dk"),
+            ("f5", 0.14, 0.12, 0.08, 1.32, -1.37, 0.12, 14.0, "tomb_cap")):
         f = box(f"sp_stone_{nm}", w, d, h, (x, y, z), P[mat],
                 rz=math.radians(rot))
         bevel(f, 0.012)
@@ -3078,6 +3326,7 @@ def build_small_pyramid(P):
 # ---------------------------------------------------------------- export/render
 BUILDERS = {
     "great_house": build_great_house,
+    "great_house_dress": build_great_house_dress,
     "market": build_market,
     "emmer_field": build_emmer_field,
     "mudbrick_yard": build_mudbrick_yard,

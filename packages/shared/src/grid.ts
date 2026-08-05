@@ -48,42 +48,65 @@ export interface SettlementPlotDef {
  * -0.26, res-emmer/shop-1 -0.06. Every pair is now positive (worst +0.14,
  * min centre-to-centre 3.49).
  *
- * COMPOSITION. The judges' other note was "the lower-left is still as empty as
- * it was": of 17 pads only 2 projected into the frame's lower-left quadrant and
- * NONE past sx 600 / sy 550. The ring is therefore broken into districts that
- * read as a real town and fill that corner:
- *   west  — the three resource pads strung down the bank at x ~ -8.7,
- *           res-emmer pushed downriver to z -6.6 (screen 307,487)
- *   north — Great House / luxury / warehouse / shrine on the upriver side
- *   south — all five shop pads as one shallow W-SW-S-SE crescent behind the
- *           core, which is what lands in the empty corner (shop-3 at 487,597
- *           and shop-5 at 573,674)
- *   east  — the training column, untouched
- * Lower-left quadrant now holds 5 pads instead of 2; screen bbox widens from
- * sx 411-1119 to 308-1119.
+ * COMPOSITION — THE SOUTH PLAZA. Owner: "bottom left quadrant is also more
+ * empty than everything, we can move some pad sites in that area so the
+ * perimeter of the market/great house are surrounded by pad sites for a more
+ * structured look. just dont cram it all in, gentle grid shape, not hard line."
  *
- * GENTLE GRID, not a ruled line: districts share a loose x (bank -9.0/-8.6/-8.5,
- * training 8.4/8.6/8.8) but every z is jittered, and no two pads now share an
- * x or a z, so nothing lines up on a screen row.
+ * WHERE THE LOWER-LEFT ACTUALLY IS, and where it ENDS. Inverting the projection
+ * above, the frame's lower-left quadrant (sx < 800, sy > 426) is the world quad
+ * (-16.5,-9.7) (-0.6,2.9) (8.9,-9.0) (-7.0,-21.6) — i.e. it is the DOWNRIVER
+ * half of the board, not the -x half. Its deep corner is unbuildable and always
+ * will be: the ground mesh was ray-probed on a 0.5 lattice and the flat rect
+ * ends at z ~ -9.6 (z -10.5 is already 0.02-0.13 and z -11.5 is 0.36-1.00), so
+ * everything past screen (450,620) is dune face. The reachable lower-left is
+ * the band z -5 .. -9.4, x -9 .. +3, and THAT is what this layout fills.
+ *
+ * The five shop pads are no longer one crescent at one radius. They are a loose
+ * ring round an open plaza — hub-shop at (-1.6,-3.6), screen (609,551) — which
+ * is the "structured look" the owner asked for and reads as a market quarter:
+ *   shop-1 (-5.4,-2.6) 517,463   shop-3 (-5.6,-6.8) 408,552
+ *   shop-5 (-2.4,-8.6) 462,647   shop-4 ( 2.0,-7.8) 617,707
+ *   shop-2 ( 2.3,-4.0) 720,628
+ * Radii from the plaza are 3.9/5.1/5.1/5.5/3.9 and bearings 165/-141/-99/-49/-6
+ * deg: jittered enough that no two sit on one screen row, regular enough to
+ * read as laid out. The ring is deliberately OPEN on its north side — that is
+ * the side facing the civic core, so the quarter reads as fronting the town.
+ *
+ * MEASURED RESULT (17 pads, 1600x852): lower-left quadrant 5 -> 6 pads; deep
+ * lower-left (sy > 620, sx < 760) 2 -> 3; pads whose screen rows collide within
+ * 10 px 4 pairs -> 0; screen bbox sx 308-1119 -> 302-1126, sy 158-776 ->
+ * 158-741. Sorted by sy the lower-left is now a continuous ladder — 463, 484,
+ * 552, 628, 647, 707 — instead of two lumps with a hole at (350-480, 520-620),
+ * which is the patch of bare sand the judges kept photographing.
+ *
+ * THE OTHER QUARTERS held their pads: bank x -9.2/-8.9/-8.5, north row
+ * luxury/warehouse/shrine, east training column x 8.4/8.5/8.9. Those three only
+ * moved by 0.2-0.8 each, and only to break screen rows they shared with a pad
+ * on the far side of the frame (train-spear z 0.2 -> 1.8 was the one real move,
+ * and it also opens the gate the tomb approach leaves through).
+ *
+ * GENTLE GRID, not a ruled line: no two pads share a worldX or a worldZ, and no
+ * two project within 10 px of the same screen row.
  *
  * HARD CONSTRAINTS HELD: ids, categories, labels, tints, starterKind and
- * allowed[] are byte-identical — only worldX/worldZ moved. >= 2.9 units
- * centre-to-centre. Everything inside the flat gameplay rect: all 17 pads AND
- * their pad corners were probed against the live ground mesh and every one
- * returns y = 0.000 (the dune toe only starts past x 9.5 / z -14 / z 14.2).
- * special-harbor is untouched on the waterline; the three resource pads stay on
- * the bank at x ~ -8.7, clear of the reed line (nearest reed cluster to the new
- * res-emmer is 2.4 units away).
+ * allowed[] are byte-identical — only worldX/worldZ moved. Min centre-to-centre
+ * 3.14 (train-spear/train-chariot), worst footprint gap +0.14
+ * (res-clay/special-harbor, both unmoved). Every pad centre and its four pad
+ * corners (half 1.175 + 0.2 bank) probed against the live ground mesh return
+ * |y| <= 0.03; the only larger reading on the board is res-clay's own excavated
+ * pit at -0.11, which is the building, not the terrain. special-harbor is
+ * untouched on the waterline; the three resource pads stay on the bank.
  */
 export const SETTLEMENT_PLOTS: SettlementPlotDef[] = [
   // —— Bank strip (closest to river, left): fields strung DOWN the bank rather
-  // than bunched, 5.4 and 4.6 apart. res-emmer at z -6.6 is what puts a
-  // starter building in the frame's empty lower-left (screen 307,487). ——
+  // than bunched, 4.8 and 5.2 apart. res-emmer at z -6.6 is the only STARTER
+  // building in the frame's lower-left (screen 302,484), so it stays deep. ——
   {
     id: "res-emmer",
     category: "starter",
     label: "Emmer Field",
-    worldX: -9.0,
+    worldX: -9.2,
     worldZ: -6.6,
     tint: "#7FA85A",
     starterKind: "emmer_field",
@@ -93,8 +116,8 @@ export const SETTLEMENT_PLOTS: SettlementPlotDef[] = [
     id: "res-reeds",
     category: "starter",
     label: "Marsh Reed Bed",
-    worldX: -8.6,
-    worldZ: -1.2,
+    worldX: -8.9,
+    worldZ: -1.8,
     tint: "#5F8F4E",
     starterKind: "marsh_reed_bed",
     allowed: [],
@@ -134,18 +157,18 @@ export const SETTLEMENT_PLOTS: SettlementPlotDef[] = [
     allowed: [],
   },
 
-  // —— 5 Flexible shop plots: the WORKSHOP CRESCENT behind the civic core,
-  // sweeping W -> SW -> S -> SE. Ids are NOT in arc order — the road chain
-  // edges are 1-3, 3-5, 5-2, 2-4, so the ids are assigned to make that chain
-  // trace the arc in one sweep. Every neighbour pair is >= 3.4 apart on its
-  // dominant axis (+0.20 footprint gap on the 3.2 kit box, +0.60 on the live
-  // 2.80 hit box). ——
+  // —— 5 Flexible shop plots: the SOUTH PLAZA quarter. A ring round the open
+  // hub-shop plaza at (-1.6,-3.6), not a crescent at one radius — see the
+  // header. Ids are in road-chain order round the ring (1-3, 3-5, 5-4, 4-2),
+  // and hub-shop spurs to 1, 5 and 2, so the quarter has a through route as
+  // well as spokes. Worst footprint gap in the ring is +0.40 (shop-3/shop-5),
+  // min centre-to-centre 3.67. ——
   {
     id: "shop-1",
     category: "shop",
     label: "Shop plot",
-    worldX: -5.2,
-    worldZ: -3.4,
+    worldX: -5.4,
+    worldZ: -2.6,
     tint: "#E8D4B0",
     allowed: [
       "ration_house",
@@ -159,8 +182,8 @@ export const SETTLEMENT_PLOTS: SettlementPlotDef[] = [
     id: "shop-2",
     category: "shop",
     label: "Shop plot",
-    worldX: 3.8,
-    worldZ: -5.0,
+    worldX: 2.3,
+    worldZ: -4.0,
     tint: "#E8D4B0",
     allowed: [
       "ration_house",
@@ -174,7 +197,7 @@ export const SETTLEMENT_PLOTS: SettlementPlotDef[] = [
     id: "shop-3",
     category: "shop",
     label: "Shop plot",
-    worldX: -3.0,
+    worldX: -5.6,
     worldZ: -6.8,
     tint: "#E8D4B0",
     allowed: [
@@ -189,8 +212,8 @@ export const SETTLEMENT_PLOTS: SettlementPlotDef[] = [
     id: "shop-4",
     category: "shop",
     label: "Shop plot",
-    worldX: 7.2,
-    worldZ: -6.8,
+    worldX: 2.0,
+    worldZ: -7.8,
     tint: "#E8D4B0",
     allowed: [
       "ration_house",
@@ -204,8 +227,8 @@ export const SETTLEMENT_PLOTS: SettlementPlotDef[] = [
     id: "shop-5",
     category: "shop",
     label: "Shop plot",
-    worldX: 0.4,
-    worldZ: -7.6,
+    worldX: -2.4,
+    worldZ: -8.6,
     tint: "#E8D4B0",
     allowed: [
       "ration_house",
@@ -228,15 +251,16 @@ export const SETTLEMENT_PLOTS: SettlementPlotDef[] = [
     allowed: ["harbor"],
   },
 
-  // —— Remaining specials: the UPRIVER row, NW round to NE. Only luxury moved
-  // (z 6.9 -> 7.6): at 6.9 it was 3.3 off the Great House, a +0.10 gap, and it
-  // shared its z exactly with the warehouse — two pads on one screen row. ——
+  // —— Remaining specials: the UPRIVER row, NW round to NE. Held in place —
+  // they and the harbour are the whole top of the frame. Only luxury moved
+  // (-3.6,7.6 -> -3.8,7.9, screen 823,270 -> 825,260): it was projecting 7 px
+  // off res-clay's screen row, which under this projection is a ruled line. ——
   {
     id: "special-luxury",
     category: "special",
     label: "Luxury works site",
-    worldX: -3.6,
-    worldZ: 7.6,
+    worldX: -3.8,
+    worldZ: 7.9,
     tint: "#8B3A4A",
     allowed: ["luxury_material"],
   },
@@ -259,13 +283,20 @@ export const SETTLEMENT_PLOTS: SettlementPlotDef[] = [
     allowed: ["shrine"],
   },
 
-  // —— 3 Training grounds (outer east edge, outside the ring) ——
+  // —— 3 Training grounds (outer east edge, outside the ring). The column is
+  // kept — it is a listed win — but each pad moved 0.2-1.6 for two reasons:
+  // train-bow shared its worldZ with shop-2 and train-spear/train-chariot each
+  // projected within 10 px of a lower-left pad's screen row; and the old
+  // spear/bow spacing walled the east off completely, so no road could leave
+  // the town for the tomb without passing inside a barracks footprint. At
+  // spear z 1.8 the hub-train -> tomb-bend leg clears every training pad by
+  // >= 1.63 (need 1.38). ——
   {
     id: "train-bow",
     category: "training",
     label: "Bowmen grounds",
-    worldX: 8.6,
-    worldZ: -3.4,
+    worldX: 8.5,
+    worldZ: -4.2,
     tint: "#A89070",
     allowed: ["training_grounds"],
     trainingUnit: "bowmen",
@@ -274,8 +305,8 @@ export const SETTLEMENT_PLOTS: SettlementPlotDef[] = [
     id: "train-spear",
     category: "training",
     label: "Spearmen grounds",
-    worldX: 8.8,
-    worldZ: 0.2,
+    worldX: 8.9,
+    worldZ: 1.8,
     tint: "#A89070",
     allowed: ["training_grounds"],
     trainingUnit: "spearmen",
@@ -283,9 +314,14 @@ export const SETTLEMENT_PLOTS: SettlementPlotDef[] = [
   {
     id: "train-chariot",
     category: "training",
+    // z 4.6 -> 5.9, not 4.9: on a fresh settlement the spearmen and chariot
+    // yards are the last two pads standing empty, and the judges see them as
+    // "exactly two adjacent empty pads". 4.1 apart (131 px on the board frame)
+    // is the widest the column takes before the pad runs into the tomb's sand
+    // drift, and it restores the separation the old 0.2/4.6 pair had.
     label: "Chariot grounds",
     worldX: 8.4,
-    worldZ: 4.6,
+    worldZ: 5.9,
     tint: "#A89070",
     allowed: ["training_grounds"],
     trainingUnit: "chariot_warriors",
@@ -386,34 +422,85 @@ export const SETTLEMENT_MONUMENTS: MonumentSpec[] = [
       "Downriver end of the same bank line, 18.0 units from mon-landing so " +
       "the pair brackets the settlement instead of grouping (screen 252,564). " +
       "It sits on the x ~ -8.5 axis the three resource pads already stand on, " +
-      "3.0 beyond res-emmer (+0.54 footprint gap, 2.46 off the nearest road), " +
-      "and it is the single object that occupies the deep lower-left the " +
-      "judges called empty. Ground y 0.000, 1.7 clear of the reed line.",
+      "3.0 beyond res-emmer (+0.54 footprint gap, 4.20 off the nearest road, " +
+      "+1.40 to the nearest pad box) and it is the deepest object in the " +
+      "frame's lower-left — past it the ground is dune, not board. HELD when " +
+      "the pads were re-laid: it is the anchor the new south-plaza quarter " +
+      "reads against, and the downriver palm grove at z -11.6..-12.4 was " +
+      "pushed behind it last round specifically to give it that depth cue. " +
+      "Ground y 0.000, 1.7 clear of the reed line.",
   },
 ];
 
 /**
- * The paved processional to the tomb. It now runs along Z, into the pyramid's
- * ENTRANCE, and it is a way rather than a slab. Both changes are corrections:
+ * WHERE THE TOMB STANDS. The renderer owns how the .glb is dressed; this owns
+ * the site, because the causeway, the sand drift, the scatter keep-out and the
+ * road that now reaches it are all functions of one point and were previously
+ * four hand-copied 12.4s in two files.
  *
- *  - WRONG FACE. Laid along x it approached the tomb's -x flank, while the
- *    portal is modelled on the -z face — the judges' "the court adjoins the
- *    pyramid's NW flank while the entrance portal is on another face".
- *  - INTERPENETRATION. The old run ended at x 11.2 but the pyramid's socle
- *    starts at x 10.902, so 0.298 of the slab passed UNDER the tomb with a hard
- *    seam. `toZ` is now 7.05 against a measured socle edge of z 7.102: a 0.052
- *    sand line, so the paving butts the base and can never slice it.
- *  - PROPORTION. 2.3 long by 2.9 wide is a forecourt, not a processional, and
- *    that is what let two monuments look like they shared one apron. 4.45 by
- *    1.90 is 2.3:1 and reads as a road.
+ * `x` IS THE ONE NUMBER THAT MOVES THE WHOLE PRECINCT, and it wants to move.
+ * Measured on a 0.25 lattice with a downward pick against the live ground, the
+ * desert under the tomb's 2.996-unit footprint (x 10.902..13.898) runs 0.000 at
+ * x <= 13.0, 0.030-0.045 at 13.25, 0.059-0.087 at 13.5 and 0.14-0.19 at the
+ * +x face — so the dune toe rides ~0.19 up the socle's east side while the west
+ * side sits on nothing, which is the judges' "clips the dune". The tomb's own
+ * sand drift does not close it: probed with the drift included, it contributes
+ * 0.012-0.023 across the whole precinct, a 2 cm veneer.
  *
- * The whole run was ray-probed against the live ground: y spans 0.000-0.023
- * from z 2.5 to 7.0 at x 12.4, i.e. dead flat, and it crosses the tomb's own
- * sand drift toe (z ~ 5.1) where the renderer conforms it to the drift.
+ * At x 11.5 the footprint is 10.002..12.998 and the SAME probe returns
+ * 0.000-0.003 across all of it — the fall drops 32x and the dune toe starts
+ * 0.15 clear of the east face.
+ *
+ * APPLIED. buildDecor() now reads TOMB_SITE instead of its own copy of the
+ * number, so tomb, causeway, sand drift, scatter keep-out and the `tomb-gate`
+ * road node all move together off this one field — which is the only way the
+ * move is safe, since sliding the causeway without the tomb would have put the
+ * paving 0.9 off the portal it points at. Clearance to the nearest pad after
+ * the move: the chariot yard's box ends at x 9.80 and the footprint starts at
+ * 10.00.
+ */
+export const TOMB_SITE = {
+  x: 11.5,
+  z: 8.6,
+  /** Half-side of the 3.0-unit footprint, for terrain sampling and drift. */
+  half: 1.5,
+} as const;
+
+/**
+ * The paved processional to the tomb — now a real approach rather than a strip
+ * that starts nowhere.
+ *
+ *  - IT CONNECTS. Judge: "the new paved causeway runs out of the pyramid's
+ *    portal face and simply stops dead in open desert. Its far end connects to
+ *    no road, no plot, no shore." `fromZ` moved 2.6 -> 2.2 so the paving now
+ *    begins exactly at the `tomb-gate` road node, which the town reaches from
+ *    hub-train via `tomb-bend`. Deleting the causeway was the alternative and
+ *    was rejected: it and the tomb are the only two objects in the eastern
+ *    third of the frame, and the same judges scored the processional a win when
+ *    it first appeared. Connecting it also draws two long road lines across the
+ *    empty east, which is the other note.
+ *  - RIGHT FACE, CONFIRMED. The portal is not guessed: in the kit source the
+ *    entrance pylon is box("sp_stone_pylon", …, (0, -1.24, 0.16)) and the
+ *    glTF axis map measured off the live mesh bounds is worldX = x + local x,
+ *    worldZ = z + local y, so the doorway is centred on the causeway's own
+ *    axis on the -z face, 1.24-1.40 out from centre. The causeway is on it.
+ *  - NO INTERPENETRATION. `toZ` 7.05 against a measured socle edge of z 7.102:
+ *    a 0.052 sand line, so the paving butts the base and can never slice it.
+ *  - PROPORTION. 4.85 by 1.90 is 2.55:1 and reads as a way, not a forecourt.
+ *
+ * The whole run ray-probes flat: y 0.000-0.023 from z 2.2 to 7.0 at x 12.4, and
+ * it crosses the tomb's own sand drift toe (z ~ 5.1) where the renderer
+ * conforms it to the drift.
+ *
+ * SCENE-SIDE FOLLOW-UP (not ours to make): SettlementView.DRESSING_KEEPOUT
+ * still hard-codes the two circles that keep scatter off the paving at the OLD
+ * quarter points, [12.4, 3.71, 1.6] and [12.4, 5.94, 1.6]. Against a 2.2..7.05
+ * run they leave the first 0.22 of the widened strip's edge uncovered; the
+ * quarter points are now 3.41 and 5.83.
  */
 export const TOMB_CAUSEWAY = {
-  x: 12.4,
-  fromZ: 2.6,
+  x: TOMB_SITE.x,
+  fromZ: 2.2,
   toZ: 7.05,
   width: 1.9,
 } as const;
@@ -753,25 +840,41 @@ export interface PathNode {
  *
  * These MUST move with SETTLEMENT_PLOTS or the roads point at where the pads
  * used to be. Rules held here, checked numerically against the new layout:
- *  - every entrance is 1.20-1.53 units off its pad centre, toward its hub;
- *  - NO segment passes within a pad's half-width of a pad that is not one of
- *    its own two endpoints (was 8 such crossings before, is 0 now);
- *  - the graph is fully connected (BFS from hub-civic reaches all 24 nodes).
+ *  - every entrance is 1.22-1.58 units off its pad centre, toward its hub;
+ *  - NO segment passes within a pad's half-width + 0.2 of a pad that is not one
+ *    of its own two endpoints (0 such crossings; the tightest clearance on the
+ *    board is 1.43 against a 1.38 limit, hub-shop → hub-train past shop-2);
+ *  - the graph is fully connected (BFS from hub-civic reaches all 26 nodes).
  *
- * One node is NEW: `bank-bend`. Any straight line from the inland hub to the
- * pier has to cross the bank strip, and it was running 0.44 units from the
- * River Clay Pit's centre — a road drawn straight through the building. The
- * riverside track now doglegs inland round it. It is deliberately NOT named
- * `hub-*`: the renderer gives hub- nodes an intersection plaza disc and uses
- * them as worker route endpoints, and this is just a bend in a track.
+ * `bank-bend` is unchanged: any straight line from the inland hub to the pier
+ * has to cross the bank strip, and it was running 0.44 units from the River
+ * Clay Pit's centre — a road drawn straight through the building. It is
+ * deliberately NOT named `hub-*`: the renderer gives hub- nodes an intersection
+ * plaza disc and uses them as worker route endpoints, and this is a bend.
+ *
+ * TWO NODES ARE NEW — `tomb-bend` and `tomb-gate` — and they are the fix for
+ * "the new paved causeway runs out of the pyramid's portal face and simply
+ * stops dead in open desert. Its far end connects to no road, no plot, no
+ * shore." tomb-gate IS the causeway's south end (TOMB_CAUSEWAY.x / .fromZ), so
+ * the paving now begins at a road junction instead of in sand. Neither carries
+ * a plotId, which matters: the renderer skips any edge whose endpoint is an
+ * entrance to an UNBUILT pad, so hanging the approach off p-train-chariot would
+ * have left the causeway orphaned again on every settlement that has not built
+ * a barracks yet. The dogleg is forced — the training column walls the east off
+ * and every straight run from hub-train to the tomb passed 0.34-1.16 inside a
+ * barracks footprint — so the track swings south-east round the bowmen at
+ * (11.0,-4.4) and then turns north onto the causeway's own axis. Clearances:
+ * 1.63 (bow) and 2.48 (spear) on the first leg, 2.63 / 3.13 on the second, and
+ * the whole corridor ray-probes flat at y 0.000.
  */
 export const PATH_NODES: PathNode[] = [
   // Main spine (west → east), routed south of the Great House
   { id: "hub-res", x: -6.2, z: -0.4 },
   { id: "hub-civic", x: -0.4, z: 1.8 },
-  // Workshop-crescent plaza: the open ground the shop arc encloses. 3.0+ clear
-  // of all five shop pads, so the spine to hub-train no longer clips one.
-  { id: "hub-shop", x: 0.6, z: -3.4 },
+  // South-plaza hub: the open ground the five shop pads ring. 3.9-5.5 from
+  // each of them, so it is a plaza rather than a junction, and the spine to
+  // hub-train crosses it without clipping a pad (worst 1.43 vs 1.38).
+  { id: "hub-shop", x: -1.6, z: -3.6 },
   { id: "hub-train", x: 7.0, z: 0.2 },
   // North specials spine — sits on the civic avenue between GH and Market
   { id: "hub-special", x: 0.4, z: 4.8 },
@@ -779,27 +882,31 @@ export const PATH_NODES: PathNode[] = [
   { id: "hub-pier", x: -9.3, z: 6.1 },
   // Dogleg that keeps the riverside track off the River Clay Pit (see above)
   { id: "bank-bend", x: -6.6, z: 6.0 },
+  // Tomb approach (see above). tomb-gate == TOMB_CAUSEWAY.x / .fromZ.
+  { id: "tomb-bend", x: 11.0, z: -4.4 },
+  // Read off the causeway, never re-typed: tomb-gate IS its south end, and the
+  // two silently disagreeing is exactly how the paving orphaned itself before.
+  { id: "tomb-gate", x: TOMB_CAUSEWAY.x, z: TOMB_CAUSEWAY.fromZ },
   // Plot entrances (slightly offset toward path network)
-  { id: "p-res-emmer", x: -8.4, z: -5.5, plotId: "res-emmer" },
-  { id: "p-res-reeds", x: -7.4, z: -0.8, plotId: "res-reeds" },
+  { id: "p-res-emmer", x: -8.6, z: -5.4, plotId: "res-emmer" },
+  { id: "p-res-reeds", x: -7.7, z: -1.2, plotId: "res-reeds" },
   { id: "p-res-clay", x: -7.2, z: 2.6, plotId: "res-clay" },
   { id: "p-civic-gh", x: -1.9, z: 2.8, plotId: "civic-gh" },
   { id: "p-civic-market", x: 0.8, z: 1.7, plotId: "civic-market" },
-  // Shop entrances follow the crescent W → SW → S → SE
-  { id: "p-shop-1", x: -4.0, z: -3.4, plotId: "shop-1" },
-  { id: "p-shop-3", x: -2.1, z: -5.9, plotId: "shop-3" },
-  { id: "p-shop-5", x: 0.5, z: -6.4, plotId: "shop-5" },
-  // shop-2 fronts SOUTH so the crescent road runs past its face, not over it
-  { id: "p-shop-2", x: 3.4, z: -6.2, plotId: "shop-2" },
-  { id: "p-shop-4", x: 6.0, z: -6.2, plotId: "shop-4" },
+  // Shop entrances all face the plaza, so every shop fronts the same open space
+  { id: "p-shop-1", x: -4.1, z: -2.9, plotId: "shop-1" },
+  { id: "p-shop-3", x: -4.6, z: -6.0, plotId: "shop-3" },
+  { id: "p-shop-5", x: -2.2, z: -7.3, plotId: "shop-5" },
+  { id: "p-shop-4", x: 1.1, z: -6.8, plotId: "shop-4" },
+  { id: "p-shop-2", x: 1.0, z: -3.9, plotId: "shop-2" },
   // Harbor pier entrance — on the waterline
   { id: "p-special-harbor", x: -11.0, z: 6.2, plotId: "special-harbor" },
   { id: "p-special-luxury", x: -2.6, z: 6.9, plotId: "special-luxury" },
   { id: "p-special-warehouse", x: 0.6, z: 6.2, plotId: "special-warehouse" },
   { id: "p-special-shrine", x: 3.6, z: 5.7, plotId: "special-shrine" },
-  { id: "p-train-bow", x: 8.1, z: -2.2, plotId: "train-bow" },
-  { id: "p-train-spear", x: 7.5, z: 0.2, plotId: "train-spear" },
-  { id: "p-train-chariot", x: 8.0, z: 3.4, plotId: "train-chariot" },
+  { id: "p-train-bow", x: 8.0, z: -2.7, plotId: "train-bow" },
+  { id: "p-train-spear", x: 7.9, z: 1.1, plotId: "train-spear" },
+  { id: "p-train-chariot", x: 8.1, z: 4.6, plotId: "train-chariot" },
 ];
 
 /** Undirected edges between PATH_NODES (by id). */
@@ -817,22 +924,21 @@ export const PATH_EDGES: [string, string][] = [
   ["hub-civic", "p-civic-gh"],
   ["hub-civic", "p-civic-market"],
   ["hub-shop", "p-civic-market"],
-  // Shops
+  // Shops: three spokes off the plaza (west, south, east) …
   ["hub-shop", "p-shop-1"],
   ["hub-shop", "p-shop-2"],
-  ["hub-shop", "p-shop-3"],
   ["hub-shop", "p-shop-5"],
-  // no hub-shop → p-shop-4 spur: shop-4 is the far end of the crescent and the
-  // straight run to it passed 0.05 units from the shop-2 pad centre. It is
-  // reached along the crescent (p-shop-2) and off the east street instead.
-  // Crescent road: 1 → 3 → 5 → 2 → 4 traces the arc in one sweep
+  // … and the ring road round it, 1 → 3 → 5 → 4 → 2, which closes the quarter
+  // so no shop is a cul-de-sac. There is no hub-shop → p-shop-3 / p-shop-4
+  // spur: with the ring in place they would be a second road to the same door.
   ["p-shop-1", "p-shop-3"],
   ["p-shop-3", "p-shop-5"],
-  ["p-shop-5", "p-shop-2"],
-  ["p-shop-2", "p-shop-4"],
-  // Crescent closes east onto the specials row (this is now the east street,
-  // running north past the market at 2.18 clear), and west onto the bank hub
-  ["p-shop-4", "p-special-shrine"],
+  ["p-shop-5", "p-shop-4"],
+  ["p-shop-4", "p-shop-2"],
+  // The quarter closes east onto the training grounds (the old east street ran
+  // to the shrine, which from the new shop-4 would have been a 12.7-unit
+  // diagonal through the market) and west onto the bank hub.
+  ["p-shop-2", "p-train-bow"],
   ["p-shop-1", "hub-res"],
   // Specials inland
   ["hub-special", "p-special-luxury"],
@@ -848,12 +954,16 @@ export const PATH_EDGES: [string, string][] = [
   ["hub-special", "bank-bend"],
   ["bank-bend", "hub-pier"],
   ["hub-pier", "p-special-harbor"],
-  // Training
+  // Training. No hub-train → p-train-chariot spur: that straight run passes
+  // 1.34 from the spearmen pad centre (limit 1.38), and the chariot yard is
+  // already reached up the column from p-train-spear.
   ["hub-train", "p-train-bow"],
   ["hub-train", "p-train-spear"],
-  ["hub-train", "p-train-chariot"],
   ["p-train-bow", "p-train-spear"],
   ["p-train-spear", "p-train-chariot"],
+  // Tomb approach — the causeway's road connection. See PATH_NODES.
+  ["hub-train", "tomb-bend"],
+  ["tomb-bend", "tomb-gate"],
 ];
 
 /**

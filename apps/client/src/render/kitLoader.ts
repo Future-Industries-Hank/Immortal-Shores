@@ -36,11 +36,44 @@ const KIND_TO_FILE: Record<string, string> = {
   training_grounds: "training_grounds",
 };
 
+/**
+ * Companion "dressing" kits: extra geometry that rides on a building kit and is
+ * revealed band by band as the settlement tiers up. Keyed by building KIND, not
+ * by kit file, and deliberately NOT in KIND_TO_FILE — that map decides which
+ * glb IS the building, and a dress kit is never a building on its own.
+ *
+ * CONTRACT (authored in tools/kit-pipeline/author_kits.py):
+ *   <file>_<material>_b<N>   N = 1..4, the tier INDEX of first appearance.
+ * Bands are CUMULATIVE — a mesh shows while N <= tier index — so nothing is
+ * tagged b0 and the humble building is the bare kit, unchanged.
+ *
+ * ALIGNMENT is by construction, not by an offset table: the dress kit's own
+ * union box is pinned to great_house's by four band-1 corner posts (both
+ * x[-1.530,+1.530] z[-1.535,+1.525], centre xz (0, -0.005)), and preload
+ * measures every mesh BEFORE anything is toggled, so the centring arithmetic
+ * below lands both kits on the same origin. Do not move those posts without
+ * re-measuring great_house.glb.
+ */
+const KIND_TO_DRESS: Record<string, string> = {
+  great_house: "great_house_dress",
+};
+
+/** Tier index of first appearance, parsed off the TEMPLATE mesh name. */
+function dressBandOf(name: string): number | null {
+  const m = /_b([1-4])(?:_|$)/.exec(name);
+  return m ? Number(m[1]) : null;
+}
+
 export type KitCache = Map<string, { root: TransformNode; meshes: AbstractMesh[] }>;
 
 export async function preloadBuildingKits(scene: Scene): Promise<KitCache> {
   const cache: KitCache = new Map();
-  const kinds = [...new Set(Object.values(KIND_TO_FILE))];
+  const kinds = [
+    ...new Set([
+      ...Object.values(KIND_TO_FILE),
+      ...Object.values(KIND_TO_DRESS),
+    ]),
+  ];
   await Promise.all(
     kinds.map(async (file) => {
       try {
@@ -131,8 +164,22 @@ export function instantiateBuildingFromKit(
     const root = new TransformNode(`b-${b.id}`, scene);
     const emissives: Mesh[] = [];
     const anim: BuildingMeshes["anim"] = [];
+    const dress: NonNullable<BuildingMeshes["dress"]> = [];
 
-    for (const src of tpl.meshes) {
+    // Building meshes first (band null = always on), then the tier dressing.
+    // Band is parsed off the TEMPLATE name, never the clone's — the clone name
+    // carries the building id on the end and parsing that would be a hostage to
+    // whatever characters an id happens to contain.
+    const dressFile = KIND_TO_DRESS[b.kind];
+    const dressTpl = dressFile ? cache.get(dressFile) : undefined;
+    const sources: Array<{ src: AbstractMesh; band: number | null }> =
+      tpl.meshes.map((src) => ({ src, band: null }));
+    for (const src of dressTpl?.meshes ?? []) {
+      const band = dressBandOf(src.name);
+      if (band !== null) sources.push({ src, band });
+    }
+
+    for (const { src, band } of sources) {
       const c = src.clone(`${src.name}_${b.id}`, root) as Mesh | null;
       if (!c) continue;
       c.setEnabled(true);
@@ -180,6 +227,12 @@ export function instantiateBuildingFromKit(
         c.setEnabled(false);
         continue;
       }
+      if (band !== null) {
+        // Off until the view applies the current tier, so a band-4 gilt cornice
+        // can never flash on a humble house for the frame between the two.
+        c.setEnabled(false);
+        dress.push({ band, mesh: c });
+      }
       // Night craft = windows/hearth/glow only — never flat roof planes
       if (
         name.includes("gold") ||
@@ -217,7 +270,7 @@ export function instantiateBuildingFromKit(
     // REAL solid glTF only — densify overlays are NOT finished art (GOAL-GRAPHICS-READY)
     // If kit is still boxy, re-author the .glb in Blender; do not stack grey slabs here.
 
-    return { root, hit, emissives, anim };
+    return { root, hit, emissives, anim, dress };
   }
 
   return createBuildingKit(scene, b);
