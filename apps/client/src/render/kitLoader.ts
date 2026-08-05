@@ -3,6 +3,7 @@
  */
 import {
   AbstractMesh,
+  BaseTexture,
   Color3,
   Mesh,
   MeshBuilder,
@@ -44,7 +45,7 @@ export async function preloadBuildingKits(scene: Scene): Promise<KitCache> {
     kinds.map(async (file) => {
       try {
         // Bump when Blender re-exports solid kits (dev/prod cache bust)
-        const KIT_VER = "textured-r17";
+        const KIT_VER = "textured-r18";
         const result = await SceneLoader.ImportMeshAsync(
           null,
           "/models/buildings/",
@@ -62,6 +63,18 @@ export async function preloadBuildingKits(scene: Scene): Promise<KitCache> {
           m.isPickable = false;
           m.receiveShadows = true;
           if (m.getTotalVertices() > 0) meshes.push(m);
+        }
+        // TEXTURE CRAWL. The kit maps arrive from the glTF loader at
+        // anisotropy 4; the board is a fixed ORTHOGRAPHIC camera looking down a
+        // 32-degree slope, so every wall in frame is a grazing surface and 4
+        // taps is where the mudbrick coursing starts to shimmer between frames
+        // as the key rotates through the day cycle. 16 is free on any GPU that
+        // reports it and Babylon clamps to the hardware maximum.
+        for (const m of result.meshes) {
+          const mm = m.material as { getActiveTextures?: () => BaseTexture[] } | null;
+          for (const t of mm?.getActiveTextures?.() ?? []) {
+            t.anisotropicFilteringLevel = 16;
+          }
         }
         // Center kit on origin (Blender layout spaced kits across the scene)
         if (meshes.length) {
@@ -130,72 +143,30 @@ export function instantiateBuildingFromKit(
       c.hasVertexAlpha = false;
       c.metadata = { buildingId: b.id, kind: b.kind, plotId: b.plotId };
       if (shadow) shadow.addShadowCaster(c, true);
-      // Force SOLID materials — never transparent/wire stand-ins
+      // Force SOLID materials — never transparent/wire stand-ins.
+      //
+      // WHAT USED TO BE HERE, AND WHY IT IS GONE. Two blocks keyed off
+      // `mat.diffuseColor`: a per-name albedo/specular grade (stone / mud /
+      // wood / crop / gold / roof / canopy) and a per-kind KIND_ACCENT roof
+      // tint. glTF kits import as PBRMaterial, which has albedoColor and NO
+      // diffuseColor at all — verified against the live scene, every shrine
+      // submesh reports mat.getClassName() === "PBRMaterial" — so both branches
+      // have been dead for several rounds and nothing on the board was ever
+      // being graded by them.
+      // They are DELETED rather than ported to albedoColor. Both existed to
+      // separate kits that were flat untinted colour blocks; the kits now ship
+      // authored 1024px base-colour maps (213 of them in the live scene), and
+      // PBR albedoColor MULTIPLIES that map, so re-running a 0.55 lerp toward a
+      // flat accent would wash the authored mudbrick coursing and plank seams
+      // back toward a solid tone — the exact detail this round was spent
+      // getting. The separation they were added for is now carried by the maps.
       const mat = c.material as StandardMaterial | null;
       if (mat) {
         mat.wireframe = false;
         mat.alpha = 1;
         mat.transparencyMode = StandardMaterial.MATERIAL_OPAQUE;
-        const n = c.name.toLowerCase();
-        if (mat.diffuseColor) {
-          if (n.includes("stone") || n.includes("gh_") || n.includes("obelisk") || n.includes("shrine") || n.includes("pale")) {
-            mat.specularColor = new Color3(0.28, 0.26, 0.22);
-            mat.specularPower = 36;
-            mat.diffuseColor = Color3.Lerp(mat.diffuseColor, new Color3(0.82, 0.78, 0.7), 0.35);
-          } else if (n.includes("mud") || n.includes("body") || n.includes("stall") || n.includes("brick") || n.includes("pile") || n.includes("yard")) {
-            mat.specularColor = new Color3(0.04, 0.03, 0.02);
-            mat.specularPower = 8;
-            mat.diffuseColor = Color3.Lerp(mat.diffuseColor, new Color3(0.6, 0.44, 0.3), 0.3);
-          } else if (n.includes("wood") || n.includes("deck") || n.includes("pier") || n.includes("post") || n.includes("crate")) {
-            mat.specularColor = new Color3(0.1, 0.07, 0.04);
-            mat.diffuseColor = Color3.Lerp(mat.diffuseColor, new Color3(0.42, 0.3, 0.18), 0.25);
-          } else if (n.includes("crop") || n.includes("reed") || n.includes("field") || n.includes("plant") || n.includes("soil")) {
-            mat.emissiveColor = new Color3(0.05, 0.07, 0.02);
-            mat.diffuseColor = Color3.Lerp(mat.diffuseColor, new Color3(0.38, 0.52, 0.22), 0.3);
-          } else if (n.includes("gold") || n.includes("lintel") || n.includes("win") || n.includes("glow")) {
-            mat.emissiveColor = new Color3(0.2, 0.12, 0.04);
-            mat.diffuseColor = Color3.Lerp(mat.diffuseColor, new Color3(0.85, 0.68, 0.28), 0.4);
-          } else if (n.includes("roof") || n.includes("thatch") || n.includes("plank")) {
-            // Roofs darker than walls: at board zoom the settlement was
-            // merging into one brown mass with no structure separation.
-            mat.diffuseColor = Color3.Lerp(mat.diffuseColor, new Color3(0.34, 0.25, 0.16), 0.3);
-          } else if (n.includes("canopy") || n.includes("cloth") || n.includes("awn")) {
-            mat.diffuseColor = Color3.Lerp(mat.diffuseColor, new Color3(0.55, 0.4, 0.25), 0.25);
-          }
-        }
-      }
-      // PBR/glTF materials: force opaque
-      const anyMat = c.material as { alpha?: number; transparencyMode?: number; wireframe?: boolean } | null;
-      if (anyMat) {
-        if (typeof anyMat.alpha === "number") anyMat.alpha = 1;
-        if ("wireframe" in anyMat) anyMat.wireframe = false;
       }
       const name = c.name.toLowerCase();
-      // Per-kind roof/canopy accent: five workshop kinds were reading as one
-      // brown mass at board zoom. Each gets a distinguishing top colour.
-      const KIND_ACCENT: Record<string, [number, number, number]> = {
-        vessel_shop: [0.42, 0.47, 0.52],
-        reed_basket_shop: [0.78, 0.7, 0.45],
-        mudbrick_yard: [0.66, 0.42, 0.28],
-        luxury_workshop: [0.5, 0.4, 0.5],
-        training_grounds: [0.44, 0.4, 0.3],
-        ration_house: [0.56, 0.46, 0.3],
-      };
-      const accent = KIND_ACCENT[b.kind];
-      if (
-        accent &&
-        (name.includes("roof") || name.includes("thatch") ||
-          name.includes("plank") || name.includes("tile"))
-      ) {
-        const rm = c.material as StandardMaterial | null;
-        if (rm?.diffuseColor) {
-          rm.diffuseColor = Color3.Lerp(
-            rm.diffuseColor,
-            new Color3(accent[0], accent[1], accent[2]),
-            0.55
-          );
-        }
-      }
       // Plot trays: force ONE shared ground tone + flatten, so kits stop
       // reading as differently-beige tiles pasted onto the sand (cohesion).
       if (

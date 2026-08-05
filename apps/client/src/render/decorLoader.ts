@@ -20,10 +20,16 @@ import "@babylonjs/loaders/glTF";
  * The STELE is deliberately absent: the owner asked for "the tablet looking
  * asset" to go, the kit agent deleted `stele.glb`, and leaving the kind in this
  * list would only cost a 404 per boot.
+ *
+ * STATUE_STANDING is absent for the same reason as of this round. The owner:
+ * "delete those 4 items in the middle of the plot area… just 1-4 spread around
+ * different parts of the settlement." The standing pair was the Great House
+ * forecourt group; the board's four monuments are now two obelisks and the
+ * tomb's seated gate (SETTLEMENT_MONUMENTS). statue_standing.glb is still on
+ * disk — it is simply never fetched, which is 185 KB off every cold boot.
  */
 export const DECOR_KINDS = [
   "obelisk",
-  "statue_standing",
   "statue_seated",
   "small_pyramid",
 ] as const;
@@ -43,7 +49,7 @@ const DECOR_DIR = "/models/decor/";
  * loader had no version token at all, so a warm browser cache would keep
  * serving the old props. Bump whenever /models/decor/*.glb is re-exported.
  */
-const DECOR_VER = "r7-hardstone";
+const DECOR_VER = "r8-quantized";
 
 /**
  * Per-kind albedo exposure. The tomb ships at the same hue AND the same value

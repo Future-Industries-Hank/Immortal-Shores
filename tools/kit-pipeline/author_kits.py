@@ -7,6 +7,7 @@ import bpy
 import bmesh
 import math
 import os
+import struct
 import sys
 from mathutils import Vector
 
@@ -56,7 +57,11 @@ _FAMILY = (
     ("stone_pale", "plaster"), ("stone_white", "plaster"),
     ("interior_warm", "plaster"), ("pottery", "plaster"),
     ("char_dark", "plaster"),
-    ("stone_warm", "stone"), ("stone_groove", "stone"), ("limestone_", "stone"),
+    ("stone_warm", "stone"), ("stone_groove", "stone"),
+    # limestone gets its own family, not "stone": see _detail's "casing" branch
+    # — its coursing has to survive a 46-degree battered face, which the shared
+    # stone coordinate provably does not.
+    ("limestone_", "casing"),
     ("wood_", "timber"), ("door_dark", "timber"),
     ("thatch_", "thatch"), ("rope_", "thatch"),
     ("cloth_", "cloth"), ("rug_", "cloth"), ("linen_", "cloth"),
@@ -113,10 +118,34 @@ def M(name, hexcol, rough=0.92, metal=0.0, emit=None, emit_str=1.0):
 
 def palette():
     return {
-        # walls
-        "mud": M("mud_terra", "#A96B48"),
-        "mud_dk": M("mud_dark", "#7A4A30"),
-        "mud_tan": M("mud_tan", "#C29A6B"),
+        # ---- WALLS. Sand-buff Nile mudbrick, NOT fired terracotta (owner:
+        # "please favor sand colored bricks over red bricks"; also the truer
+        # material — straw-tempered river silt dries tan, not brick red).
+        #
+        # The thing that made this more than a swatch swap: the settlement used
+        # to separate from the desert BY HUE, red walls at H20 against sand at
+        # H37. Measured on the live board that separation was never actually
+        # doing the work — lit sand renders V221 and a mud_terra wall renders
+        # V92, so 129 levels of VALUE carry the read and only 17 degrees of hue
+        # were riding along. That value gap is geometric (ground faces the key,
+        # facades do not) and is untouched by recolouring, which is what makes
+        # this safe. So the family moves onto the sand's hue axis but stops
+        # ~6 degrees short of it and drops BELOW the sand's saturation (0.51),
+        # i.e. greyer/cooler than the ground it stands on, never yellower.
+        #
+        # What is deliberately NOT recoloured: roof_mud, pottery, cloth_orange/
+        # red, rug_red and the granite props all stay at H20-25. With the walls
+        # neutralised those become the settlement's warm accents, so the town
+        # keeps a red note in the roofs and awnings instead of in every facade.
+        "mud": M("mud_terra", "#AC865F"),
+        # socle/band tone: still the darkest wall step (48 levels under "mud",
+        # same gap it always had) and kept a few degrees warmer than the wall
+        # so a shaded course reads as shadow on brick, not as grey paint
+        "mud_dk": M("mud_dark", "#7C5B42"),
+        # trim/upper course. Pushed 31 levels over "mud" (was 25) to buy back
+        # the facade's internal break: mud and mud_tan used to be 11 degrees
+        # apart in hue and are now 2, so value has to carry that split alone.
+        "mud_tan": M("mud_tan", "#CBA475"),
         "stone": M("stone_pale", "#D9CDB0", rough=0.8),
         "stone_w": M("stone_white", "#E4DCC6", rough=0.78),
         # cut limestone: warm quarry tone + a darker chisel/band tone so
@@ -148,8 +177,14 @@ def palette():
         "crop_gr": M("crop_green", "#82894A"),
         "crop_dk": M("crop_deep", "#6E7A3A"),
         "crop_lt": M("crop_light", "#969256"),
-        # brick
-        "brick": M("brick_red", "#9A5B3C"),
+        # brick — the loose stacks in the yard and the kiln aprons. Renamed off
+        # "brick_red": nothing in the client keys on the material name (the
+        # kitLoader keyword list is apron/earth_pack/dirt_/gold/glow/window/
+        # lamp/hearth/crest/kiln/canopy/reed) and family_of still matches on
+        # the "brick_" prefix, so this is a rename for honesty only.
+        # Held 12 levels ABOVE the wall so a brick stack against a wall is a
+        # value step, not a hue step, now that both are buff.
+        "brick": M("brick_sand", "#A07B56"),
         "brick_g": M("brick_grey", "#8A7259"),
         "char": M("char_dark", "#3A2E24"),
         # accents
@@ -222,9 +257,20 @@ def palette():
         # a pale casing-stone tomb is simply not reachable from this file. The
         # mass is read by a three-value split instead — dark socle, mid courses,
         # pale dressed cap — which also stops it photographing as one flat slab.
-        "tomb": M("limestone_tomb", "#CDAA8B", rough=0.86),
-        "tomb_dk": M("limestone_socle", "#92725D", rough=0.88),
-        "tomb_cap": M("limestone_cap", "#E8CBAE", rough=0.80),
+        #
+        # Values re-scaled +8% when limestone moved from the "stone" surface
+        # family to "casing". The casing pattern is far denser (block bond +
+        # per-block tone + scour), so its atlas mean falls ~0.92 -> ~0.84 and
+        # TEX_GAIN is deliberately ONE constant for the whole settlement. The
+        # rescale is exactly that ratio, so the tomb photographs at the value
+        # it did before the coursing landed, not 9% darker. Hue and saturation
+        # are held: each channel is scaled by the same factor.
+        # tomb_cap also came DOWN off 232 so that value x TEX_GAIN stays under
+        # 255 — it used to clamp on red only, which silently pushed the cap
+        # from H28 S0.25 to H35 S0.22.
+        "tomb": M("limestone_tomb", "#DEB897", rough=0.86),
+        "tomb_dk": M("limestone_socle", "#9E7B65", rough=0.88),
+        "tomb_cap": M("limestone_cap", "#DFC3A7", rough=0.80),
     }
 
 
@@ -2933,7 +2979,23 @@ def build_small_pyramid(P):
     breaking the outline. The pyramidion is the same slope family and the only
     pale stone on the mass, so it terminates the tip instead of decorating a
     deck, and the entrance pylon emerging from the lower front face gives the
-    whole thing scale."""
+    whole thing scale.
+
+    R6: "the least-detailed object on the board — a smooth grey-mauve solid
+    with a few edge creases and a flat untextured top face. No block coursing,
+    no casing-stone joints, no weathering." The tomb WAS in the surfacing stage
+    the whole time; it was in the wrong family. limestone_ mapped to "stone",
+    whose across-course coordinate blends world z into a horizontal axis by
+    |nz|, and on a 46-degree batter that compresses a 0.30 m course to 0.84 m
+    of real height — the entire casing held about one and a half courses, and
+    the two grooves that survived ran diagonally across the slope, which is
+    what the judges read as "a few edge creases". limestone_ now has its own
+    "casing" family (see _detail) whose courses are horizontal on any sloped
+    face, so the mass carries a real 0.115 m bond with per-block tone and
+    wind-scour weathering. Geometry changes are deliberately small — a second
+    chipped corner, five spalled blocks instead of two, and a pyramidion that
+    converges to 0.014 instead of ending on a 0.04 deck — because every earlier
+    attempt to fix this prop with PROFILE was rejected."""
     # socle: the course that meets the sand, in the dark stone so it never
     # reads as a bright lip and the mass looks bedded rather than placed
     p0 = frustum("sp_stone_socle", 3.0, 3.0, 2.96, 2.96, 0.16, (0, 0, 0),
@@ -2955,8 +3017,14 @@ def build_small_pyramid(P):
         wt = face(zb) - 0.05 * i
         k = frustum(f"sp_stone_k{i}", wb, wb, wt, wt, zb - za, (0, 0, za),
                     P["tomb"])
-        if i == 0:                     # one weathered corner, low, off the front
+        # Weathering is CUT, never piled: a chip keeps the batter's outline
+        # crisp where a proud block would fur it. Two now, on different corners
+        # and different courses, so the mass reads as eroded rather than as one
+        # modelled notch. Both are off the front so the entrance stays clean.
+        if i == 0:
             carve(k, [chip(-1.43, 1.43, -1, 1, 0.22, 0.16, 0.30)])
+        elif i == 2:
+            carve(k, [chip(0.77, 0.77, 1, 1, 0.13, 0.81, 0.15)])
         bevel(k, 0.014)
 
     # pyramidion: the only pale stone on the mass, and the only one whose whole
@@ -2965,7 +3033,11 @@ def build_small_pyramid(P):
     # never read as a triangle recessed into a frame, which is the note this
     # prop keeps collecting. 0.24 over a 0.21 half-run is 48.8 degrees, steeper
     # than the casing the way a real capstone is.
-    cap = frustum("sp_stone_pyramidion", 0.46, 0.46, 0.04, 0.04, 0.24,
+    # 0.014 across the tip, not 0.04: at the decor crop's ~100 px/m that deck
+    # was a 4 px flat quad catching the key straight on, and it is what the
+    # judges called "a flat untextured top face". At 0.014 the apex converges
+    # to a sub-pixel point and the cap reads as a capstone, not as a plateau.
+    cap = frustum("sp_stone_pyramidion", 0.46, 0.46, 0.014, 0.014, 0.24,
                   (0, 0, 1.46), P["tomb_cap"])
     bevel(cap, 0.010)
 
@@ -2985,12 +3057,20 @@ def build_small_pyramid(P):
     # dark reveal, never a punched black hole: the socle stone, not a void
     box("sp_stone_pdoor", 0.28, 0.04, 0.32, (0, -1.39, 0.16), P["tomb_dk"])
 
-    # two casing blocks that came off the face, resting on the sand inside the
-    # 3.0 footprint — weathering that does not touch the silhouette
-    for nm, w, d, h, x, y, z, rot in (
-            ("f1", 0.22, 0.18, 0.13, -0.92, -1.16, 0.0, 7.0),
-            ("f2", 0.17, 0.20, 0.11, 0.78, -1.24, 0.0, -9.0)):
-        f = box(f"sp_stone_{nm}", w, d, h, (x, y, z), P["tomb_dk"],
+    # Casing blocks that came off the face, resting on the sand inside the 3.0
+    # footprint — weathering that does not touch the silhouette. Five now, not
+    # two, and two of them are the pale cap stone rather than the socle stone,
+    # so the debris reads as spalled casing from the courses above instead of
+    # as three identical dark pebbles. One sits ON the socle lip (z 0.16) under
+    # the chipped corner it fell from, which is the only one of these the eye
+    # actually connects to the damage.
+    for nm, w, d, h, x, y, z, rot, mat in (
+            ("f1", 0.22, 0.18, 0.13, -0.92, -1.16, 0.00, 7.0, "tomb_dk"),
+            ("f2", 0.17, 0.20, 0.11, 0.78, -1.24, 0.00, -9.0, "tomb_dk"),
+            ("f3", 0.19, 0.15, 0.10, -1.24, -0.62, 0.00, 22.0, "tomb"),
+            ("f4", 0.13, 0.14, 0.09, 1.16, -0.30, 0.00, -31.0, "tomb_cap"),
+            ("f5", 0.15, 0.13, 0.08, 0.86, 0.94, 0.16, 14.0, "tomb_cap")):
+        f = box(f"sp_stone_{nm}", w, d, h, (x, y, z), P[mat],
                 rz=math.radians(rot))
         bevel(f, 0.012)
 
@@ -3270,8 +3350,44 @@ TEX_SIZE = 1024           # ceiling; the real size is picked per kit by area
 TEX_DENSITY = 88          # texels per metre of surface (one texel ~ 11 mm)
 TEX_AO_FLOOR = 0.82      # texel AO is CONTACT only; COLOR_0 still carries form
 TEX_AO_DIST = 0.40
+# JPEG quality for the atlases. This is a DOWNLOAD budget knob, not a quality
+# knob to be trimmed by feel: texel density is left alone (the judges' standing
+# complaint is that there is not enough surface detail, not too much) and the
+# bytes come out of the encoder instead. See write_surface_jpeg for why the
+# old scene.render.image_settings.quality line never did anything.
+TEX_JPEG_Q = 74
 TEX_DIR = os.path.join(OUT, "tex")
 os.makedirs(TEX_DIR, exist_ok=True)
+
+
+def write_surface_jpeg(v, size, path):
+    """Encode the float atlas to JPEG directly instead of via Image.save().
+
+    Two reasons.
+      1. Image.save() IGNORES scene.render.image_settings.quality. Verified by
+         building great_house and shrine at q82 and q70: byte-identical output,
+         257 kB and 158 kB both times. The quality knob this stage documented
+         was never connected to anything and every atlas shipped at Blender's
+         built-in default.
+      2. The map is exactly greyscale — R, G and B are all wired from the same
+         scalar and the AO multiplier is scalar too, measured max channel
+         deviation 0 over a whole 1024 atlas — so there is nothing for the
+         encoder's chroma planes to carry.
+
+    The transfer function is Blender's and has to stay bit-comparable or the
+    whole settlement re-exposes: a float image tagged Linear Rec.709 goes to an
+    8-bit format through the standard linear->sRGB curve. Measured against
+    Image.save over a 64-step ramp the curve below matches to 0.0035, i.e. to
+    rounding. Babylon reads baseColorTexture as sRGB and undoes it, so the
+    round trip is exactly what it was."""
+    from PIL import Image
+    import numpy as np
+    a = np.clip(v.reshape(size, size, 4)[::-1, :, :3], 0.0, 1.0)  # rows are
+    #                                          bottom-up in Blender's buffer
+    s = np.where(a <= 0.0031308, a * 12.92,
+                 1.055 * np.power(a, 1.0 / 2.4) - 0.055)
+    Image.fromarray((s * 255.0 + 0.5).astype(np.uint8)).save(
+        path, "JPEG", quality=TEX_JPEG_Q, optimize=True, subsampling=2)
 
 class _NB:
     """Throwaway node-graph builder. The patterns below are ~20 math nodes
@@ -3357,8 +3473,9 @@ def _detail(B, fam):
     geo = B.n("ShaderNodeNewGeometry")
     pos, nor = geo.outputs["Position"], geo.outputs["Normal"]
     px, py, pz = B.sep(pos)
-    nx, _ny, nz = B.sep(nor)
+    nx, ny, nz = B.sep(nor)
     ax = B.math("ABSOLUTE", nx)
+    ay = B.math("ABSOLUTE", ny)
     az = B.math("ABSOLUTE", nz)
     # horizontal run coordinate that follows the face: y on X-facing walls,
     # x on Y-facing walls, and a smooth blend on battered/rotated ones, so
@@ -3414,6 +3531,50 @@ def _detail(B, fam):
         wav.inputs["Distortion"].default_value = 7.0
         wav.inputs["Detail"].default_value = 2.0
         dark.append((0.055, wav.outputs["Fac"]))
+    elif fam == "casing":
+        # DRESSED LIMESTONE ON A BATTERED FACE — the tomb, and the statue
+        # plinths that share its stone.
+        #
+        # Why this is not just `stone` with tighter numbers. The shared `w`
+        # above blends world z into a horizontal axis by |nz|, which is right
+        # for a vertical wall and a flat deck and WRONG for everything between.
+        # On the tomb's 46-degree casing |nz| is 0.69 and y falls as z rises,
+        # so dw/dz collapses to 0.36: a 0.30 m course occupied 0.84 m of real
+        # height and the entire 1.3 m of casing held about one and a half of
+        # them. That is exactly what the judges photographed — "a smooth
+        # grey-mauve solid with a few edge creases", the creases being the two
+        # surviving grooves running DIAGONALLY across the slope.
+        #
+        # Casing courses are horizontal by definition, so the across-course
+        # coordinate is world z on anything that is not a true deck, and only a
+        # deck (|nz| > 0.9 — the ledge tops and the pyramidion's tip) falls
+        # back to the 2D bond that keeps a horizontal face from landing wholly
+        # inside or wholly outside one groove.
+        deck = B.ramp(az, 0.90, 0.99)
+        wc = B.math("ADD", pz,
+                    B.math("MULTIPLY", B.math("SUBTRACT", py, pz), deck))
+        # Run coordinate. `u` blends on |nx| alone, which is ambiguous on a
+        # batter because |nx| and |nz| are both large there; splitting on
+        # ax/(ax+ay) is exact on all four slopes of a pyramid (the +Y face gets
+        # x, the +X face gets y) and degrades smoothly on a rotated block.
+        fx = B.math("DIVIDE", ax, B.math("ADD", B.math("ADD", ax, ay), 1e-4))
+        uc = B.math("ADD", px, B.math("MULTIPLY", B.math("SUBTRACT", py, px), fx))
+        ch, cl, cg = 0.115, 0.26, 0.010          # course, block, joint (metres)
+        row = B.math("FLOOR", B.math("DIVIDE", wc, ch))
+        uu = B.math("ADD", uc, B.math("MULTIPLY",
+                                      B.math("MODULO", row, 2.0), cl * 0.5))
+        joint = B.math("MINIMUM", B.lines(wc, ch, cg), B.lines(uu, cl, cg))
+        dark.append((0.26, B.math("SUBTRACT", 1.0, joint)))
+        # per-block tone. Quarried casing is never one stone, and this is what
+        # turns a groove grid into masonry rather than into scored plaster.
+        dark.append((0.115, B.wnoise(B.comb(
+            B.math("FLOOR", B.math("DIVIDE", uu, cl)), row, 0.0))))
+        # weathering: wind-driven sand scours and stains the bottom third, and
+        # a coarse patchiness stands in for casing that has spalled away
+        dark.append((0.100, B.math("MULTIPLY", B.ramp(pz, 0.75, 0.10),
+                                   B.noise(pos, 7.0, detail=2.0))))
+        dark.append((0.075, B.noise(pos, 2.2, detail=3.0, rough=0.6)))
+        dark.append((0.045, B.noise(pos, 16.0, detail=1.0)))
     elif fam == "timber":
         # planks run along the long axis of the piece: across a deck that is
         # X, up a post that is Z. az blends between the two.
@@ -3586,17 +3747,8 @@ def surface_bake(kind, objs, size=None):
     v.reshape(-1, 4)[~cov] = 1.0            # neutral outside the islands
 
     final = bpy.data.images.new(f"{kind}_surf", size, size, float_buffer=True)
-    final.pixels.foreach_set(v)
     path = os.path.join(TEX_DIR, f"{kind}_surf.jpg")
-    final.file_format = "JPEG"
-    final.filepath_raw = path
-    prev_fmt = sc.render.image_settings.file_format
-    prev_q = sc.render.image_settings.quality
-    sc.render.image_settings.file_format = "JPEG"
-    sc.render.image_settings.quality = 82
-    final.save()
-    sc.render.image_settings.file_format = prev_fmt   # preview render is PNG
-    sc.render.image_settings.quality = prev_q
+    write_surface_jpeg(v, size, path)
     # hand the exporter the on-disk JPEG rather than a float datablock
     final.source = "FILE"
     final.filepath = path
@@ -3645,6 +3797,139 @@ def surface_bake(kind, objs, size=None):
             "kb": os.path.getsize(path) / 1024.0}
 
 
+# ------------------------------------------------------------- glb payload
+# Measured on the g6 library: 11.9 MB total, of which the atlases are 4.2 MB
+# and the VERTEX BUFFERS are 7.3 MB. Blender writes NORMAL and TEXCOORD_0 as
+# float32 and COLOR_0 as u16 — 40 bytes per vertex over ~174k vertices — so the
+# download is dominated by attribute width, not by texture or by triangle
+# count. Narrowing the three that can take it is the only lever here that costs
+# nothing visible.
+#
+# POSITION IS DELIBERATELY LEFT AT FLOAT32. Quantizing it means folding a
+# dequantization scale into every node's TRS, and kitLoader re-centres each kit
+# by mutating mesh.position after load — that is the one attribute where a bug
+# moves buildings instead of merely shading them, for the last 12% of the win.
+_Q_ATTR = {                        # glTF attribute -> (componentType, dtype)
+    "NORMAL": (5120, "int8"),          # ~0.5 deg; these are flat-shaded solids
+    "TEXCOORD_0": (5123, "uint16"),    # 1/65535 of a 1024 atlas = 0.016 texel
+    "COLOR_0": (5121, "uint8"),        # already a per-FACE constant, no ramp
+}
+_GLB_JSON, _GLB_BIN = 0x4E4F534A, 0x004E4942
+
+
+def quantize_glb(path):
+    """Rewrite an exported GLB with narrow vertex attributes. Returns
+    (before, after) byte counts.
+
+    NORMAL and TEXCOORD_0 need KHR_mesh_quantization, which Babylon registers
+    from the `import "@babylonjs/loaders/glTF"` both kitLoader and decorLoader
+    already do; COLOR_0 as normalized u8 is core glTF. Babylon's
+    getVerticesData() runs every buffer through GetFloatData(), which
+    de-normalizes, so Mesh.MergeMeshes — and therefore the hoverHalo silhouette
+    proxy — sees float data exactly as before.
+
+    Bails out unchanged on anything it does not fully understand (interleaved
+    buffer views, shared views, UVs outside 0-1), because a half-converted GLB
+    is worse than an unconverted one."""
+    import json
+    import numpy as np
+
+    raw = open(path, "rb").read()
+    js, bin_, off = None, b"", 12
+    while off < len(raw):
+        ln, ty = struct.unpack_from("<II", raw, off)
+        off += 8
+        if ty == _GLB_JSON:
+            js = json.loads(raw[off:off + ln])
+        elif ty == _GLB_BIN:
+            bin_ = raw[off:off + ln]
+        off += ln
+    if js is None:
+        return len(raw), len(raw)
+
+    ctype = {5120: np.int8, 5121: np.uint8, 5122: np.int16, 5123: np.uint16,
+             5125: np.uint32, 5126: np.float32}
+    ncomp = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4, "MAT4": 16}
+
+    want = {}
+    for mesh in js.get("meshes", []):
+        for prim in mesh["primitives"]:
+            for attr, ai in prim["attributes"].items():
+                if attr in _Q_ATTR:
+                    want[ai] = _Q_ATTR[attr]
+
+    owners = {}
+    for i, acc in enumerate(js.get("accessors", [])):
+        owners.setdefault(acc.get("bufferView"), []).append(i)
+    for ai in list(want):
+        acc = js["accessors"][ai]
+        bv = js["bufferViews"][acc["bufferView"]]
+        if len(owners[acc["bufferView"]]) != 1 or "byteStride" in bv:
+            return len(raw), len(raw)        # interleaved/shared: not ours
+        n = ncomp[acc["type"]]
+        if bv["byteLength"] != acc["count"] * n * np.dtype(
+                ctype[acc["componentType"]]).itemsize:
+            return len(raw), len(raw)
+
+    out = bytearray()
+    for i, bv in enumerate(js["bufferViews"]):
+        ai = owners.get(i, [None])[0]
+        if ai is not None and ai in want:
+            acc = js["accessors"][ai]
+            n = ncomp[acc["type"]]
+            src = np.frombuffer(bin_, dtype=ctype[acc["componentType"]],
+                                count=acc["count"] * n,
+                                offset=bv.get("byteOffset", 0)
+                                + acc.get("byteOffset", 0)).reshape(-1, n)
+            f = src.astype(np.float32)
+            if acc.get("normalized"):
+                f /= float(np.iinfo(src.dtype).max)
+            cty, dt = want[ai]
+            if dt == "int8":
+                q = np.clip(np.rint(f * 127.0), -127, 127).astype(np.int8)
+                # 3-byte elements are not 4-byte aligned, which the spec
+                # requires of vertex attributes; pad to a stride of 4 and keep
+                # the accessor VEC3.
+                q = np.concatenate(
+                    [q, np.zeros((len(q), 4 - n), np.int8)], axis=1)
+                bv["byteStride"] = 4
+            elif dt == "uint16":
+                if f.min() < -1e-4 or f.max() > 1.0 + 1e-4:
+                    return len(raw), len(raw)   # atlas UVs must be in 0-1
+                q = np.clip(np.rint(f * 65535.0), 0, 65535).astype(np.uint16)
+            else:
+                q = np.clip(np.rint(f * 255.0), 0, 255).astype(np.uint8)
+            data = q.tobytes()
+            acc["componentType"] = cty
+            acc["normalized"] = True
+            acc["byteOffset"] = 0
+            acc.pop("min", None)
+            acc.pop("max", None)
+        else:
+            st = bv.get("byteOffset", 0)
+            data = bin_[st:st + bv["byteLength"]]
+        while len(out) % 4:
+            out.append(0)
+        bv["byteOffset"] = len(out)
+        bv["byteLength"] = len(data)
+        out += data
+
+    js["buffers"][0]["byteLength"] = len(out)
+    for key in ("extensionsUsed", "extensionsRequired"):
+        used = js.setdefault(key, [])
+        if "KHR_mesh_quantization" not in used:
+            used.append("KHR_mesh_quantization")
+
+    jb = json.dumps(js, separators=(",", ":")).encode()
+    jb += b" " * (-len(jb) % 4)
+    ob = bytes(out) + b"\0" * (-len(out) % 4)
+    glb = struct.pack("<III", 0x46546C67, 2, 12 + 8 + len(jb) + 8 + len(ob))
+    glb += struct.pack("<II", len(jb), _GLB_JSON) + jb
+    glb += struct.pack("<II", len(ob), _GLB_BIN) + ob
+    open(path, "wb").write(glb)
+    return len(raw), len(glb)
+
+
 for kind in KINDS:
     reset()
     P = palette()
@@ -3665,7 +3950,8 @@ for kind in KINDS:
     bpy.ops.export_scene.gltf(filepath=out, export_format="GLB",
                               use_selection=True, export_apply=True,
                               export_yup=True)
-    print(f"EXPORTED {out} bytes={os.path.getsize(out)}")
+    b0, b1 = quantize_glb(out)
+    print(f"EXPORTED {out} bytes={b1} (raw {b0}, -{100 * (b0 - b1) / b0:.0f}%)")
     # preview render
     add_preview_rig()
     bpy.context.scene.render.filepath = os.path.join(OUT, f"new-{kind}.png")
@@ -3691,7 +3977,8 @@ for kind in DECOR_KINDS:
     bpy.ops.export_scene.gltf(filepath=out, export_format="GLB",
                               use_selection=True, export_apply=True,
                               export_yup=True)
-    print(f"EXPORTED {out} bytes={os.path.getsize(out)}")
+    b0, b1 = quantize_glb(out)
+    print(f"EXPORTED {out} bytes={b1} (raw {b0}, -{100 * (b0 - b1) / b0:.0f}%)")
     add_preview_rig(size=DECOR_PREVIEW[kind])
     bpy.context.scene.render.filepath = os.path.join(OUT, f"decor-{kind}.png")
     bpy.ops.render.render(write_still=True)

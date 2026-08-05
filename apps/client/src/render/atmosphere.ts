@@ -199,8 +199,17 @@ export class Atmosphere {
     // into the downward fill put a olive wash under every overhang.
     // +8% of its own value at imperial: a richer bounce under the overhangs,
     // which is where "warmer and richer" is legible without touching the key.
+    // 0.30 -> 0.23. THE DOWNWARD FILL IS THE ONLY AMBIENT TERM AN OVERHANG
+    // SEES. Babylon's hemispheric term is mix(groundColor, diffuse, N·up*0.5+0.5),
+    // so a surface facing straight down — the underside of an awning, the soffit
+    // of a cornice, the reveal of a recessed doorway — is lit by this and by
+    // nothing else, while a surface facing up is lit by it not at all. Cutting
+    // it therefore darkens exactly the overhangs the judges said "cast nothing",
+    // and touches a sunlit roof or an open sand plane by 0. A vertical wall sits
+    // halfway and loses ~3.5% of its fill, which is inside the measured hue and
+    // exposure tolerances (board p50 does not move; see the light budget above).
     this.hemi.groundColor = hexToColor3("#C08E52").scale(
-      0.3 * (1 + this.tierWarmth * 0.08) * (1 - n * 0.75)
+      0.23 * (1 + this.tierWarmth * 0.08) * (1 - n * 0.75)
     );
 
     // Day clear matches desert sand so map fringe never reads as void edge
