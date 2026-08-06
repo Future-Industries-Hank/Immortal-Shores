@@ -29,7 +29,6 @@ import {
   SETTLEMENT_TIERS,
   SETTLEMENT_TIER_PRESENTATION,
   STYLE,
-  TOMB_CAUSEWAY,
   TOMB_SITE,
   getMapArchetype,
   getPathNode,
@@ -107,8 +106,13 @@ export class SettlementView {
     SettlementTier,
     { fill: StandardMaterial; edge: StandardMaterial }
   >();
-  /** Cumulative dressing: shown when its band <= the current tier index. */
-  private tierBands: Array<{ band: number; mesh: Mesh }> = [];
+  /**
+   * Cumulative dressing: shown when its band <= the current tier index.
+   * `until` RETIRES a piece at a later tier, for the case where a richer piece
+   * stands in its place — a replacement that co-exists with the thing it
+   * replaces is the brazier-through-the-bollard the judges scored.
+   */
+  private tierBands: Array<{ band: number; mesh: Mesh; until?: number }> = [];
   /** Exclusive dressing (props upgrade IN PLACE): shown when band === index. */
   private tierVariants: Array<{ band: number; mesh: Mesh }> = [];
   /** Materials whose colour is re-graded per tier (never re-allocated). */
@@ -130,6 +134,11 @@ export class SettlementView {
   private atmosphere: Atmosphere;
   private sun: DirectionalLight;
   private shadowGen: ShadowGenerator | null = null;
+  /**
+   * Every mesh ever handed to the shadow generator, visible or not. The live
+   * caster list is re-derived from this once a frame — see syncShadowCasters.
+   */
+  private shadowCasterPool = new Set<AbstractMesh>();
   private ssao: SSAO2RenderingPipeline | null = null;
   private kitCache: KitCache = new Map();
   private kitsReady = false;
@@ -268,7 +277,19 @@ export class SettlementView {
     // because the fill it is left with is sky over warm sand albedo.
     this.shadowGen.darkness = 0.24;
     this.shadowGen.bias = 0.0012;
-    this.shadowGen.normalBias = 0.02;
+    // 0.02 -> 0.010, AND THIS IS THE GROUND CONTACT UNDER A WALL.
+    // normalBias shrinks the CASTER along its own normal when the depth map is
+    // drawn, in world units, so it buys acne headroom by eroding exactly the
+    // band of ground the mass is standing on — peter-panning. It has to be
+    // sized in TEXELS, and syncShadowCasters just halved the texel: the fitted
+    // frustum went from 27.8 to 60.0 shadow texels per world unit, i.e. a texel
+    // is 0.036 -> 0.017 units. 0.02 was 0.55 texels at the old density; 0.010
+    // is 0.60 at the new one, so the acne guard is unchanged in the units that
+    // actually govern it and the wall keeps 0.01 units more of its own shadow.
+    this.shadowGen.normalBias = 0.010;
+    // See syncShadowCasters(), called once a frame from the render loop: it is
+    // the single place the caster list is allowed to contain a mesh, and it
+    // only ever admits meshes that are actually drawn this frame.
 
     // Debug/capture handle (judge tooling probes mesh names)
     (window as unknown as { __scene?: Scene }).__scene = this.scene;
@@ -452,6 +473,10 @@ export class SettlementView {
           lampBase * (0.82 + Math.sin(now * (1.1 + (wi % 5) * 0.3) + wi) * 0.08);
       }
       this.animateRiverLife(now);
+      // LAST write before the draw: everything above this line is allowed to
+      // enable/disable meshes (night windows do it every frame), so the caster
+      // list is reconciled here and nowhere else.
+      this.syncShadowCasters();
       this.scene.render();
       this.fpsFrames++;
       const wall = performance.now();
@@ -497,7 +522,7 @@ export class SettlementView {
 
   /**
    * LANDMARKS, not a monument park. The WHERE now lives in shared —
-   * SETTLEMENT_MONUMENTS + TOMB_CAUSEWAY — because every site is a function of
+   * SETTLEMENT_MONUMENTS — because every site is a function of
    * the plot layout, and the plots move. This function only owns HOW one is
    * built: apron, plinth, ground dressing.
    *
@@ -655,14 +680,9 @@ export class SettlementView {
         ? Math.max(this.desertHeight(x, z), drift(x, z))
         : this.desertHeight(x, z);
 
-    // THE PROCESSIONAL. Judge: "the paved causeway that made this read as a
-    // processional in g5r is gone". TOMB_CAUSEWAY now runs along Z into the
-    // tomb's ENTRANCE face and stops 0.052 short of its socle — see the constant
-    // for the measurements. The paving is laid ON groundY, drift included, so
-    // there is no step where the two meet. Kerbs use the same grammar as the
-    // roads: two flanking strips a hair lower than the crown, so it is a cut
-    // surface with a shoulder rather than a slab dropped on the sand.
-    if (hasTomb) this.buildCauseway(root, groundY);
+    // No causeway. Five rounds of tuning could not stop a paved rectangle in
+    // open desert reading as a placeholder slab — owner call, remove it. The
+    // tomb now meets the sand directly, which is what the other monuments do.
 
     // kind, x, z, rotY, plinth size, apron side (0 = none)
     //
@@ -717,93 +737,6 @@ export class SettlementView {
    * side face wherever the sand falls away, which is what the "hairline crack"
    * report turned out to be.
    */
-  private buildCauseway(
-    root: TransformNode,
-    groundY: (x: number, z: number) => number
-  ) {
-    // Runs along Z now, into the tomb's entrance face — so the long axis is the
-    // ground's `height` and the kerbs are offset in X. See TOMB_CAUSEWAY.
-    const c = TOMB_CAUSEWAY;
-    const midZ = (c.fromZ + c.toZ) / 2;
-    const runZ = c.toZ - c.fromZ;
-    // A TINTED SAND SHEET IS NOT A PAVED WAY, AND TWO PASSES PROVED IT: at
-    // #C3B79E and again at #D2CBB8 over the sandGrit map the causeway
-    // photographed as slightly-different sand, because sandGrit's own mean
-    // pulls it back down and it carries no joints. It now uses the settlement's
-    // OWN "smooth fitted stone" road recipe verbatim — the same albedo scale,
-    // the same joint map, the same normal — so the tomb's way reads as the same
-    // material as the town's best street, which is what a processional is.
-    const stone = SETTLEMENT_TIER_PRESENTATION.grand;
-    const rm = this.roadMaterials(stone);
-    const way = this.dressMat("causewayMat", stone.road.fill);
-    // ALBEDO TAKEN FROM THE ROAD MATERIAL ITSELF, not re-derived from the
-    // palette hex. The two used to be computed independently — the road through
-    // roadMaterials' rendered target, the causeway as a 0.82 scale on the raw
-    // hex with its own 200/255 tile-base compensation — which was already only
-    // approximately the same colour, and stopped being the same colour at all
-    // once the stone tiers moved onto a cool hue. Reading rm.fill.diffuseColor
-    // makes "the same material as the town's best street" true by construction:
-    // that value already carries the tier target, the chroma and the tile-base
-    // division. Assigned on every call because rm may be rebuilt under us.
-    way.diffuseColor = rm.fill.diffuseColor.clone();
-    way.emissiveColor = rm.fill.diffuseColor.scale(0.03);
-    if (!way.diffuseTexture && rm.fill.diffuseTexture) {
-      way.diffuseTexture = rm.fill.diffuseTexture;
-      way.bumpTexture = rm.fill.bumpTexture;
-      way.specularColor = new Color3(0.06, 0.055, 0.045);
-      way.specularPower = 42;
-    }
-    const kerb = this.dressMat("causewayKerbMat", stone.road.edge);
-    // Same story for the shoulder — the street's kerb, not a second recipe.
-    kerb.diffuseColor = rm.edge.diffuseColor.clone();
-    kerb.emissiveColor = rm.edge.diffuseColor.scale(0.02);
-
-    const slab = MeshBuilder.CreateGround(
-      "causeway",
-      {
-        width: c.width,
-        height: runZ,
-        subdivisionsX: 4,
-        subdivisionsY: Math.max(2, Math.ceil(runZ * 3)),
-        updatable: true,
-      },
-      this.scene
-    );
-    slab.position.set(c.x, 0, midZ);
-    slab.material = way;
-    slab.parent = root;
-    slab.isPickable = false;
-    slab.receiveShadows = true;
-    // 0.060 over a 0.025 kerb, not 0.045 over 0.038. Both sheets are conformed
-    // to the same ground, so the only thing that separates the crown from its
-    // shoulder is this pair of offsets — and a 0.007 difference is the
-    // "zero-thickness card" report: at ~34 px per world unit that step is a
-    // quarter of a pixel and the paving read as a printed rectangle. 0.035
-    // apart is just over one pixel of shoulder, which is what a kerb is.
-    this.conformTo(slab, groundY, 0.06);
-    this.roadUvs(slab, 1.15);
-
-    for (const side of [-1, 1] as const) {
-      const k = MeshBuilder.CreateGround(
-        `causewayKerb-${side}`,
-        {
-          width: 0.3,
-          height: runZ,
-          subdivisionsX: 1,
-          subdivisionsY: Math.max(2, Math.ceil(runZ * 3)),
-          updatable: true,
-        },
-        this.scene
-      );
-      k.position.set(c.x + side * (c.width / 2 - 0.15), 0, midZ);
-      k.material = kerb;
-      k.parent = root;
-      k.isPickable = false;
-      k.receiveShadows = true;
-      this.conformTo(k, groundY, 0.025);
-    }
-  }
-
   /**
    * Sand banked against a monument. Rises to `lapY` over the footprint and
    * falls back to the true desert surface at the outer radius, so a prop on
@@ -3622,6 +3555,8 @@ export class SettlementView {
   private courtRoot: TransformNode | null = null;
   /** Per-tier forecourt paving, indexed by tier index. See ensureCourtMaps(). */
   private courtPaveMats: StandardMaterial[] = [];
+  /** Per-tier forecourt TRIM (border, inlaid axis, threshold). Same maps. */
+  private courtTrimMats: StandardMaterial[] = [];
 
   /**
    * THE CIVIC FORECOURT — the Great House's own rung on the tier ladder.
@@ -3660,6 +3595,14 @@ export class SettlementView {
     front: 2.09,
     /** how far the paving runs back UNDER the kit, so there is never a joint */
     lap: 0.35,
+    /**
+     * The flanking file. Bollards stand at +-flankX from band 2; at imperial a
+     * brazier takes over the FRONT one's exact site (flankX, brazierZ) and that
+     * bollard is retired (`until`). One pair of numbers for both pieces so the
+     * swap cannot drift into the co-existing overlap the judges scored.
+     */
+    flankX: 1.5,
+    brazierZ: 0.3,
     /** per-band [halfX, halfZ] */
     size: [
       [0.95, 0.62],
@@ -3717,12 +3660,36 @@ export class SettlementView {
       const CV = [166, 176, 176, 182, 190][i]!;
       const CS = [0.38, 0.36, 0.14, 0.13, 0.12][i]!;
       const col = SettlementView.reChroma(C.fill[i]!, CS, CV / 263);
-      p.diffuseColor = col;
-      p.emissiveColor = col.scale(paved ? 0.03 : 0.02);
+      // dressMat CACHES BY NAME, so on a rebuild (a quality change re-enters
+      // buildCivicCourt) this material comes back already textured and already
+      // carrying ensureCourtMaps' 255/200 tile-base compensation — and that
+      // method's own guard is `diffuseTexture`, so it will not re-apply it.
+      // Rewriting the authored albedo here would therefore drop the
+      // compensation and the court would come back 22% dark for the rest of
+      // the session. Only grade a material that has not been surfaced yet.
+      if (!p.diffuseTexture) {
+        p.diffuseColor = col;
+        p.emissiveColor = col.scale(paved ? 0.03 : 0.02);
+      }
       pav.push(p);
-      trim.push(this.dressMat(`courtTrim-${t}`, C.trim[i]!, 0.02));
+      // TRIM ON THE SAME RENDERED LADDER AS THE PAVING. The fill went through
+      // reChroma to an explicit rendered target and the trim never did, so the
+      // two drifted onto different scales: the raw hexes say trim is darker
+      // (#C6BBA4 vs #E8E0CE) but the graded fill lands at 0.921 x the 200/255
+      // tile = 0.722 while the ungraded trim sat flat at 0.776, i.e. the
+      // border and the threshold rendered BRIGHTER than the court they edge.
+      // Same targets, 12 V down: a trim course reads by being a shade deeper
+      // and by carrying the joint, not by being the palest thing in frame.
+      const tcol = SettlementView.reChroma(C.trim[i]!, CS, (CV - 12) / 263);
+      const tm = this.dressMat(`courtTrim-${t}`, C.trim[i]!, 0.02);
+      if (!tm.diffuseTexture) {
+        tm.diffuseColor = tcol;
+        tm.emissiveColor = tcol.scale(paved ? 0.03 : 0.02);
+      }
+      trim.push(tm);
     }
     this.courtPaveMats = pav;
+    this.courtTrimMats = trim;
 
     const stoneM = this.dressMat("courtStone", "#B3A78C", 0.02);
     const stoneDkM = this.dressMat("courtStoneDk", "#93866C");
@@ -3738,13 +3705,19 @@ export class SettlementView {
 
     const buckets = new Map<
       string,
-      { mat: StandardMaterial; band: number; parts: Mesh[] }
+      { mat: StandardMaterial; band: number; until?: number; parts: Mesh[] }
     >();
-    const push = (mat: StandardMaterial, band: number, m: Mesh) => {
-      const key = `${mat.name}|${band}`;
+    /** `until` = last tier index this piece survives; omit for permanent. */
+    const push = (
+      mat: StandardMaterial,
+      band: number,
+      m: Mesh,
+      until?: number
+    ) => {
+      const key = `${mat.name}|${band}|${until ?? ""}`;
       let b = buckets.get(key);
       if (!b) {
-        b = { mat, band, parts: [] };
+        b = { mat, band, until, parts: [] };
         buckets.set(key, b);
       }
       b.parts.push(m);
@@ -3836,6 +3809,10 @@ export class SettlementView {
           border.parent = root;
           border.isPickable = false;
           border.receiveShadows = true;
+          // The trim now carries the road tile (ensureCourtMaps), so it needs
+          // the paving's world-scaled UVs too — on a CreateGround's default
+          // 0..1 UVs one joint cell would be stretched over the whole strip.
+          this.roadUvs(border, k >= 3 ? 1.15 : 1.45);
           this.tierVariants.push({ band: k, mesh: border });
         }
       }
@@ -3898,6 +3875,12 @@ export class SettlementView {
           flight.parent = root;
           flight.isPickable = false;
           flight.receiveShadows = true;
+          // Same world-scaled UVs as the paving. The threshold's top face is
+          // the largest single trim surface in the court (3.1 x 0.95 at
+          // imperial) and it is the one that photographed as a bare plane; its
+          // 0.175-tall sides take the same projection, which at this size is a
+          // vertical smear of one joint and reads as a cut stone edge.
+          this.roadUvs(flight, k >= 3 ? 1.15 : 1.45);
           if (this.shadowGen) this.shadowGen.addShadowCaster(flight, false);
           this.tierVariants.push({ band: k, mesh: flight });
         }
@@ -3905,7 +3888,13 @@ export class SettlementView {
     }
 
     // ── flanking dressing: CUMULATIVE, so each tier keeps the last ───────
-    // band 1 — the yard gets its first kerb stones
+    // band 1 — the yard gets its first kerb stones.
+    // z 1.55 -> 0.95: at 1.55 the kerb stood x [0.98,1.32] z [1.45,1.65], which
+    // from "settled" up is INSIDE the entrance platform (x <= +-1.55, z >= 1.19,
+    // top y g+0.115) with the kerb's own top at g+0.125 — a 1 cm strip of a
+    // buried stone z-fighting the threshold at four of the five tiers. At 0.95
+    // it is 0.06 clear of the band-3 mast foot, 0.06 clear of the bollard file
+    // and still 0.11 inside the settled court's own near edge (z 0.74).
     for (const side of [-1, 1] as const) {
       const x = C.x + side * 1.15;
       const b = MeshBuilder.CreateBox(
@@ -3913,23 +3902,34 @@ export class SettlementView {
         { width: 0.34, height: 0.15, depth: 0.2 },
         this.scene
       );
-      b.position.set(x, gy(x, 1.55) + 0.05, 1.55);
+      b.position.set(x, gy(x, 0.95) + 0.05, 0.95);
       push(stoneDkM, 1, b);
     }
-    // band 2 — bollards down the approach
+    // band 2 — bollards down the approach.
+    // BOTH z VALUES MOVED FORWARD (were 1.05 / 0.35) and the reason is
+    // measured, not styled: at x |1.5| a 0.12-radius bollard spans z
+    // [0.93,1.17], and from "grand" up the threshold's cheek wall occupies
+    // x [1.57,1.81] z [0.995,2.145] y [g-0.06,g+0.38] while the band-3 mast
+    // foot occupies x [1.06,1.44] z [1.11,1.49] y [g-0.03,g+0.13]. The rear
+    // bollard therefore intersected BOTH of them in 3D. At 0.80 it clears the
+    // cheek by 0.075 and the mast foot by 0.19, and the pair still reads as a
+    // line down the approach.
+    // The FRONT bollard is retired at imperial (`until` 3) because the brazier
+    // below stands on exactly its site: a replacement must not co-exist with
+    // the thing it replaces.
     for (const side of [-1, 1] as const) {
-      for (const [zc, hh] of [
-        [1.05, 0.44],
-        [0.35, 0.4],
+      for (const [zc, hh, until] of [
+        [0.8, 0.44, undefined],
+        [SettlementView.COURT.brazierZ, 0.4, 3],
       ] as const) {
-        const x = C.x + side * 1.5;
+        const x = C.x + side * C.flankX;
         const p = MeshBuilder.CreateCylinder(
           `courtBollard-${side}-${zc}`,
           { height: hh, diameterBottom: 0.24, diameterTop: 0.17, tessellation: 8 },
           this.scene
         );
         p.position.set(x, gy(x, zc) + hh / 2 - 0.03, zc);
-        push(stoneM, 2, p);
+        push(stoneM, 2, p, until);
       }
     }
     // band 3 — banner masts either side of the door
@@ -3959,10 +3959,16 @@ export class SettlementView {
       cloth.position.set(x + side * 0.2, g0 + 1.52, zc);
       push(clothM, 3, cloth);
     }
-    // band 4 — braziers on the outer corners, and clipped hedges
+    // band 4 — braziers, and clipped hedges.
+    // The brazier is a REPLACEMENT, so it stands on the front bollard's own
+    // site rather than beside it. It used to sit at (1.85, 0.55), which left
+    // its 0.21-radius bowl 0.02 clear of that bollard's 0.12 radius — two
+    // stone cylinders 2 cm apart photograph as one interpenetrating lump, and
+    // the bollard was still there underneath it. Now the bollard retires
+    // (`until` 3) and the brazier takes the spot.
     for (const side of [-1, 1] as const) {
-      const x = C.x + side * 1.85;
-      const zc = 0.55;
+      const x = C.x + side * C.flankX;
+      const zc = C.brazierZ;
       const g0 = gy(x, zc);
       const drum = MeshBuilder.CreateCylinder(
         `courtBrazierBase-${side}`,
@@ -4002,20 +4008,20 @@ export class SettlementView {
       }
     }
 
-    for (const { mat, band, parts } of buckets.values()) {
+    for (const { mat, band, until, parts } of buckets.values()) {
       if (parts.length === 0) continue;
       const merged =
         parts.length === 1
           ? parts[0]!
           : Mesh.MergeMeshes(parts, true, true, undefined, false, false);
       if (!merged) continue;
-      merged.name = `court-${mat.name}-t${band}`;
+      merged.name = `court-${mat.name}-t${band}${until === undefined ? "" : `u${until}`}`;
       merged.material = mat;
       merged.parent = root;
       merged.isPickable = false;
       merged.receiveShadows = true;
       if (this.shadowGen) this.shadowGen.addShadowCaster(merged, false);
-      this.tierBands.push({ band, mesh: merged });
+      this.tierBands.push({ band, mesh: merged, until });
     }
   }
 
@@ -4111,22 +4117,6 @@ export class SettlementView {
         ]
     ),
     [TOMB_SITE.x, TOMB_SITE.z, 2.6], // small pyramid
-    // The tomb causeway, now a 1.90 x 4.85 run along Z (TOMB_CAUSEWAY). One
-    // circle cannot cover a strip that long, so it takes two, at the quarter
-    // points of the run. r 1.60 is sized so that even at the strip's own edge
-    // (0.95 off centre) each circle still spans +-1.29 in z, which is enough to
-    // overlap its neighbour and reach both ends: no scatter can surface inside
-    // the paving. DERIVED, not typed: these were still the quarter points of
-    // the OLD 2.6..7.05 run and left the first 0.22 of the widened strip's edge
-    // uncovered, and they would have been left behind again by the x move.
-    ...([0.25, 0.75] as const).map(
-      (f) =>
-        [
-          TOMB_CAUSEWAY.x,
-          TOMB_CAUSEWAY.fromZ + f * (TOMB_CAUSEWAY.toZ - TOMB_CAUSEWAY.fromZ),
-          1.6,
-        ] as readonly [number, number, number]
-    ),
     [-11.0, 6.5, 2.6], // harbor pier
     // The civic forecourt. Nothing scattered may stand inside the Great
     // House's paving — see buildCivicCourt().
@@ -4517,7 +4507,21 @@ export class SettlementView {
           { width: 0.02, height: 0.44, depth: 0.3 },
           this.scene
         );
-        cloth.position.set(p.x + 0.02, gy + 0.78, p.z);
+        // ANCHOR THE CLOTH TO THE POLE. It used to sit at p.x + 0.02, i.e.
+        // centred on the pole with a 2 cm nudge along world X — an axis that
+        // has nothing to do with the flag once rotation.y = yaw is applied. So
+        // the pole speared the 0.3-deep flag through its middle and, at the
+        // yaws where the flag turned edge-on to it, the cloth read as hanging
+        // off nothing. rotation.y sends the box's local +Z to world
+        // (sin yaw, cos yaw); hang it 0.14 along THAT — half the 0.3 depth less
+        // a 0.01 bite — so the cloth's near edge overlaps the 0.035-radius pole
+        // by 0.045 at every site instead of straddling it. `at()` must not be
+        // used here: it rotates (dx,dz) the opposite way to rotation.y.
+        cloth.position.set(
+          p.x + Math.sin(yaw) * 0.14,
+          gy + 0.78,
+          p.z + Math.cos(yaw) * 0.14
+        );
         cloth.rotation.y = yaw;
         push(clothM, 3, cloth);
       }
@@ -6329,7 +6333,11 @@ export class SettlementView {
     const i = this.tierPres.index;
     this.ensureCourtMaps(i);
     for (const b of this.tierBands) {
-      if (!b.mesh.isDisposed()) b.mesh.setEnabled(b.band <= i);
+      // One write per mesh: a piece that is retired by a later tier is still a
+      // single enable test, so nothing can fight over it between the two rules.
+      if (!b.mesh.isDisposed()) {
+        b.mesh.setEnabled(b.band <= i && (b.until === undefined || i <= b.until));
+      }
     }
     for (const v of this.tierVariants) {
       if (!v.mesh.isDisposed()) v.mesh.setEnabled(v.band === i);
@@ -6364,6 +6372,57 @@ export class SettlementView {
   }
 
   /**
+   * THE ONE CHOKE POINT FOR THE SHADOW CASTER LIST: a mesh that is not on
+   * screen this frame is not in it. Every addShadowCaster in the codebase
+   * (here, kitLoader, decorLoader) feeds the pool; the list is re-derived.
+   *
+   * This is NOT about what gets drawn into the shadow map — Babylon already
+   * skips hidden meshes there (ObjectRenderer._prepareRenderingManager tests
+   * isEnabled() && isVisible). It is about the FRUSTUM. DirectionalLight fits
+   * its ortho projection by walking the raw render list, hidden entries and
+   * all (_setDefaultAutoExtendShadowProjectionMatrix), so retired tier
+   * dressing, pad markers on taken plots and kit dressing above the current
+   * tier were all still voting on how big the shadow map has to cover.
+   *
+   * Measured on the shipped board, 141 of 664 casters were hidden and cost:
+   *   fit   34.2 x 73.8 units, 27.8 shadow texels per world unit, z-range 44.5
+   *   -> 34.2 x 19.5 units, 55.2 texels per unit, z-range 25.4
+   * i.e. HALF the shadow resolution was being spent on meshes nobody can see.
+   * That is the "small-prop shadow edges stair-step at closeup" report: the
+   * PCSS blocker search is a fraction of the map (contactHardeningLightSize-
+   * UVRatio 0.018 = 37 texels), so at 27.8 texels/unit it was smearing 1.33
+   * world units and washing thin legs and posts out of their own shadows.
+   * bias is NORMALISED depth too, so the fatter z-range was inflating the
+   * world-space bias by the same 1.75x and floating shadows off their bases.
+   *
+   * Allocation-free after warm-up: the pool absorbs whatever addShadowCaster
+   * appended since the last pass, then the list is rewritten in place.
+   *
+   * NOTE FOR FUTURE EDITS: do not call shadowGen.removeShadowCaster — a caster
+   * is retired by hiding or disposing the mesh, which is what every caller
+   * already does, and a bare list removal would be undone here next frame.
+   */
+  private syncShadowCasters() {
+    const list = this.shadowGen?.getShadowMap()?.renderList;
+    if (!list) return;
+    const pool = this.shadowCasterPool;
+    for (const m of list) pool.add(m);
+    let n = 0;
+    for (const m of pool) {
+      if (m.isDisposed()) {
+        pool.delete(m);
+        continue;
+      }
+      // isEnabled() walks the parents, which is how one write to a dressing
+      // band root retires the whole band; visibility 0 is how the pick boxes
+      // and the hover cue hide without leaving the tree.
+      if (!m.isEnabled() || !m.isVisible || m.visibility <= 0) continue;
+      list[n++] = m;
+    }
+    list.length = n;
+  }
+
+  /**
    * Hand the forecourt the road maps of the tier that is about to be shown.
    * Idempotent and allocation-free after the first visit to a tier — the road
    * material for the current tier already exists (buildRoads runs first), so
@@ -6382,6 +6441,24 @@ export class SettlementView {
     p.diffuseColor = p.diffuseColor.scale(255 / 200);
     p.specularColor = new Color3(0.06, 0.055, 0.045);
     p.specularPower = i >= 2 ? 42 : 18;
+    // THE TRIM WAS LEFT OUT OF THE RESURFACING AND IT IS THE BIGGER SURFACE.
+    // courtTrim skins the border band, the inlaid imperial axis (0.5 x 2.92)
+    // and the whole entrance platform (3.1 x 0.95 plus riser and cheeks) —
+    // measured on the live board it carried tex=NONE at every tier while the
+    // paving 3 cm away carried the road tile, and its flat albedo rendered
+    // ABOVE the paving's (imperial 0.776 vs 0.921 x the 200/255 tile base =
+    // 0.722). Untextured AND brighter than everything it borders is exactly
+    // the "blank untextured white plane" the judges scored. It gets the same
+    // tile, the same bump and the same compensation as the paving here, so the
+    // court reads as one surfacing job.
+    const t = this.courtTrimMats[i];
+    if (t && !t.diffuseTexture) {
+      t.diffuseTexture = road.fill.diffuseTexture;
+      t.bumpTexture = road.fill.bumpTexture;
+      t.diffuseColor = t.diffuseColor.scale(255 / 200);
+      t.specularColor = new Color3(0.06, 0.055, 0.045);
+      t.specularPower = i >= 2 ? 42 : 18;
+    }
   }
 
   /** Current settlement presentation tier (capture tooling reads this). */

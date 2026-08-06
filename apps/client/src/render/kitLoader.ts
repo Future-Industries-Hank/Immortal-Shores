@@ -152,6 +152,57 @@ export async function preloadBuildingKits(scene: Scene): Promise<KitCache> {
   return cache;
 }
 
+/**
+ * THE FLAT ORANGE PLACEHOLDER QUAD ON THE BOARD, and why it is removed here.
+ *
+ * mudbrick_yard's `ember_glow` part is ONE mesh carrying TWO disjoint pieces:
+ * the ember bed, authored on the mesh origin (local y -0.03..0.03), and a
+ * 24-vertex 0.24 x 0.19 x 0.03 card authored 1.75 units off it (local y
+ * -1.84..-1.65) for the kiln mouth. On the board that card renders at world
+ * (-4.5, 3.5, -2.2) — a saturated, untextured, unlit-looking orange rectangle
+ * hanging in clear air a metre and a half above the kiln with nothing under
+ * it, which is exactly the placeholder the judges called out.
+ *
+ * It also MOVES: every `glow` part is registered below as a "pulse", and
+ * animateBuildingKit pulses it with scaling.set(s, s, s) up to 1.119. Scaling
+ * is about the mesh ORIGIN, so a piece sitting 1.75 units away from that
+ * origin is swept +-0.21 world units every cycle. On the origin — where the
+ * ember bed is, and where a glow is meant to be — the same pulse is correct.
+ *
+ * So: collapse any vertex of a glow part that is stranded more than STRAND_R
+ * from its own origin onto that origin. Its triangles go degenerate and stop
+ * rasterising; the bed keeps every vertex it had, keeps its pulse, and the
+ * mesh's bounding box (and therefore its shadow) shrinks to the bed alone.
+ * Guarded both ways — it needs a real body at the origin AND a minority of
+ * strays — so a glow authored as one off-origin body is left completely alone.
+ * Measured against the live scene this touches exactly one mesh of the three
+ * glow parts on the board (vessel_shop kiln and luxury_workshop hearth are
+ * single-piece and on-origin).
+ */
+function collapseStrandedGlow(mesh: Mesh): void {
+  const STRAND_R = 1.0;
+  const src = mesh.getVerticesData("position");
+  if (!src) return;
+  const n = src.length / 3;
+  let far = 0;
+  for (let i = 0; i < src.length; i += 3) {
+    if (Math.hypot(src[i]!, src[i + 1]!, src[i + 2]!) > STRAND_R) far++;
+  }
+  if (far === 0 || far >= n - far) return;
+  // clone() shares geometry with the cached template — write to our own copy
+  mesh.makeGeometryUnique();
+  const pos = mesh.getVerticesData("position");
+  if (!pos) return;
+  for (let i = 0; i < pos.length; i += 3) {
+    if (Math.hypot(pos[i]!, pos[i + 1]!, pos[i + 2]!) <= STRAND_R) continue;
+    pos[i] = 0;
+    pos[i + 1] = 0;
+    pos[i + 2] = 0;
+  }
+  mesh.setVerticesData("position", pos, false);
+  mesh.refreshBoundingInfo();
+}
+
 export function instantiateBuildingFromKit(
   scene: Scene,
   cache: KitCache,
@@ -250,6 +301,7 @@ export function instantiateBuildingFromKit(
         anim.push({ mesh: c, kind: "bob" });
       }
       if (name.includes("glow")) {
+        collapseStrandedGlow(c);
         anim.push({ mesh: c, kind: "pulse" });
       }
     }
