@@ -1355,7 +1355,7 @@ export class SettlementView {
       rim.dispose();
       if (!halo) return;
       halo.outlineColor = hexToColor3(STYLE.goldSoft);
-      halo.outlineWidth = SettlementView.OUTLINE_WIDTH;
+      halo.outlineWidth = this.outlineWidth();
       halo.renderOutline = true;
       this.hoverHalo = halo;
       return;
@@ -1370,19 +1370,53 @@ export class SettlementView {
     const halo = this.buildHoverHalo(meshes);
     if (!halo) return;
     halo.outlineColor = tint;
-    halo.outlineWidth = SettlementView.OUTLINE_WIDTH;
+    halo.outlineWidth = this.outlineWidth();
     halo.renderOutline = true;
     this.hoverHalo = halo;
   }
 
   /**
-   * World units along the normal. The board renders ~34px per world unit, so
-   * this is a ~1.7 CSS px stroke. It was 0.032 while the outline was drawn
-   * per-submesh and every extra tenth of a pixel ate more trim; now that the
-   * stencil confines it to the far side of the silhouette the extra width
-   * lands entirely on sand, and the edge has to survive the fixed board zoom.
+   * World units along the normal, at BOARD framing. The board renders ~39 CSS
+   * px per world unit, so this is a ~2 CSS px stroke. It was 0.032 while the
+   * outline was drawn per-submesh and every extra tenth of a pixel ate more
+   * trim; now that the stencil confines it to the far side of the silhouette
+   * the extra width lands entirely on sand, and the edge has to survive the
+   * fixed board zoom.
    */
   private static readonly OUTLINE_WIDTH = 0.05;
+
+  /** What OUTLINE_WIDTH is worth at board framing, and the target at any zoom. */
+  private static readonly OUTLINE_CSS_PX = 2.0;
+
+  /**
+   * The stroke in WORLD units for the framing that is actually live.
+   *
+   * renderOutline's width is a world length, so one constant is only correct at
+   * one zoom. The board frames ~39 CSS px per world unit (0.05 -> 2.0 px), but
+   * the closeup framing the gallery harness uses (orthoRight 6) frames ~133 px
+   * per unit, where that same 0.05 is a 6.7 CSS px SLAB. That is what made the
+   * clay pit's cue read as "an opaque yellow flood-fill" rather than an edge:
+   * its kit is a hollow terraced basin, so unlike a house the back-face pass
+   * leaks a thread of gold at every interior ledge, and at 6.7px those threads
+   * merge into a wash over the basin, the kerb and the sand behind it. Measured
+   * on the g9 closeup: 199,945 strongly-saturated gold px against 9,968 in the
+   * clean g8 frame.
+   *
+   * Clamped so a zoom may only ever THIN the stroke, never widen it. Measured
+   * live: board framing 0.05 -> 1.97 CSS px (unchanged, orthoTop 10.8, 39.4
+   * px/unit); closeup framing 0.05 -> 0.015, i.e. 6.67 -> 2.00 CSS px.
+   */
+  private outlineWidth(): number {
+    const halfH = Math.abs(this.camera.orthoTop ?? 0);
+    const cssH =
+      this.engine.getRenderHeight() * this.engine.getHardwareScalingLevel();
+    if (!(halfH > 0) || !(cssH > 0)) return SettlementView.OUTLINE_WIDTH;
+    const pxPerUnit = cssH / (2 * halfH);
+    return Math.min(
+      SettlementView.OUTLINE_WIDTH,
+      SettlementView.OUTLINE_CSS_PX / pxPerUnit
+    );
+  }
 
   private clearHover() {
     this.hoverKey = null;
@@ -3672,18 +3706,17 @@ export class SettlementView {
       // court/street joint read as paper against stone. It goes through the
       // same rendered target the roads do (see roadMaterials for the
       // measurement and for the /263 and /(200/255) terms) — one step brighter
-      // and one step cooler than the street it meets, which is the "more
+      // and one step cleaner than the street it meets, which is the "more
       // formal" this table was always trying to say. ensureCourtMaps multiplies
       // this by 255/200 when it attaches the road tile, so the tile-base term
-      // is deliberately NOT divided out here.
+      // is deliberately NOT divided out here. The court tracks the road's
+      // chroma exactly, including the return from the cool hue-200 experiment to
+      // the table's warm stone — see roadMaterials; a court on a different hue
+      // family from the causeway it opens onto is the same joint failure this
+      // comment is about, just in colour instead of value.
       const CV = [166, 176, 176, 182, 190][i]!;
-      const CS = [0.38, 0.36, 0.1, 0.09, 0.08][i]!;
-      const col = SettlementView.reChroma(
-        C.fill[i]!,
-        CS,
-        CV / 263,
-        paved ? 200 : undefined
-      );
+      const CS = [0.38, 0.36, 0.14, 0.13, 0.12][i]!;
+      const col = SettlementView.reChroma(C.fill[i]!, CS, CV / 263);
       p.diffuseColor = col;
       p.emissiveColor = col.scale(paved ? 0.03 : 0.02);
       pav.push(p);
@@ -5943,32 +5976,34 @@ export class SettlementView {
     // failures either side of this are near-white (low S on a WARM hue) and
     // invisible (high S on a warm hue); both are the same mistake, which is
     // trying to describe stone with the sand's hue and only one free parameter.
-    // The stone tiers therefore get a chroma family of their own — a cool
-    // grey-blue, which is also what Egypt actually paved its processionals in —
-    // and keep a real value step below the sand:
+    // The free parameter that was missing is VALUE, not hue. The answer tried
+    // next was a hue rotation — the stone tiers on a cool grey-blue at hue 200 —
+    // and it was measured wrong by three reviewers: the crown photographed
+    // rgb(156,164,167) H195.9 S0.067 in a frame where every other surface sits
+    // at H27-37, i.e. the paving stopped belonging to the scene. Even taken down
+    // to S 0.06-0.10, where the cool is only a cast, it still reads as the one
+    // foreign family on the board.
+    // So the hue goes back to the tier table's own warm stone progression
+    // (32.7 deg rammed earth -> 41.4 deg limestone) and the LOW CHROMA is what
+    // is kept, because that is the part that worked: at a third of the sand's
+    // saturation the paving is unmistakably worked stone rather than raked
+    // desert, and the separation is carried by the value step, which is where it
+    // belongs.
     //   idx      0     1     2     3     4
     //   V      158   166   168   174   180      (vs lit sand 230)
-    //   S     0.40  0.39  0.10  0.09  0.08      (vs sand 0.50)
-    //   hue   table table  200   200   200  deg (vs sand 36.4)
-    // The dirt tiers are untouched: a rammed-earth track IS the desert's hue
-    // and going cool there would read as mud, not as stone.
-    // THE COOL IS A CAST, NOT A COLOUR, and that was found by overshooting it.
-    // The first pass ran the stone tiers at S 0.15-0.20 on this hue; measured on
-    // the rendered causeway that came out rgb(141,159,168) H199 S0.157 against
-    // sand rgb(171,137,84) H36 S0.513, and it photographs as a blue tarp laid on
-    // the desert — a worse regression than the one it was fixing. At S 0.08-0.10
-    // the same hue reads as grey limestone that happens not to be warm, and the
-    // separation from sand is carried by the VALUE step (-50 against lit sand)
-    // plus a chroma gap of -0.43 — both larger than the +32.8 L / -0.210 S the
-    // judges cited as the last state that worked.
+    //   S     0.40  0.39  0.14  0.13  0.12      (vs sand 0.50)
+    //   hue   ------------- table ------------  (32.7 -> 41.4 deg)
+    // S is held a little above the hue-200 pass's 0.08-0.10: a warm hue at that
+    // chroma is a neutral grey, and neutral-plus-bright is exactly the
+    // "near-white paper cutout" the whole exercise started from. 0.12-0.14 is
+    // still a -0.36 chroma gap to the sand, so the district reads as stone
+    // without the roads turning back into pale slabs.
     const TARGET_V = [158, 166, 168, 174, 180][pres.index]!;
-    const TARGET_S = [0.4, 0.39, 0.1, 0.09, 0.08][pres.index]!;
-    const STONE_HUE = 200;
+    const TARGET_S = [0.4, 0.39, 0.14, 0.13, 0.12][pres.index]!;
     const roadFill = SettlementView.reChroma(
       pres.road.fill,
       TARGET_S,
-      TARGET_V / 263 / (200 / 255),
-      paved ? STONE_HUE : undefined
+      TARGET_V / 263 / (200 / 255)
     );
     fill.diffuseColor = roadFill;
     fill.specularColor = Color3.Black();
@@ -5993,10 +6028,9 @@ export class SettlementView {
     const edge = new StandardMaterial(`roadEdge-${pres.tier}`, this.scene);
     // Same treatment, one step down in value and one up in chroma: the shoulder
     // is the crown with sand worked into it, so it must sit between the two.
-    // Deliberately left on the WARM table hue even where the crown has gone
-    // cool — the kerb is where the stone meets the desert, so a warm shoulder
-    // around cool paving is the join, and a cool one would put a hard chroma
-    // edge against the sand instead of a transition.
+    // Crown and shoulder are now on the same warm table hue, so the join is
+    // carried purely by chroma: 0.32 against the crown's 0.14 and the sand's
+    // 0.50 puts the kerb literally between the two.
     const edgeFill = SettlementView.reChroma(
       pres.road.edge,
       TARGET_S + (paved ? 0.18 : 0.03),
