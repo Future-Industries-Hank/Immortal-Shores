@@ -60,7 +60,12 @@ export default defineConfig({
   },
   build: {
     outDir: "dist",
-    sourcemap: true,
+    // Off, not "hidden": hidden still WRITES the maps, and they were 19 MB of a
+    // 35 MB dist. No browser ever fetched them (there is no sourceMappingURL
+    // either way), so on a host that is 19 MB of upload and disk for nothing —
+    // and a footgun if the deploy copies dist wholesale. Flip to "hidden" if you
+    // ever need to symbolicate a production stack trace.
+    sourcemap: false,
     rollupOptions: {
       output: {
         // Babylon is ~95% of the bundle and changes only when the dependency

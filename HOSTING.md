@@ -114,6 +114,34 @@ server runs is safe because writes are atomic renames.
 
 Static client (`apps/client/dist`) can be redeployed freely; it holds no authoritative state.
 
+### Client payload — what a player actually downloads
+
+Measured cold-cache, HTTP cache disabled, bytes from CDP `encodedDataLength`:
+
+| | requests | total | JS | `.glb` |
+|---|---:|---:|---:|---:|
+| dev server (5173) | 564 | 20.3 MB | 13.6 MB | 6.6 MB |
+| production build, gzipped | 45 | **7.9 MB** | **1.2 MB** | 6.6 MB |
+
+Never quote the dev server for payload — it serves 521 unbundled, unminified modules.
+
+`dist` is 13 MB on disk (source maps are not emitted and the storyboard is stripped by the
+build). **Upload the whole of `dist`.**
+
+Two wins left, both at the serving layer, neither in the code:
+
+- **Serve `/models/*.glb` with gzip.** They are not compressed today and plain gzip measures
+  0.43–0.56× on them — about **3.3 MB off every cold boot**, the single biggest remaining win.
+  Nginx: add `application/octet-stream` and `model/gltf-binary` to `gzip_types`.
+- **Cache `/models` hard.** They are content-versioned by a query param (`?v=…`), so
+  `Cache-Control: public, max-age=31536000, immutable` is safe and makes every repeat visit
+  fetch JS only.
+
+The remaining in-code win, not done: `preloadBuildingKits()` fetches all 16 building kits at
+boot, but a fresh settlement can only see 6 of them (2.7 MB) — the other ten are 3.6 MB
+downloaded for pads the player has not built yet. Loading those on first build would roughly
+halve a new player's cold boot.
+
 ### Live channels
 
 - **WebSocket** `GET /ws?token=` — snapshots + chat/trade/barge/notify events
