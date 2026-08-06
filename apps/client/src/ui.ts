@@ -1193,7 +1193,13 @@ function renderWall(s: PublicSnapshot) {
         <span class="chat-body"><span class="chat-name ch-${m.channel}">${m.fromName}</span><span class="chat-time">${hh}</span><br />${formatChatHtml(m.text)}</span>`;
       box.appendChild(line);
     }
+    // Deferred a frame: scrollHeight measured in the same tick as the appends
+    // is the pre-layout height, so the newest message landed half-clipped at
+    // the bottom edge and read as a broken row rather than as chat history.
     box.scrollTop = box.scrollHeight;
+    requestAnimationFrame(() => {
+      box.scrollTop = box.scrollHeight;
+    });
   };
   redrawChat();
   panel.querySelector("#chat-search")?.addEventListener("input", redrawChat);
