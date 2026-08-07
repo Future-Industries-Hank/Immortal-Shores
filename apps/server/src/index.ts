@@ -572,6 +572,22 @@ if (CLIENT_DIST && existsSync(CLIENT_DIST)) {
           : "public, max-age=86400";
     reply.header("Content-Type", ctype);
     reply.header("Cache-Control", cache);
+    // Precompressed siblings (build writes .glb.br/.glb.gz — see
+    // apps/client/scripts/compress-dist.mjs). Cloudflare compresses text types
+    // at the edge but not model/gltf-binary, so without this every .glb ships
+    // at its on-disk size (~84% of a cold boot).
+    const accept = String(req.headers["accept-encoding"] ?? "");
+    for (const [token, suffix] of [
+      ["br", ".br"],
+      ["gzip", ".gz"],
+    ] as const) {
+      if (!accept.includes(token)) continue;
+      const sibling = `${full}${suffix}`;
+      if (!existsSync(sibling)) continue;
+      reply.header("Content-Encoding", token);
+      reply.header("Vary", "Accept-Encoding");
+      return reply.send(createReadStream(sibling));
+    }
     return reply.send(createReadStream(full));
   });
   app.log.info(`Serving client dist from ${CLIENT_DIST}`);

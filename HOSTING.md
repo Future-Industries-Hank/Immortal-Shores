@@ -128,14 +128,15 @@ Never quote the dev server for payload — it serves 521 unbundled, unminified m
 `dist` is 13 MB on disk (source maps are not emitted and the storyboard is stripped by the
 build). **Upload the whole of `dist`.**
 
-Two wins left, both at the serving layer, neither in the code:
+Serving-layer wins — both now shipped in code:
 
-- **Serve `/models/*.glb` with gzip.** They are not compressed today and plain gzip measures
-  0.43–0.56× on them — about **3.3 MB off every cold boot**, the single biggest remaining win.
-  Nginx: add `application/octet-stream` and `model/gltf-binary` to `gzip_types`.
-- **Cache `/models` hard.** They are content-versioned by a query param (`?v=…`), so
-  `Cache-Control: public, max-age=31536000, immutable` is safe and makes every repeat visit
-  fetch JS only.
+- **Models are precompressed at build.** `npm run build` writes `.glb.br`/`.glb.gz` siblings
+  (7.0 MB raw → 3.4 MB brotli across the library) and the static handler serves them when
+  `Accept-Encoding` allows, falling back to the raw file otherwise. Cloudflare compresses text
+  types at the edge but not `model/gltf-binary`, which is why this lives at the origin.
+- **`/models` is cached immutable** (`Cache-Control: public, max-age=31536000, immutable`) —
+  safe because the client versions them with `?v=…`. Optional extra: a Cloudflare Cache Rule
+  for `*.glb` would also edge-cache them (CF reports `DYNAMIC` on them by default).
 
 The remaining in-code win, not done: `preloadBuildingKits()` fetches all 16 building kits at
 boot, but a fresh settlement can only see 6 of them (2.7 MB) — the other ten are 3.6 MB
