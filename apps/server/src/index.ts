@@ -1,3 +1,5 @@
+import { createReadStream, existsSync, statSync } from "node:fs";
+import { extname, normalize, resolve, sep } from "node:path";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import websocket from "@fastify/websocket";
@@ -5,6 +7,10 @@ import { Game } from "./game.js";
 
 const PORT = Number(process.env.PORT ?? 8787);
 const HOST = process.env.HOST ?? "0.0.0.0";
+/** Production client build. When set and present, this process serves the static
+ *  Arcade client (index.html + assets + models) next to /api and /ws so one
+ *  public hostname can host multiplayer. Dev leaves this unset and uses Vite. */
+const CLIENT_DIST = (process.env.CLIENT_DIST ?? "").trim();
 
 /** A refusing store means the world file is damaged — never boot an empty world over it. */
 function bootGame(): Game {
@@ -500,6 +506,79 @@ app.register(async (instance) => {
   });
 });
 
+/* ── Static client (production multiplayer host) ─────────────────── */
+
+const MIME: Record<string, string> = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".webmanifest": "application/manifest+json",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".svg": "image/svg+xml",
+  ".glb": "model/gltf-binary",
+  ".wasm": "application/wasm",
+  ".ico": "image/x-icon",
+  ".map": "application/json",
+  ".txt": "text/plain; charset=utf-8",
+};
+
+function safeClientPath(urlPath: string): string | null {
+  if (!CLIENT_DIST) return null;
+  const root = resolve(CLIENT_DIST);
+  // strip query/hash; default to index
+  let rel = urlPath.split("?")[0].split("#")[0] || "/";
+  if (rel === "/" || rel === "") rel = "/index.html";
+  // forbid escape
+  const cleaned = normalize(rel).replace(/^(\.\.(\/|\\|$))+/, "");
+  const full = resolve(root, "." + (cleaned.startsWith("/") ? cleaned : `/${cleaned}`));
+  if (!full.startsWith(root + sep) && full !== root) return null;
+  return full;
+}
+
+if (CLIENT_DIST && existsSync(CLIENT_DIST)) {
+  app.get("/*", async (req, reply) => {
+    const pathOnly = (req.url ?? "/").split("?")[0] ?? "/";
+    // never shadow live API / health / ws (ws is registered on the same server)
+    if (
+      pathOnly === "/health" ||
+      pathOnly.startsWith("/api/") ||
+      pathOnly === "/ws" ||
+      pathOnly.startsWith("/ws?")
+    ) {
+      return reply.callNotFound();
+    }
+    let full = safeClientPath(pathOnly);
+    if (!full || !existsSync(full) || !statSync(full).isFile()) {
+      // SPA-style fallback only for bare navigations, not missing assets
+      if (!extname(pathOnly) || pathOnly.endsWith("/")) {
+        full = safeClientPath("/index.html");
+      }
+    }
+    if (!full || !existsSync(full) || !statSync(full).isFile()) {
+      return reply.code(404).send({ error: "Not found" });
+    }
+    const ext = extname(full).toLowerCase();
+    const ctype = MIME[ext] ?? "application/octet-stream";
+    // versioned models use ?v=… — hard-cache them; HTML always revalidate
+    const cache =
+      ext === ".html"
+        ? "no-cache"
+        : ext === ".glb" || pathOnly.includes("/models/")
+          ? "public, max-age=31536000, immutable"
+          : "public, max-age=86400";
+    reply.header("Content-Type", ctype);
+    reply.header("Cache-Control", cache);
+    return reply.send(createReadStream(full));
+  });
+  app.log.info(`Serving client dist from ${CLIENT_DIST}`);
+} else if (CLIENT_DIST) {
+  app.log.warn(`CLIENT_DIST set but missing: ${CLIENT_DIST}`);
+}
+
 let shuttingDown = false;
 /**
  * Stop accepting requests, then flush. store.close() clears the 5s save interval before it
@@ -538,3 +617,8 @@ process.on("uncaughtException", (err) => {
 
 await app.listen({ port: PORT, host: HOST });
 console.log(`Immortal Shores server on http://${HOST}:${PORT}`);
+if (CLIENT_DIST && existsSync(CLIENT_DIST)) {
+  console.log(`  client: ${CLIENT_DIST}`);
+} else {
+  console.log(`  client: (API only — set CLIENT_DIST to serve the browser build)`);
+}

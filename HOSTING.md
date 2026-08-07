@@ -168,19 +168,65 @@ halve a new player's cold boot.
 | `NODE_ENV` | — | `production` locks debug routes unless `ALLOW_DEBUG=1` |
 | `ALLOW_DEBUG` | — | Enable `/api/debug/*` in production |
 
-## FI Arcade shape
+## FI Arcade shape (multiplayer — production)
+
+Immortal Shores is **not** a static zip on `games.futureindustries.ai`. A shared world
+needs one authoritative Node process (REST + WebSocket + durable `DATA_DIR`). On the
+home FI box that is:
 
 ```
-Browser
-  → hosted-games/immortal-shores/   # static client (npm run build -w @immortal/client → apps/client/dist)
-  → /api + /ws                     # game server (Cloudflare Tunnel or reverse proxy)
-  → private persistent DATA_DIR    # world.json + sessions.json + backups/
+Browser  →  https://shores.futureindustries.ai/
+              │  Cloudflare Tunnel (HTTP + WebSocket upgrade)
+              ▼
+         immortal-shores.service  (loopback :8787)
+              ├── static client   CLIENT_DIST=apps/client/dist
+              ├── /api/*          Fastify game API
+              ├── /ws             live channel
+              └── DATA_DIR=/var/lib/immortal-shores   # world.json + sessions + backups
 ```
+
+Arcade listing on futureindustries.ai points at that host (`games/immortal-shores.html`).
+Players register **in the game** (name + password); that is separate from the FI site login.
+
+### Deploy (operator)
+
+```bash
+# on fi-server
+sudo mkdir -p /var/lib/immortal-shores
+sudo chown futureindustries:futureindustries /var/lib/immortal-shores
+sudo -u futureindustries git -C /opt/futureindustries/Immortal-Shores pull --ff-only \
+  || sudo -u futureindustries git clone https://github.com/Future-Industries-Hank/Immortal-Shores.git \
+       /opt/futureindustries/Immortal-Shores
+sudo -u futureindustries bash -lc 'cd /opt/futureindustries/Immortal-Shores && npm ci && npm run build'
+sudo cp /opt/futureindustries/Future-Industries/deploy/immortal-shores.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now immortal-shores
+
+# tunnel hostname (once)
+sudo cloudflared tunnel route dns fi shores.futureindustries.ai
+# ensure /etc/cloudflared/config.yml has shores.futureindustries.ai → http://localhost:8787
+sudo systemctl restart cloudflared
+```
+
+Env contract (unit file + optional fi.env notes):
+
+| Var | Production value |
+|---|---|
+| `HOST` | `127.0.0.1` |
+| `PORT` | `8787` |
+| `DATA_DIR` | `/var/lib/immortal-shores` |
+| `CLIENT_DIST` | `/opt/futureindustries/Immortal-Shores/apps/client/dist` |
+| `NODE_ENV` | `production` |
 
 Run exactly **one** server process per `DATA_DIR`. The store is single-process by design;
 two processes on the same directory would overwrite each other's worlds. `docker-compose.yml`
 still ships a Postgres container from an earlier plan — it is unused, and nothing in the
 server talks to it.
+
+### Static-only zip (not multiplayer)
+
+`apps/client/dist` can still be zipped for FI community upload as a **shell** — register/login
+and the board will not work without the API. Prefer the shores hostname for real play.
 
 ### Identity
 
