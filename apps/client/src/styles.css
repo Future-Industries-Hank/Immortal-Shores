@@ -625,6 +625,20 @@ html.dark button.btn-locked svg {
   font-size: 0.68rem;
 }
 
+/* Free vs working — always first chip in the top bar */
+.res-chip.res-workers .w-free {
+  color: #b8e0a8;
+  font-weight: 700;
+}
+.res-chip.res-workers .w-busy {
+  color: #e8c26a;
+  font-weight: 700;
+}
+.res-chip.res-workers .w-sep {
+  opacity: 0.55;
+  font-weight: 500;
+}
+
 /* Seals / province chip */
 #seals {
   display: inline-flex;
@@ -1293,7 +1307,8 @@ html.dark .b-card-glyph {
   letter-spacing: 0.02em;
 }
 
-/* Settings & Debug collapsible */
+/* Settings collapsible (debug time-advance removed for live ship) */
+.settings-panel,
 .settings-debug {
   margin-top: 1rem;
   border: 1px dashed var(--hairline-strong);
@@ -1302,6 +1317,7 @@ html.dark .b-card-glyph {
   background: var(--surface-inset);
 }
 
+.settings-panel summary,
 .settings-debug summary {
   cursor: pointer;
   padding: 0.5rem 0;
@@ -1313,10 +1329,12 @@ html.dark .b-card-glyph {
   list-style-position: inside;
 }
 
+.settings-panel .row,
 .settings-debug .row {
   margin-top: 0.4rem;
 }
 
+.settings-panel > div:last-child,
 .settings-debug > div:last-child {
   padding-bottom: 0.6rem;
 }

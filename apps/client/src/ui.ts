@@ -66,7 +66,7 @@ let selectedPlotId: string | null = null;
 let selectedConstruction = false;
 /** Currently open menu popup panel id, or null when closed. */
 let activePanel: string | null = null;
-/** Shore panel "Settings & Debug" collapsible state (survives re-render). */
+/** Shore panel Settings collapsible state (survives re-render). */
 let settingsOpen = false;
 /** World map legend filters (survive re-render). */
 let mapKindFilter: string = "all";
@@ -529,11 +529,26 @@ function renderPadBuildMenu() {
   });
 }
 
+const WORKER_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7" r="2.4"/><path d="M4.5 19v-1.2c0-2.1 1.9-3.8 4.5-3.8s4.5 1.7 4.5 3.8V19"/><circle cx="16.5" cy="8" r="2"/><path d="M19.5 19v-.9c0-1.7-1.3-3.1-3-3.4"/></svg>`;
+
 function renderHud(s: PublicSnapshot) {
   const el = document.getElementById("resources")!;
   const parts: string[] = [];
   const chip = (r: string, v: number, note = "") =>
     `<span class="res-chip" title="${RESOURCE_LABELS[r as ResourceId] ?? r}">${resourceIcon(r)}<span class="res-name">${resourceShort(r)}</span> <span class="res-val">${fmt(v)}</span>${note ? `<span class="res-note">${note}</span>` : ""}</span>`;
+  // Free vs working first — assignment is the primary economy decision.
+  const st = s.settlements[0];
+  if (st) {
+    const free = Math.max(0, st.workers - st.workersAssigned);
+    const working = Math.max(0, st.workersAssigned);
+    parts.push(
+      `<span class="res-chip res-workers" title="${free} free · ${working} working · ${st.workers} total">` +
+        `${WORKER_ICON}<span class="res-name">Workers</span> ` +
+        `<span class="res-val"><span class="w-free">${free} free</span>` +
+        `<span class="w-sep"> · </span>` +
+        `<span class="w-busy">${working} working</span></span></span>`
+    );
+  }
   for (const r of HUD_RESOURCES) {
     if (r === "seals") continue;
     const v = s.player.vault[r] ?? 0;
@@ -542,13 +557,13 @@ function renderHud(s: PublicSnapshot) {
     }
   }
   // show unique luxury always (assigned at founding — may not produce until Luxury Works built)
-  const lux = s.settlements[0]?.uniqueLuxury;
+  const lux = st?.uniqueLuxury;
   if (lux) {
-    const hasWorks = s.settlements[0]?.buildings.some((b) => b.kind === "luxury_material");
+    const hasWorks = st?.buildings.some((b) => b.kind === "luxury_material");
     parts.push(chip(lux, s.player.vault[lux] ?? 0, hasWorks ? "" : "build works"));
   }
   el.innerHTML = parts.join("");
-  const prov = s.map.provinces.find((p) => p.id === s.settlements[0]?.provinceId);
+  const prov = s.map.provinces.find((p) => p.id === st?.provinceId);
   document.getElementById("seals")!.innerHTML =
     `<span class="wax-dot" aria-hidden="true"></span>Seals ${s.player.seals}${prov ? ` <span class="seals-prov">· ${prov.name}</span>` : ""}`;
 }
@@ -604,8 +619,8 @@ function renderSettlement(s: PublicSnapshot) {
     }
     <h3>Buildings</h3>
     <div id="building-list"></div>
-    <details class="settings-debug" id="settings-debug" ${settingsOpen ? "open" : ""}>
-      <summary>Settings &amp; Debug</summary>
+    <details class="settings-panel" id="settings-panel" ${settingsOpen ? "open" : ""}>
+      <summary>Settings</summary>
       <div>
         <div class="row">
           <button class="small secondary" id="btn-overlay">Production overlay</button>
@@ -613,11 +628,6 @@ function renderSettlement(s: PublicSnapshot) {
         </div>
         <div class="row">
           <button class="small secondary" id="btn-pause">${s.player.pauseNonEssential ? "Resume non-essential" : "Pause non-essential"}</button>
-        </div>
-        <p class="muted">Time advance (testing / catch-up — never monetized):</p>
-        <div class="row">
-          <button class="small secondary" id="btn-advance-1">+1 hour</button>
-          <button class="small secondary" id="btn-advance-8">+8 hours</button>
         </div>
         <div class="row">
           <button class="small secondary" id="btn-dark">Dark mode</button>
@@ -664,7 +674,7 @@ function renderSettlement(s: PublicSnapshot) {
     `;
     list.appendChild(row);
   }
-  panel.querySelector("#settings-debug")?.addEventListener("toggle", (e) => {
+  panel.querySelector("#settings-panel")?.addEventListener("toggle", (e) => {
     settingsOpen = (e.target as HTMLDetailsElement).open;
   });
   list.querySelectorAll<HTMLElement>("[data-pick]").forEach((node) => {
@@ -726,22 +736,6 @@ function renderSettlement(s: PublicSnapshot) {
   panel.querySelector("#cancel-build")?.addEventListener("click", async () => {
     try {
       handlers.onSnapshot(await api.cancelConstruct(st.id));
-    } catch (e) {
-      handlers.onToast((e as Error).message);
-    }
-  });
-  panel.querySelector("#btn-advance-1")?.addEventListener("click", async () => {
-    try {
-      handlers.onSnapshot(await api.advance(1));
-      sfx.ok();
-    } catch (e) {
-      handlers.onToast((e as Error).message);
-    }
-  });
-  panel.querySelector("#btn-advance-8")?.addEventListener("click", async () => {
-    try {
-      handlers.onSnapshot(await api.advance(8));
-      sfx.ok();
     } catch (e) {
       handlers.onToast((e as Error).message);
     }
