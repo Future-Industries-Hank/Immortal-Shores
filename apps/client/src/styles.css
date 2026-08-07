@@ -639,6 +639,25 @@ html.dark button.btn-locked svg {
   font-weight: 500;
 }
 
+/* The workers chip is a real <button> that opens the Shore panel. Reset the
+   UA button font (everything else about .res-chip already styles it), and give
+   it the same press affordance as the other top-bar buttons. */
+button.res-chip.res-workers {
+  font-family: inherit;
+  cursor: pointer;
+  transition: filter 0.12s ease, transform 0.12s ease;
+}
+button.res-chip.res-workers:hover {
+  filter: brightness(1.18);
+}
+button.res-chip.res-workers:active {
+  transform: translateY(1px);
+}
+button.res-chip.res-workers:focus-visible {
+  outline: 2px solid var(--gold-soft, #d4a84b);
+  outline-offset: 2px;
+}
+
 /* Seals / province chip */
 #seals {
   display: inline-flex;

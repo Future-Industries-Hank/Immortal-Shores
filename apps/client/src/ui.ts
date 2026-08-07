@@ -108,6 +108,12 @@ export function initUi(h: UiHandlers) {
   document.getElementById("btn-postcard")?.addEventListener("click", () => {
     handlers.onPostcard();
   });
+  // Workers chip → Shore panel (all workers + buildings in one place).
+  // Delegated: renderHud rebuilds #resources on every snapshot, so a listener
+  // on the button itself would be lost at the next render.
+  document.getElementById("resources")?.addEventListener("click", (e) => {
+    if ((e.target as HTMLElement).closest?.("#btn-workers")) showPanel("settlement");
+  });
   // Fold must stay snapped to a card boundary through reflows: viewport
   // resize, and <details> disclosures inside a panel (toggle doesn't bubble,
   // so listen in the capture phase).
@@ -541,12 +547,17 @@ function renderHud(s: PublicSnapshot) {
   if (st) {
     const free = Math.max(0, st.workers - st.workersAssigned);
     const working = Math.max(0, st.workersAssigned);
+    // A real <button>: clicking it opens the Shore panel, which is where all
+    // workers and buildings are managed at once. Handled by delegation on
+    // #resources (initUi) — this markup is rebuilt on every snapshot, so a
+    // listener attached here would be lost on the next render.
     parts.push(
-      `<span class="res-chip res-workers" title="${free} free · ${working} working · ${st.workers} total">` +
+      `<button type="button" class="res-chip res-workers" id="btn-workers" ` +
+        `title="${free} free · ${working} working · ${st.workers} total — manage workers">` +
         `${WORKER_ICON}<span class="res-name">Workers</span> ` +
         `<span class="res-val"><span class="w-free">${free} free</span>` +
         `<span class="w-sep"> · </span>` +
-        `<span class="w-busy">${working} working</span></span></span>`
+        `<span class="w-busy">${working} working</span></span></button>`
     );
   }
   for (const r of HUD_RESOURCES) {
