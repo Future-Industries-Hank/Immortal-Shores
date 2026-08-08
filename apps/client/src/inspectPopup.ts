@@ -55,6 +55,9 @@ function costHtml(
 }
 
 
+/** Remember whether the menu popup was open so hidePopup can restore it. */
+let menuWasOpenForPopup = false;
+
 function ensureScrim(root: HTMLElement) {
   let scrim = document.getElementById("popup-scrim");
   if (!scrim) {
@@ -64,9 +67,15 @@ function ensureScrim(root: HTMLElement) {
     root.parentElement?.insertBefore(scrim, root);
   }
   (scrim as HTMLElement).hidden = false;
-  // The modal owns the screen — hide the menu popup underneath
+  // The modal owns the screen — hide the menu popup underneath, then restore
+  // on close so drill-downs from Vault / Shore / Harbor don't strand the player.
+  // Only latch "was open" when the menu is currently visible; re-renders while
+  // the inspect popup is already up leave the latch alone.
   const menu = document.getElementById("menu-popup");
-  if (menu) (menu as HTMLElement).hidden = true;
+  if (menu) {
+    if (!(menu as HTMLElement).hidden) menuWasOpenForPopup = true;
+    (menu as HTMLElement).hidden = true;
+  }
 }
 
 export function renderBuildingPopup(
@@ -313,6 +322,11 @@ export function hidePopup(root: HTMLElement) {
   root.innerHTML = "";
   const scrim = document.getElementById("popup-scrim");
   if (scrim) (scrim as HTMLElement).hidden = true;
+  if (menuWasOpenForPopup) {
+    const menu = document.getElementById("menu-popup");
+    if (menu) (menu as HTMLElement).hidden = false;
+    menuWasOpenForPopup = false;
+  }
 }
 
 /** Generic info + actions popup (build catalog, map sites, barges, etc.). */
@@ -328,6 +342,8 @@ export function renderGenericPopup(
     what: string;
     details?: string[];
     levelTableHtml?: string;
+    /** Heading above levelTableHtml (default "Levels & outputs"). */
+    extraTitle?: string;
     primaryLabel?: string;
     primaryDisabled?: boolean;
     onPrimary?: () => void;
@@ -344,6 +360,7 @@ export function renderGenericPopup(
     : opts.glyphKind
       ? buildingIcon(opts.glyphKind)
       : GLYPHS.cartouche!;
+  const extraTitle = opts.extraTitle ?? "Levels & outputs";
   root.innerHTML = `
     <div class="popup-backdrop" id="popup-backdrop"></div>
     <div class="popup-card" role="dialog" aria-modal="true">
@@ -371,7 +388,7 @@ export function renderGenericPopup(
         ${
           opts.levelTableHtml
             ? `<section class="popup-section">
-                <h3>Levels & outputs</h3>
+                <h3>${extraTitle}</h3>
                 <div class="lvl-table-wrap">${opts.levelTableHtml}</div>
               </section>`
             : ""

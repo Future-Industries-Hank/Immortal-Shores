@@ -575,6 +575,14 @@ html.dark button.btn-locked svg {
   flex: 1 1 auto;
   scrollbar-width: none;
   align-items: center;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+#resources:focus-visible,
+#seals:focus-visible {
+  outline: 2px solid var(--gold-soft);
+  outline-offset: 2px;
 }
 
 #resources::-webkit-scrollbar {
@@ -674,6 +682,7 @@ button.res-chip.res-workers:focus-visible {
   white-space: nowrap;
   flex: 0 0 auto;
   font-variant-numeric: tabular-nums;
+  cursor: pointer;
 }
 
 #seals .wax-dot {
@@ -1061,6 +1070,8 @@ button.res-chip.res-workers:focus-visible {
 .menu-popup-body .offer-card,
 .menu-popup-body .note-card,
 .menu-popup-body .unit-card,
+.menu-popup-body .inv-card,
+.menu-popup-body .inv-group,
 .menu-popup-body .palette-card,
 .menu-popup-body .map-site,
 .menu-popup-body .empty-card,
@@ -1917,6 +1928,304 @@ html.dark .note-count {
 .notes-earlier summary:hover {
   color: var(--ink-ui);
   background: rgba(212, 168, 75, 0.1);
+}
+
+/* ── Vault / inventory ───────────────────────────────────────────── */
+
+.inv-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem 0.75rem;
+  margin: 0.35rem 0 0.55rem;
+}
+
+.inv-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink-ui);
+  cursor: pointer;
+  user-select: none;
+}
+
+.inv-filter input {
+  width: auto;
+  margin: 0;
+  accent-color: var(--gold-deep);
+}
+
+.inv-hint {
+  font-size: 0.72rem;
+}
+
+.inv-hint kbd {
+  display: inline-block;
+  padding: 0.05rem 0.32rem;
+  border-radius: 3px;
+  border: 1px solid var(--hairline);
+  background: var(--surface-inset);
+  font-family: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--gold-deep);
+}
+
+html.dark .inv-hint kbd {
+  color: var(--gold-soft);
+}
+
+.inv-group {
+  margin: 0.55rem 0 0.35rem;
+}
+
+.inv-group-title {
+  margin: 0 0 0.35rem;
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink-ui);
+  opacity: 0.92;
+}
+
+.inv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  gap: 0.4rem;
+}
+
+.inv-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.18rem;
+  padding: 0.55rem 0.4rem 0.5rem;
+  background: var(--surface-inset);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  text-align: center;
+  font-size: 0.76rem;
+  min-width: 0;
+  width: 100%;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.inv-card:hover {
+  border-color: var(--gold-soft);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(40, 28, 14, 0.12);
+}
+
+.inv-card:focus-visible {
+  outline: 2px solid var(--gold-soft);
+  outline-offset: 2px;
+}
+
+.inv-card.is-unique {
+  border-color: color-mix(in srgb, var(--gold-soft) 55%, var(--hairline));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold-soft) 22%, transparent);
+}
+
+.inv-card.is-empty {
+  opacity: 0.48;
+}
+
+.inv-card.is-empty .inv-amt {
+  color: var(--ink-ui);
+  opacity: 0.7;
+}
+
+.inv-glyph {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(212, 168, 75, 0.14);
+  border: 1px solid var(--hairline);
+  color: var(--gold-deep);
+}
+
+html.dark .inv-glyph {
+  color: var(--gold-soft);
+}
+
+.inv-glyph svg {
+  width: 18px;
+  height: 18px;
+}
+
+.inv-name {
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.15;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inv-amt {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 1.02rem;
+  color: var(--gold-deep);
+  line-height: 1.2;
+}
+
+html.dark .inv-amt {
+  color: var(--gold-soft);
+}
+
+.inv-rate {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.inv-rate.is-gain {
+  color: #3d6b3a;
+}
+
+.inv-rate.is-drain {
+  color: #9a3d35;
+}
+
+html.dark .inv-rate.is-gain {
+  color: #8fbf86;
+}
+
+html.dark .inv-rate.is-drain {
+  color: #e08a82;
+}
+
+.inv-badge {
+  margin-top: 0.1rem;
+  padding: 0.08rem 0.35rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--gold-soft) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gold-soft) 40%, transparent);
+  color: var(--gold-deep);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+html.dark .inv-badge {
+  color: var(--gold-soft);
+}
+
+.inv-transit-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-top: 0.08rem;
+  padding: 0.06rem 0.32rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, #2c5a74 18%, transparent);
+  border: 1px solid color-mix(in srgb, #2c5a74 35%, var(--hairline));
+  color: #2c5a74;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+html.dark .inv-transit-chip {
+  color: #8eb8cc;
+  background: color-mix(in srgb, #8eb8cc 12%, transparent);
+  border-color: color-mix(in srgb, #8eb8cc 30%, var(--hairline));
+}
+
+.inv-transit-chip svg {
+  width: 11px;
+  height: 11px;
+}
+
+.inv-transit-section {
+  margin-bottom: 0.65rem;
+}
+
+.inv-transit-card {
+  margin: 0.4rem 0;
+}
+
+.inv-transit-goods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.inv-transit-good {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.28rem 0.45rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-card, var(--surface-inset));
+  border: 1px solid var(--hairline);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.inv-transit-good:hover {
+  border-color: var(--gold-soft);
+}
+
+.inv-transit-good svg {
+  width: 14px;
+  height: 14px;
+  color: var(--gold-deep);
+}
+
+html.dark .inv-transit-good svg {
+  color: var(--gold-soft);
+}
+
+.inv-dossier {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+@media (max-width: 520px) {
+  .inv-dossier {
+    grid-template-columns: 1fr;
+  }
+}
+
+.inv-dossier-col h4 {
+  margin: 0 0 0.35rem;
+  font-family: var(--font-display);
+  font-size: 0.88rem;
+  color: var(--ink-ui);
+}
+
+.inv-dossier-list {
+  margin: 0;
+  padding-left: 1.05rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.inv-dossier-list li::marker {
+  color: var(--gold-soft);
 }
 
 /* ── Military unit cards ─────────────────────────────────────────── */

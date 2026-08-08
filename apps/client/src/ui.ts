@@ -1,7 +1,10 @@
 import {
+  BARGE_COST,
   BUILDING_BLURB,
   BUILDING_TITLE,
+  LUXURY_GOODS,
   NEW_BUILD_COST,
+  PRODUCTION,
   RESOURCE_LABELS,
   UNIT_COSTS,
   allowedKindsForPlot,
@@ -16,6 +19,7 @@ import {
   type BuildingKind,
   type PublicSnapshot,
   type ResourceId,
+  type ResourceStack,
 } from "@immortal/shared";
 import { api } from "./api.js";
 import { sfx } from "./audio.js";
@@ -30,6 +34,7 @@ import {
   buildingIcon,
   formatChatHtml,
   levelPips,
+  resourceGlyphName,
   resourceIcon,
   resourceShort,
   toggleProdOverlay,
@@ -71,9 +76,12 @@ let settingsOpen = false;
 /** World map legend filters (survive re-render). */
 let mapKindFilter: string = "all";
 let mapProvFilter: string | null = null;
+/** Vault panel: hide zero-stock rows (survives re-render). */
+let inventoryHeldOnly = false;
 
 const PANEL_TITLES: Record<string, string> = {
   settlement: "Shore",
+  inventory: "Vault",
   harbor: "Harbor",
   tablets: "Tablets",
   allies: "Allies",
@@ -82,6 +90,50 @@ const PANEL_TITLES: Record<string, string> = {
   military: "Military",
   map: "Map",
 };
+
+/** Full vault catalog for the Inventory panel (order = display order within group). */
+const VAULT_GROUPS: { id: string; title: string; resources: ResourceId[] }[] = [
+  {
+    id: "staples",
+    title: "Staples",
+    resources: ["emmer", "river_clay", "marsh_reeds", "rations", "mudbricks"],
+  },
+  {
+    id: "crafted",
+    title: "Crafted goods",
+    resources: ["vessels", "reed_baskets", "limestone"],
+  },
+  {
+    id: "lux-mat",
+    title: "Luxury materials",
+    resources: [
+      "hides",
+      "bronze",
+      "cedarwood",
+      "red_ochre",
+      "eye_paint",
+      "sacred_oil",
+      "green_stones",
+      "royal_gold",
+    ],
+  },
+  {
+    id: "lux-goods",
+    title: "Luxury goods",
+    resources: [
+      "fine_sandals",
+      "stone_idols",
+      "eye_cosmetics",
+      "sacred_perfume",
+      "amulets",
+    ],
+  },
+  {
+    id: "seals",
+    title: "Sacred currency",
+    resources: ["seals"],
+  },
+];
 
 export function initUi(h: UiHandlers) {
   handlers = h;
@@ -94,25 +146,50 @@ export function initUi(h: UiHandlers) {
   document.getElementById("btn-map")?.addEventListener("click", () => {
     showPanel("map");
   });
+  // HUD resource strip is rebuilt every snapshot — use delegated clicks.
+  // Workers chip → Shore (manage assignments). Any other chip / empty strip
+  // space → Vault (full inventory). Seals chip always opens Vault.
+  document.getElementById("resources")?.addEventListener("click", (e) => {
+    if ((e.target as HTMLElement).closest?.("#btn-workers")) {
+      showPanel("settlement");
+      return;
+    }
+    showPanel("inventory");
+  });
+  const sealsEl = document.getElementById("seals");
+  sealsEl?.addEventListener("click", () => showPanel("inventory"));
+  sealsEl?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      showPanel("inventory");
+      e.preventDefault();
+    }
+  });
   document.getElementById("menu-popup-close")?.addEventListener("click", () => {
     closeMenuPopup();
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key !== "Escape") return;
-    const popup = document.getElementById("menu-popup");
-    if (popup && !popup.hidden) {
-      closeMenuPopup();
+    if (e.key === "Escape") {
+      const popup = document.getElementById("menu-popup");
+      if (popup && !popup.hidden) {
+        closeMenuPopup();
+        e.preventDefault();
+      }
+      return;
+    }
+    // I = open Vault (skip when typing in a field)
+    if (
+      (e.key === "i" || e.key === "I") &&
+      !(e.target instanceof HTMLInputElement) &&
+      !(e.target instanceof HTMLTextAreaElement) &&
+      !(e.target instanceof HTMLSelectElement) &&
+      !(e.target as HTMLElement | null)?.isContentEditable
+    ) {
+      showPanel("inventory");
       e.preventDefault();
     }
   });
   document.getElementById("btn-postcard")?.addEventListener("click", () => {
     handlers.onPostcard();
-  });
-  // Workers chip → Shore panel (all workers + buildings in one place).
-  // Delegated: renderHud rebuilds #resources on every snapshot, so a listener
-  // on the button itself would be lost at the next render.
-  document.getElementById("resources")?.addEventListener("click", (e) => {
-    if ((e.target as HTMLElement).closest?.("#btn-workers")) showPanel("settlement");
   });
   // Fold must stay snapped to a card boundary through reflows: viewport
   // resize, and <details> disclosures inside a panel (toggle doesn't bubble,
@@ -190,6 +267,8 @@ const FOLD_CARD_SELECTOR = [
   ".tablet-card",
   ".offer-card",
   ".unit-card",
+  ".inv-card",
+  ".inv-group",
   ".map-site",
   ".empty-card",
   ".stat-band",
@@ -261,6 +340,7 @@ export function renderSnapshot(s: PublicSnapshot) {
   }
   renderHud(s);
   renderSettlement(s);
+  renderInventory(s);
   renderHarbor(s);
   renderTablets(s);
   renderAllies(s);
@@ -541,7 +621,7 @@ function renderHud(s: PublicSnapshot) {
   const el = document.getElementById("resources")!;
   const parts: string[] = [];
   const chip = (r: string, v: number, note = "") =>
-    `<span class="res-chip" title="${RESOURCE_LABELS[r as ResourceId] ?? r}">${resourceIcon(r)}<span class="res-name">${resourceShort(r)}</span> <span class="res-val">${fmt(v)}</span>${note ? `<span class="res-note">${note}</span>` : ""}</span>`;
+    `<span class="res-chip" title="${RESOURCE_LABELS[r as ResourceId] ?? r} — open Vault for full inventory">${resourceIcon(r)}<span class="res-name">${resourceShort(r)}</span> <span class="res-val">${fmt(v)}</span>${note ? `<span class="res-note">${note}</span>` : ""}</span>`;
   // Free vs working first — assignment is the primary economy decision.
   const st = s.settlements[0];
   if (st) {
@@ -574,9 +654,451 @@ function renderHud(s: PublicSnapshot) {
     parts.push(chip(lux, s.player.vault[lux] ?? 0, hasWorks ? "" : "build works"));
   }
   el.innerHTML = parts.join("");
+  el.title = "Open Vault — full inventory (Workers chip opens Shore)";
   const prov = s.map.provinces.find((p) => p.id === st?.provinceId);
-  document.getElementById("seals")!.innerHTML =
+  const sealsEl = document.getElementById("seals")!;
+  sealsEl.innerHTML =
     `<span class="wax-dot" aria-hidden="true"></span>Seals ${s.player.seals}${prov ? ` <span class="seals-prov">· ${prov.name}</span>` : ""}`;
+  sealsEl.setAttribute("role", "button");
+  sealsEl.setAttribute("tabindex", "0");
+  sealsEl.setAttribute("aria-label", "Open vault — Sacred Seals");
+  sealsEl.title = "Open Vault — full inventory";
+}
+
+/** Net vault change/h: production outputs, workshop inputs, and ration upkeep. */
+function vaultNetRates(s: PublicSnapshot): Map<string, number> {
+  const rates = new Map<string, number>();
+  const add = (r: string, n: number) => rates.set(r, (rates.get(r) ?? 0) + n);
+
+  for (const line of s.production ?? []) {
+    if (line.outputResource && line.outputPerHour) {
+      add(line.outputResource, line.outputPerHour);
+      const rule = PRODUCTION.find((p) => p.kind === line.kind);
+      if (rule?.inputsPerOutput?.length) {
+        for (const inp of rule.inputsPerOutput) {
+          add(inp.resource, -inp.amount * line.outputPerHour);
+        }
+      }
+    }
+    if (line.rationDrainPerHour) add("rations", -line.rationDrainPerHour);
+  }
+  return rates;
+}
+
+/** Goods currently committed to river barges (left the vault on launch). */
+function transitByResource(s: PublicSnapshot): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const b of s.settlements[0]?.barges ?? []) {
+    if (b.status !== "in_transit" && b.status !== "arrived") continue;
+    for (const c of b.cargo ?? []) {
+      m.set(c.resource, (m.get(c.resource) ?? 0) + c.amount);
+    }
+  }
+  return m;
+}
+
+type TransitBargeRow = {
+  id: string;
+  name: string;
+  status: string;
+  eta: string;
+  cargo: ResourceStack[];
+  destLabel: string;
+};
+
+function listTransitBarges(s: PublicSnapshot): TransitBargeRow[] {
+  const st = s.settlements[0];
+  if (!st) return [];
+  const rows: TransitBargeRow[] = [];
+  for (const b of st.barges) {
+    if (b.status !== "in_transit" && b.status !== "arrived") continue;
+    if (!b.cargo?.length) continue;
+    let destLabel = "river destination";
+    if (b.toSettlementId === st.id) destLabel = "your shore";
+    else if (b.toSettlementId === "province_site") destLabel = "province site";
+    else {
+      const other = s.map.sites.find((x) => x.id === b.toSettlementId);
+      destLabel = other?.name ?? "another shore";
+    }
+    const eta =
+      b.status === "in_transit" && b.arriveAt
+        ? etaText(b.arriveAt - Date.now())
+        : b.status === "arrived"
+          ? "arriving now"
+          : b.status;
+    rows.push({
+      id: b.id,
+      name: bargeName(b.id),
+      status: b.status,
+      eta,
+      cargo: b.cargo,
+      destLabel,
+    });
+  }
+  return rows;
+}
+
+const RESOURCE_BLURB: Partial<Record<ResourceId, string>> = {
+  emmer: "Grain of the riverbanks. Grown on Emmer Fields; cooked into Rations.",
+  river_clay: "Wet clay cut from the bank. Feeds Mudbrick Yards, Vessel Shops, and Stone Idols.",
+  marsh_reeds: "Cut from Marsh Reed Beds. Bricks, baskets, sandals, and many builds need them.",
+  rations: "Daily bread of the shore. Workers and soldiers eat 1 each per hour. Market currency.",
+  mudbricks: "Sun-dried bricks — the backbone of every building cost.",
+  vessels: "Clay amphorae from the Vessel Shop. Great House upgrades and Luxury Goods Shop want them.",
+  reed_baskets: "Woven baskets from the Reed Basket Shop. Early construction and storage staple.",
+  limestone: "Hard stone quarried only at held monument grounds. Late Great House upgrades devour it.",
+  hides: "Luxury material. Only the settlement whose specialty is Hides can produce it at home.",
+  bronze: "Luxury material. Trade for it unless your shore specializes in Bronze.",
+  cedarwood: "Luxury wood for barges, bows, and chariots. Specialty-locked production.",
+  red_ochre: "Pigment luxury. Ingredient of Eye Cosmetics and Sacred Perfume.",
+  eye_paint: "Luxury cosmetic base. Pairs with Red Ochre into Eye Cosmetics.",
+  sacred_oil: "Fragrant luxury. Pairs with Red Ochre into Sacred Perfume.",
+  green_stones: "Gem luxury. Pairs with Royal Gold into Amulets.",
+  royal_gold: "Precious luxury. Pairs with Green Stones into Amulets.",
+  fine_sandals: "Luxury good: 2 Hides + 4 Marsh Reeds. Trade staple and early GH upgrade tax.",
+  stone_idols: "Luxury good: 2 Bronze + 4 River Clay. Shrine founding and mid-game prestige.",
+  eye_cosmetics: "Luxury good: 1 Red Ochre + 1 Eye Paint. A province patron offering.",
+  sacred_perfume: "Luxury good: 1 Red Ochre + 1 Sacred Oil. Midstream's patron scent.",
+  amulets: "Luxury good: 1 Royal Gold + 1 Green Stones. Late Great House demand.",
+  seals:
+    "Sacred Seals — premium currency. Start with 10; never trade below 10. Unlocks major Great House levels, extra shores, and monument rights.",
+};
+
+function resourceSources(r: ResourceId, s: PublicSnapshot): string[] {
+  const lines: string[] = [];
+  const st = s.settlements[0];
+  const unique = st?.uniqueLuxury;
+
+  for (const rule of PRODUCTION) {
+    if (rule.kind === "luxury_material") continue;
+    if (rule.output !== r) continue;
+    const title = BUILDING_TITLE[rule.kind] ?? rule.kind;
+    const rate = `${rule.ratePerWorkerHour} / Worker / hour`;
+    const inputs = rule.inputsPerOutput?.length
+      ? ` from ${formatStacks(rule.inputsPerOutput)} each`
+      : "";
+    const built = st?.buildings.some((b) => b.kind === rule.kind);
+    lines.push(
+      `${title}: ${rate}${inputs}${built ? " · you have this building" : " · not built yet"}`
+    );
+  }
+
+  if (r === unique) {
+    const works = st?.buildings.some((b) => b.kind === "luxury_material");
+    lines.push(
+      `Luxury Works (your specialty): 2 / Worker / hour${works ? " · built" : " · build on a Special pad"}`
+    );
+  } else if (
+    (
+      [
+        "hides",
+        "bronze",
+        "cedarwood",
+        "red_ochre",
+        "eye_paint",
+        "sacred_oil",
+        "green_stones",
+        "royal_gold",
+      ] as ResourceId[]
+    ).includes(r)
+  ) {
+    lines.push(
+      `Raw luxury — only the shore whose specialty is ${RESOURCE_LABELS[r]} can produce it. Trade on the Wall, Market, gifts, or barges.`
+    );
+  }
+
+  for (const g of LUXURY_GOODS) {
+    if (g.output !== r) continue;
+    const shop = st?.buildings.some((b) => b.kind === "luxury_workshop");
+    lines.push(
+      `Luxury Goods Shop: ${g.ratePerWorkerHour} / Worker / hour from ${formatStacks(g.inputs)}${shop ? " · shop built" : " · build the shop"}`
+    );
+  }
+
+  if (r === "limestone") {
+    const mons = st?.monuments.length ?? 0;
+    lines.push(
+      `Monument grounds: 1 Limestone / Worker / hour at held sites${mons ? ` · holding ${mons}` : " · capture from the Map"}`
+    );
+  }
+
+  if (r === "seals") {
+    lines.push("New shores start with 10 Sacred Seals");
+    lines.push("Purchase (store stub) or admin grant for testing");
+    lines.push("Player-to-player trade allowed above the floor of 10");
+  }
+
+  if (r === "rations") {
+    lines.push("Market currency — buy listed goods with Rations");
+  }
+
+  lines.push("Incoming gifts, Tablet Wall accepts, Market buys, and arriving barges credit the vault");
+  return lines;
+}
+
+function resourceUses(r: ResourceId, s: PublicSnapshot): string[] {
+  const lines: string[] = [];
+  const st = s.settlements[0];
+  const patron = s.map.provinces.find((p) => p.id === st?.provinceId)?.patronGood;
+
+  for (const rule of PRODUCTION) {
+    if (!rule.inputsPerOutput?.some((i) => i.resource === r)) continue;
+    const need = rule.inputsPerOutput.find((i) => i.resource === r)!;
+    lines.push(
+      `${BUILDING_TITLE[rule.kind] ?? rule.kind}: ${need.amount} per ${RESOURCE_LABELS[rule.output]} crafted`
+    );
+  }
+
+  for (const g of LUXURY_GOODS) {
+    if (!g.inputs.some((i) => i.resource === r)) continue;
+    const need = g.inputs.find((i) => i.resource === r)!;
+    lines.push(
+      `Luxury good ${RESOURCE_LABELS[g.output]}: ${need.amount} per craft at the Luxury Goods Shop`
+    );
+  }
+
+  for (const [kind, cost] of Object.entries(NEW_BUILD_COST)) {
+    if (!cost?.some((c) => c.resource === r)) continue;
+    const need = cost.find((c) => c.resource === r)!;
+    lines.push(
+      `Found ${BUILDING_TITLE[kind as BuildingKind] ?? kind}: ${need.amount} ${resourceShort(r)}`
+    );
+  }
+
+  if (BARGE_COST.some((c) => c.resource === r)) {
+    const need = BARGE_COST.find((c) => c.resource === r)!;
+    lines.push(`Lay a river barge: ${need.amount} ${resourceShort(r)}`);
+  }
+
+  for (const [unit, def] of Object.entries(UNIT_COSTS)) {
+    if (!def.cost.some((c) => c.resource === r)) continue;
+    const need = def.cost.find((c) => c.resource === r)!;
+    const label = unit.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    lines.push(`Train ${label}: ${need.amount} ${resourceShort(r)}`);
+  }
+
+  if (r === "rations") {
+    lines.push("Assigned Workers: −1 Ration / hour each");
+    lines.push("Soldiers: −1 Ration / hour each (or desert)");
+    lines.push("Travel: −2 Rations per hour of march");
+    lines.push("Market: pay Rations to take listed orders");
+  }
+
+  if (
+    (
+      [
+        "mudbricks",
+        "reed_baskets",
+        "vessels",
+        "fine_sandals",
+        "limestone",
+        "stone_idols",
+        "amulets",
+      ] as ResourceId[]
+    ).includes(r)
+  ) {
+    lines.push("Great House upgrades scale costs of this good at higher levels");
+  }
+
+  if (r === "seals") {
+    lines.push("Great House levels 7, 10, 13, 16, 19, 22 — 1 Seal each");
+    lines.push("Found 2nd / 3rd / 4th settlement: 2 / 3 / 4 Seals");
+    lines.push("Unlock raising monuments and optional cosmetics");
+  }
+
+  if (patron === r) {
+    lines.push(`Province patron good — Shrine offerings want ${RESOURCE_LABELS[r]}`);
+  }
+
+  lines.push("Gifts, Wall offers, Market listings, and barge cargo leave the vault when you commit them");
+  return lines;
+}
+
+function openResourceDossier(s: PublicSnapshot, r: ResourceId) {
+  const vault = s.player.vault;
+  const seals = s.player.seals;
+  const amt = r === "seals" ? seals : (vault[r] ?? 0);
+  const rates = vaultNetRates(s);
+  const transit = transitByResource(s);
+  const inTransit = transit.get(r) ?? 0;
+  const net = rates.get(r);
+  const unique = s.settlements[0]?.uniqueLuxury === r;
+
+  const details: string[] = [
+    `In vault: ${fmt(amt)}`,
+    inTransit > 0 ? `On the river (in transit): ${fmt(inTransit)}` : "None currently on barges",
+  ];
+  if (net !== undefined && Math.abs(net) >= 0.05) {
+    const sign = net > 0 ? "+" : "";
+    const val = Math.abs(net) >= 10 ? net.toFixed(0) : net.toFixed(1);
+    details.push(`Estimated net now: ${sign}${val} / hour`);
+  }
+  if (unique) details.push("This is your founding specialty luxury");
+
+  const sources = resourceSources(r, s);
+  const uses = resourceUses(r, s);
+  const list = (items: string[]) =>
+    `<ul class="inv-dossier-list">${items.map((i) => `<li>${i}</li>`).join("")}</ul>`;
+
+  const el = document.getElementById("building-inspect")!;
+  renderGenericPopup(el, {
+    title: RESOURCE_LABELS[r] ?? r,
+    subtitle: `Vault stock ${fmt(amt)}${inTransit > 0 ? ` · ${fmt(inTransit)} on the river` : ""}`,
+    glyphName: resourceGlyphName(r),
+    what: RESOURCE_BLURB[r] ?? `${RESOURCE_LABELS[r] ?? r} is a tradeable shore good.`,
+    details,
+    extraTitle: "Sources & uses",
+    levelTableHtml: `
+      <div class="inv-dossier">
+        <div class="inv-dossier-col">
+          <h4>How to get it</h4>
+          ${list(sources)}
+        </div>
+        <div class="inv-dossier-col">
+          <h4>What spends it</h4>
+          ${list(uses)}
+        </div>
+      </div>`,
+    secondaryLabel: inTransit > 0 ? "View Harbor" : undefined,
+    onSecondary:
+      inTransit > 0
+        ? () => {
+            hidePopup(el);
+            showPanel("harbor");
+          }
+        : undefined,
+    onClose: () => hidePopup(el),
+  });
+}
+
+function renderInventory(s: PublicSnapshot) {
+  const panel = document.getElementById("panel-inventory");
+  if (!panel) return;
+  const vault = s.player.vault;
+  const rates = vaultNetRates(s);
+  const transit = transitByResource(s);
+  const transitBarges = listTransitBarges(s);
+  const uniqueLux = s.settlements[0]?.uniqueLuxury;
+  const seals = s.player.seals;
+
+  // Prefer live seals on the player record; vault may also hold a seals key.
+  const amountOf = (r: ResourceId): number => {
+    if (r === "seals") return seals ?? vault.seals ?? 0;
+    return vault[r] ?? 0;
+  };
+
+  let totalKinds = 0;
+  let heldKinds = 0;
+  let transitUnits = 0;
+  for (const g of VAULT_GROUPS) {
+    for (const r of g.resources) {
+      totalKinds += 1;
+      if (amountOf(r) > 0) heldKinds += 1;
+    }
+  }
+  for (const n of transit.values()) transitUnits += n;
+
+  const rateNote = (r: ResourceId): string => {
+    const n = rates.get(r);
+    if (n === undefined || Math.abs(n) < 0.05) return "";
+    const sign = n > 0 ? "+" : "";
+    const val = Math.abs(n) >= 10 ? n.toFixed(0) : n.toFixed(1);
+    return `<span class="inv-rate ${n < 0 ? "is-drain" : "is-gain"}">${sign}${val}/h</span>`;
+  };
+
+  const groupsHtml = VAULT_GROUPS.map((g) => {
+    const cards = g.resources
+      .map((r) => {
+        const amt = amountOf(r);
+        const river = transit.get(r) ?? 0;
+        if (inventoryHeldOnly && amt <= 0 && river <= 0) return "";
+        const isUnique = uniqueLux === r;
+        const empty = amt <= 0 && river <= 0;
+        const label = RESOURCE_LABELS[r] ?? r;
+        return `<button type="button" class="inv-card${empty ? " is-empty" : ""}${isUnique ? " is-unique" : ""}" data-res="${r}" title="${label} — tap for sources & uses">
+          <span class="inv-glyph">${resourceIcon(r)}</span>
+          <strong class="inv-name">${resourceShort(r)}</strong>
+          <span class="inv-amt">${fmt(amt)}</span>
+          ${rateNote(r)}
+          ${river > 0 ? `<span class="inv-transit-chip" title="On barges">${GLYPHS.barge}${fmt(river)} river</span>` : ""}
+          ${isUnique ? `<span class="inv-badge">your luxury</span>` : ""}
+        </button>`;
+      })
+      .filter(Boolean)
+      .join("");
+    if (!cards) return "";
+    return `<section class="inv-group" data-group="${g.id}">
+      <h3 class="inv-group-title">${g.title}</h3>
+      <div class="inv-grid">${cards}</div>
+    </section>`;
+  })
+    .filter(Boolean)
+    .join("");
+
+  const emptyState =
+    inventoryHeldOnly && heldKinds === 0 && transitBarges.length === 0
+      ? `<div class="empty-card">Your vault is empty — grow Emmer and cook Rations to start filling it.</div>`
+      : "";
+
+  const transitHtml =
+    transitBarges.length === 0
+      ? ""
+      : `<section class="inv-group inv-transit-section">
+          <h3 class="inv-group-title">On the river</h3>
+          <p class="muted">Cargo left your vault when the barge launched. It returns (or delivers) on arrival.</p>
+          ${transitBarges
+            .map((b) => {
+              const cargoLine = b.cargo
+                .map(
+                  (c) =>
+                    `<button type="button" class="inv-transit-good" data-res="${c.resource}">${resourceIcon(c.resource)}<strong>${fmt(c.amount)}</strong> ${resourceShort(c.resource as ResourceId)}</button>`
+                )
+                .join("");
+              return `<div class="inv-transit-card barge-card">
+                <div class="barge-head">${GLYPHS.barge}<strong>${b.name}</strong><span class="muted">${b.eta} · ${b.destLabel}</span></div>
+                <div class="inv-transit-goods">${cargoLine}</div>
+              </div>`;
+            })
+            .join("")}
+        </section>`;
+
+  panel.innerHTML = `
+    <h2>Vault</h2>
+    <p class="muted">Every good you hold on this shore. Tap a good for where it comes from and what spends it.</p>
+    <div class="stat-band">
+      <span class="b-card-glyph">${GLYPHS.crates}</span>
+      <div class="stat-band-text">
+        <strong>${heldKinds} of ${totalKinds} goods in stock</strong>
+        <div class="muted">Seals ${seals}${uniqueLux ? ` · specialty ${resourceShort(uniqueLux)}` : ""}${transitUnits > 0 ? ` · ${fmt(transitUnits)} on the river` : ""}</div>
+      </div>
+    </div>
+    <div class="inv-toolbar">
+      <label class="inv-filter">
+        <input type="checkbox" id="inv-held-only" ${inventoryHeldOnly ? "checked" : ""} />
+        Held only
+      </label>
+      <span class="muted inv-hint">Press <kbd>I</kbd> · click top bar · tap a good</span>
+    </div>
+    ${transitHtml}
+    ${emptyState}
+    ${groupsHtml}
+  `;
+
+  const heldToggle = panel.querySelector<HTMLInputElement>("#inv-held-only");
+  if (heldToggle) {
+    heldToggle.onchange = () => {
+      inventoryHeldOnly = heldToggle.checked;
+      renderInventory(s);
+      snapPanelFold();
+    };
+  }
+
+  panel.querySelectorAll<HTMLElement>("[data-res]").forEach((el) => {
+    el.addEventListener("click", () => {
+      const res = el.getAttribute("data-res") as ResourceId | null;
+      if (res) openResourceDossier(s, res);
+    });
+  });
 }
 
 function fmt(n: number) {

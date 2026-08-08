@@ -120,6 +120,11 @@ export function resourceIcon(r: string): string {
   return GLYPHS[RESOURCE_GLYPH[r] ?? "cartouche"] ?? GLYPHS.cartouche!;
 }
 
+/** GLYPHS key for a resource — for popup headers that take glyphName. */
+export function resourceGlyphName(r: string): string {
+  return RESOURCE_GLYPH[r] ?? "cartouche";
+}
+
 /** Full short display names — no machine mangles like "RiCl". */
 export const RESOURCE_SHORT: Record<string, string> = {
   emmer: "Emmer",
